@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Usuarios</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+
+<body>
+  <div class="app-nosidebar">
+
+    <!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-inner">
+
+    <!-- Marca -->
+    <div class="topbar-left">
+      <span class="brand">MooneyMaker</span>
+    </div>
+
+    <!-- Botón hamburguesa (solo mobile) -->
+    <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+      <span></span>
+    </button>
+
+    <!-- Navegación desktop -->
+    <nav class="topbar-center nav-desktop">
+      <a href="egreso.html" class="nav-item">Retiros</a>
+      <a href="consulta-egresos.html" class="nav-item">Historial</a>
+      <a href="usuarios.html" class="nav-item active" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="nav-item" data-admin-only="1">Logs</a>
+      <a href="alertas.html" class="nav-item" data-admin-only="1">
+        Alertas
+        <span id="alertBadge" class="alert-badge-nav" style="display:none;"></span>
+      </a>
+    </nav>
+
+    <!-- Acciones desktop -->
+    <div class="topbar-right nav-desktop">
+      <span id="whoami" class="user-badge">—</span>
+      <button id="logoutBtn" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <!-- Menú mobile (drawer) -->
+  <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+    <div class="mobile-drawer-head">
+      <span class="brand">MooneyMaker</span>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+    </div>
+
+    <nav class="mobile-nav">
+      <a href="egreso.html" class="mobile-item">Retiros</a>
+      <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+      <a href="usuarios.html" class="mobile-item active" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="mobile-item" data-admin-only="1">Logs</a>
+      <a href="alertas.html" class="mobile-item" data-admin-only="1">
+        Alertas
+        <span id="alertBadgeMobile" class="alert-badge-nav" style="display:none;"></span>
+      </a>
+    </nav>
+
+    <div class="mobile-actions">
+      <div id="whoamiMobile" class="user-badge">—</div>
+      <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <!-- overlay -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+</header>
+
+    <main class="content-wrap">
+      <div class="page">
+
+        <section class="card">
+          <div class="card-header">Administración de usuarios</div>
+          <div class="card-body">
+
+            <!-- Crear -->
+            <div class="section span12">
+              <div class="section-head">
+                <div class="section-title">➕ Crear usuario</div>
+                <div class="section-subtitle">Solo admin.</div>
+              </div>
+
+              <div class="section-body grid">
+                <div class="field span3">
+                  <label>USERNAME *</label>
+                  <input id="u_username" placeholder="ej: juan123">
+                </div>
+
+                <div class="field span3">
+                  <label>PASSWORD *</label>
+                  <input id="u_password" type="password" placeholder="Contraseña segura">
+                  <small class="note" style="display:block; margin-top:4px; font-size:11px;">
+                    Mín 8 caracteres, mayúscula, minúscula, número y carácter especial
+                  </small>
+                </div>
+
+                <div class="field span3">
+                  <label>CONFIRMAR PASSWORD *</label>
+                  <input id="u_password_confirm" type="password" placeholder="Repetir contraseña">
+                  <small id="password_match_indicator" class="note" style="display:block; margin-top:4px; font-size:11px; color:var(--muted);">
+                    Las contraseñas deben coincidir
+                  </small>
+                </div>
+
+                <div class="field span3">
+                  <label>ROL *</label>
+                  <select id="u_role">
+                    <option value="empleado">empleado</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </div>
+
+                <div class="field span3">
+                  <label>NOMBRE COMPLETO</label>
+                  <input id="u_fullname" placeholder="opcional">
+                </div>
+
+                <div class="actions span12">
+                  <button id="btnCreateUser" class="btn btn-primary" type="button">Crear</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lista -->
+            <div class="section span12" style="margin-top:12px">
+              <div class="section-head">
+                <div class="section-title">📋 Usuarios</div>
+                <div class="section-subtitle">Editar rol, nombre, activar/desactivar, reset password.</div>
+              </div>
+
+              <div class="section-body">
+                <div class="users-toolbar">
+                  <input id="usersSearch" class="users-search" placeholder="Buscar por username o nombre…">
+                  <button id="btnReloadUsers" class="btn btn-ghost" type="button">Actualizar</button>
+                </div>
+
+                <div class="table-wrap">
+                  <table class="table" id="usersTable">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Activo</th>
+                        <th>Creado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="usersTbody">
+                      <tr><td colspan="7" class="muted">Cargando…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="note" style="margin-top:10px">
+                  Tip: Desactivar usuarios en vez de borrarlos mantiene el historial y evita líos con auditoría.
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <div id="toast" class="toast">
+      <strong>—</strong><span>—</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

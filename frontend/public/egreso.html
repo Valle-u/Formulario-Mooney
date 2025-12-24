@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Retiros</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+
+<body>
+  <div class="app-nosidebar">
+
+    <!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-inner">
+
+    <!-- Marca -->
+    <div class="topbar-left">
+      <span class="brand">MooneyMaker</span>
+    </div>
+
+    <!-- Botón hamburguesa (solo mobile) -->
+    <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+      <span></span>
+    </button>
+
+    <!-- Navegación desktop -->
+    <nav class="topbar-center nav-desktop">
+      <a href="egreso.html" class="nav-item active">Retiros</a>
+      <a href="consulta-egresos.html" class="nav-item">Historial</a>
+      <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="nav-item" data-admin-only="1">Logs</a>
+      <a href="alertas.html" class="nav-item" data-admin-only="1">
+        Alertas
+        <span id="alertBadge" class="alert-badge-nav" style="display:none;"></span>
+      </a>
+    </nav>
+
+    <!-- Acciones desktop -->
+    <div class="topbar-right nav-desktop">
+      <span id="whoami" class="user-badge">—</span>
+      <button id="logoutBtn" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <!-- Menú mobile (drawer) -->
+  <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+    <div class="mobile-drawer-head">
+      <span class="brand">MooneyMaker</span>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+    </div>
+
+    <nav class="mobile-nav">
+      <a href="egreso.html" class="mobile-item active">Retiros</a>
+      <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+      <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="mobile-item" data-admin-only="1">Logs</a>
+      <a href="alertas.html" class="mobile-item" data-admin-only="1">
+        Alertas
+        <span id="alertBadgeMobile" class="alert-badge-nav" style="display:none;"></span>
+      </a>
+    </nav>
+
+    <div class="mobile-actions">
+      <div id="whoamiMobile" class="user-badge">—</div>
+      <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <!-- overlay -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+</header>
+
+
+
+    <!-- CONTENT -->
+    <main class="content-wrap">
+      <div class="page">
+
+        <!-- FORM CARD -->
+        <section class="card">
+          <div class="card-header">
+            Registrar transferencia saliente
+          </div>
+
+          <div class="card-body">
+
+            <form id="egresoForm" class="grid" enctype="multipart/form-data">
+
+              <!-- =========================
+                   SECCIÓN 1: Concepto (PRIMERO)
+                   ========================= -->
+              <div class="section span12">
+                <div class="section-head">
+                  <div class="section-title">📋 Concepto de la Transferencia</div>
+                  <div class="section-subtitle">Seleccioná primero el motivo para ver los campos necesarios.</div>
+                </div>
+
+                <div class="section-body grid">
+                  <div class="field span6">
+                    <label>ETIQUETA (CONCEPTO) *</label>
+                    <select id="etiqueta" required></select>
+                    <div class="note">Elegí el motivo de la transferencia</div>
+                  </div>
+
+                  <div class="field span6 hidden" id="wrap_otro">
+                    <label>OTRO (detalle) *</label>
+                    <input id="otro_concepto">
+                  </div>
+
+                  <div class="field span6 hidden" id="wrap_usuario_casino">
+                    <label>USUARIO DEL CASINO *</label>
+                    <input id="usuario_casino">
+                    <div class="note">Necesario para premios, duplicados o errores</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- =========================
+                   SECCIÓN 2: Datos Básicos
+                   ========================= -->
+              <div class="section span12">
+                <div class="section-head">
+                  <div class="section-title">🕒 Fecha y Hora</div>
+                  <div class="section-subtitle">Cuándo se registra esta transferencia.</div>
+                </div>
+
+                <div class="section-body grid">
+                  <div class="field span3">
+                    <label>FECHA *</label>
+                    <input id="fecha" type="date" required>
+                    <div class="note">Fecha del registro</div>
+                  </div>
+
+                  <div class="field span3">
+                    <label>HORA *</label>
+                    <input id="hora" type="time" required>
+                    <div class="note">Hora del registro</div>
+                  </div>
+
+                  <div class="field span3">
+                    <label>TURNO *</label>
+                    <select id="turno" required>
+                      <option value="">Seleccionar turno</option>
+                      <option value="Turno mañana">Turno mañana</option>
+                      <option value="Turno tarde">Turno tarde</option>
+                      <option value="Turno noche">Turno noche</option>
+                    </select>
+                    <div class="note" id="turno_sugerido"></div>
+                  </div>
+
+                  <!-- Campos condicionales para PREMIOS -->
+                  <div class="field span3 hidden" id="wrap_hora_solicitud">
+                    <label>HORA SOLICITUD CLIENTE</label>
+                    <input id="hora_solicitud_cliente" type="text" placeholder="Ej: 14:32">
+                    <div class="note">Pegá la hora del banco (HH:MM)</div>
+                  </div>
+
+                  <div class="field span3 hidden" id="wrap_hora_quema">
+                    <label>HORA QUEMA DE FICHAS</label>
+                    <input id="hora_quema_fichas" type="time">
+                    <div class="note">Hora de la quema</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- =========================
+                   SECCIÓN 3: Transacción
+                   ========================= -->
+              <div class="section span12">
+                <div class="section-head">
+                  <div class="section-title">💸 Datos de la Transferencia</div>
+                  <div class="section-subtitle">Monto e identificación.</div>
+                </div>
+
+                <div class="section-body grid">
+                  <div class="field span6">
+                    <label>MONTO DE TRANSFERENCIA *</label>
+                    <input id="monto" placeholder="Ej: 12000 o 12000,50" required>
+                    <div class="note">Formato: 12000 o 12000,50 (sin puntos)</div>
+                  </div>
+
+                  <div class="field span6">
+                    <label>ID TRANSFERENCIA *</label>
+                    <input
+                      id="id_transferencia"
+                      required
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      autocomplete="off"
+                      placeholder="Solo números"
+                    >
+                    <div class="note">Solo números</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- =========================
+                   SECCIÓN 4: Cuentas
+                   ========================= -->
+              <div class="section span12">
+                <div class="section-head">
+                  <div class="section-title">🏦 Cuentas</div>
+                  <div class="section-subtitle">Origen y destino del dinero.</div>
+                </div>
+
+                <div class="section-body grid">
+                  <div class="field span6">
+                    <label>EMPRESA DE LA CUENTA DE SALIDA *</label>
+                    <select id="empresa_salida" required></select>
+                  </div>
+
+                  <div class="field span6">
+                    <label>NOMBRE DE CUENTA DE SALIDA *</label>
+                    <input id="cuenta_salida" required>
+                  </div>
+
+                  <div class="field span12">
+                    <label>NOMBRE DE CUENTA RECEPTORA *</label>
+                    <input id="cuenta_receptora" required>
+                  </div>
+                </div>
+              </div>
+
+              <!-- =========================
+                   SECCIÓN 5: Comprobante & Notas
+                   ========================= -->
+              <div class="section span12">
+                <div class="section-head">
+                  <div class="section-title">📎 Comprobante & Notas</div>
+                  <div class="section-subtitle">Adjunto obligatorio + observaciones.</div>
+                </div>
+
+                <div class="section-body grid">
+                  <div class="field span6">
+                    <label>SUBIR ARCHIVO COMPROBANTE *</label>
+                    <input id="comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
+                    <div class="note" id="comprobante_nombre">Ningún archivo seleccionado</div>
+                    <div class="note">JPG / PNG / PDF • Máx 10MB</div>
+                  </div>
+
+                  <div class="field span12">
+                    <label>NOTAS</label>
+                    <textarea id="notas"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ACTIONS (sticky) -->
+
+                <div class="actions-right">
+                  <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+
+                <!-- Sticky guardar (solo mobile) -->
+
+            </form>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- MODAL DE CONFIRMACIÓN -->
+    <div id="modalConfirmacion" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-backdrop" onclick="cerrarModalConfirmacion()"></div>
+      <div class="modal-content">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <span id="modalTitle">⚠️ Confirmar Egreso</span>
+          <button type="button" onclick="cerrarModalConfirmacion()" style="background:none; border:none; color:var(--text); font-size:24px; cursor:pointer; padding:0; line-height:1;" aria-label="Cerrar modal">&times;</button>
+        </div>
+        <div class="card-body" id="confirmacionBody" style="max-height:70vh; overflow-y:auto;">
+          <!-- Contenido dinámico -->
+        </div>
+        <div style="padding:16px; border-top:1px solid var(--border); display:flex; gap:12px; justify-content:flex-end;">
+          <button type="button" onclick="cerrarModalConfirmacion()" class="btn btn-ghost">Cancelar</button>
+          <button type="button" id="btnConfirmarEgreso" onclick="confirmarYEnviarEgreso()" class="btn btn-primary">✓ Confirmar y Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast">
+      <strong>—</strong>
+      <span>—</span>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

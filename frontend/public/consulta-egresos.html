@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Consulta de Retiros</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+
+<body>
+  <div class="app-nosidebar">
+
+    <!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-inner">
+
+    <!-- Marca -->
+    <div class="topbar-left">
+      <span class="brand">MooneyMaker</span>
+    </div>
+
+    <!-- Botón hamburguesa (solo mobile) -->
+    <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+      <span></span>
+    </button>
+
+    <!-- Navegación desktop -->
+    <nav class="topbar-center nav-desktop">
+      <a href="egreso.html" class="nav-item">Retiros</a>
+      <a href="consulta-egresos.html" class="nav-item active">Historial</a>
+      <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="nav-item" data-admin-only="1">Logs</a>
+      <a href="alertas.html" class="nav-item" data-admin-only="1">
+        Alertas
+        <span id="alertBadge" class="alert-badge-nav" style="display:none;"></span>
+      </a>
+    </nav>
+
+    <!-- Acciones desktop -->
+    <div class="topbar-right nav-desktop">
+      <span id="whoami" class="user-badge">—</span>
+      <button id="logoutBtn" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <!-- Menú mobile (drawer) -->
+  <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+    <div class="mobile-drawer-head">
+      <span class="brand">MooneyMaker</span>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+    </div>
+
+    <nav class="mobile-nav">
+      <a href="egreso.html" class="mobile-item">Retiros</a>
+      <a href="consulta-egresos.html" class="mobile-item active">Historial</a>
+      <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="mobile-item" data-admin-only="1">Logs</a>
+      <a href="alertas.html" class="mobile-item" data-admin-only="1">
+        Alertas
+        <span id="alertBadgeMobile" class="alert-badge-nav" style="display:none;"></span>
+      </a>
+    </nav>
+
+    <div class="mobile-actions">
+      <div id="whoamiMobile" class="user-badge">—</div>
+      <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <!-- overlay -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+</header>
+
+    <!-- CONTENT -->
+    <main class="content-wrap">
+      <div class="page">
+
+        <!-- FILTROS -->
+        <section class="card">
+          <div class="card-header">
+            🔍 Filtros de búsqueda
+          </div>
+
+          <div class="card-body">
+            <form id="filtrosForm" class="grid">
+
+              <div class="field span3">
+                <label>FECHA DESDE</label>
+                <input id="fecha_desde" type="date">
+              </div>
+
+              <div class="field span3">
+                <label>FECHA HASTA</label>
+                <input id="fecha_hasta" type="date">
+              </div>
+
+              <div class="field span3">
+                <label>EMPRESA</label>
+                <select id="empresa_salida">
+                  <option value="">Todas</option>
+                </select>
+              </div>
+
+              <div class="field span3">
+                <label>ETIQUETA</label>
+                <select id="etiqueta">
+                  <option value="">Todas</option>
+                </select>
+              </div>
+
+              <div class="field span3">
+                <label>USUARIO CASINO</label>
+                <input id="usuario_casino" placeholder="Buscar...">
+              </div>
+
+              <div class="field span3">
+                <label>ID TRANSFERENCIA</label>
+                <input id="id_transferencia" placeholder="Buscar...">
+              </div>
+
+              <div class="field span3">
+                <label>MONTO MÍNIMO</label>
+                <input id="monto_min" type="number" placeholder="Ej: 3000">
+              </div>
+
+              <div class="field span3">
+                <label>MONTO MÁXIMO</label>
+                <input id="monto_max" type="number" placeholder="Ej: 50000">
+              </div>
+
+              <div class="actions span12" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="submit" class="btn btn-primary">Buscar</button>
+                <button type="button" id="btnLimpiar" class="btn btn-ghost">Limpiar filtros</button>
+              </div>
+
+            </form>
+          </div>
+        </section>
+
+        <!-- RESULTADOS -->
+        <section class="card" style="margin-top: 20px;">
+          <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+              📋 Resultados
+              <span id="resultadosInfo" class="note" style="margin-left: 16px; font-weight: normal;">—</span>
+            </div>
+            <button id="btnDescargarCsvFiltrado" class="btn btn-ghost" data-admin-only="1" style="margin: 0;">
+              ⬇ Descargar CSV
+            </button>
+          </div>
+
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="table" id="egresosTable">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Empresa</th>
+                    <th>ID Trans.</th>
+                    <th>Etiqueta</th>
+                    <th>Usuario Casino</th>
+                    <th>Monto</th>
+                    <th>Creado por</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="egresosTbody">
+                  <tr><td colspan="9" class="muted">Usá los filtros para buscar transferencias</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="actions span12" style="margin-top: 16px;">
+              <button id="btnPrev" class="btn btn-ghost" disabled>← Anterior</button>
+              <button id="btnNext" class="btn btn-ghost" disabled>Siguiente →</button>
+              <span class="note" id="paginacionInfo" style="margin-left: auto;"></span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- MODAL DETALLE -->
+    <div id="detalleModal" class="modal" style="display: none;">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Detalle de transferencia</h3>
+          <button id="btnCerrarModal" class="btn-close">✕</button>
+        </div>
+        <div class="modal-body" id="detalleBody">
+          <!-- Contenido dinámico -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast">
+      <strong>—</strong>
+      <span>—</span>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
