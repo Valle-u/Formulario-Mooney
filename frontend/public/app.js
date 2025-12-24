@@ -1638,6 +1638,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     // Cerrar modal al hacer click en el backdrop
     document.querySelector(".modal-backdrop")?.addEventListener("click", cerrarModal);
+
+    // IMPORTANTE: Cargar egresos al iniciar la página
+    buscarEgresos();
   }
 
 

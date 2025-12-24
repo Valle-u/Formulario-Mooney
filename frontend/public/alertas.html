@@ -121,7 +121,7 @@
                   </select>
                 </div>
 
-                <div class="actions span12">
+                <div class="actions span12" style="display: flex; gap: 12px;">
                   <button id="btnFilter" class="btn btn-primary" type="button">Aplicar filtros</button>
                   <button id="btnRefresh" class="btn btn-ghost" type="button">Actualizar</button>
                 </div>
@@ -244,33 +244,53 @@
        INICIALIZACIÓN
        ========================= */
     async function initAlertas() {
-      await requireAuth();
+      console.log('🚀 Inicializando página de alertas...');
+
+      // Verificar autenticación
+      if (!requireAuth()) {
+        console.log('❌ No autenticado, redirigiendo...');
+        return;
+      }
+
       const user = getUser();
+      console.log('👤 Usuario:', user);
 
       // Solo admin puede ver alertas
       if (user.role !== 'admin') {
+        console.log('⛔ Usuario no es admin, redirigiendo...');
         window.location.href = 'egreso.html';
         return;
       }
 
+      console.log('✅ Usuario es admin, continuando...');
+
       hydrateTopbar();
       setupLogout();
 
+      console.log('📊 Cargando datos...');
+
       // Cargar datos
-      await Promise.all([
-        cargarEstadisticas(),
-        cargarAlertas()
-      ]);
+      try {
+        await Promise.all([
+          cargarEstadisticas(),
+          cargarAlertas()
+        ]);
+        console.log('✅ Datos cargados exitosamente');
+      } catch (error) {
+        console.error('❌ Error cargando datos iniciales:', error);
+      }
 
       // Setup filtros
       document.getElementById('btnFilter').addEventListener('click', aplicarFiltros);
       document.getElementById('btnRefresh').addEventListener('click', () => {
+        console.log('🔄 Actualizando...');
         cargarEstadisticas();
         cargarAlertas();
       });
 
       // Recargar cada 60 segundos
       setInterval(async () => {
+        console.log('⏰ Auto-refresh...');
         await cargarEstadisticas();
         await cargarAlertas();
       }, 60000);
@@ -324,13 +344,20 @@
           params.append('severity', currentFilters.severity);
         }
 
+        console.log('🔍 Cargando alertas con filtros:', currentFilters);
+        console.log('📡 URL:', `/api/alerts?${params}`);
+
         const data = await api(`/api/alerts?${params}`);
+
+        console.log('✅ Respuesta del servidor:', data);
+        console.log('📊 Alertas recibidas:', data.alerts?.length || 0);
+
         allAlerts = data.alerts || [];
 
         renderAlertas(allAlerts);
 
       } catch (error) {
-        console.error('Error cargando alertas:', error);
+        console.error('❌ Error cargando alertas:', error);
         toast('Error', 'No se pudieron cargar las alertas', 'error');
         document.getElementById('alertsTbody').innerHTML = '<tr><td colspan="7" class="muted">Error al cargar alertas</td></tr>';
       }

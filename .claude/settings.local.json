@@ -7,7 +7,8 @@
       "Bash(npm start)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(node test-alerts-endpoint.js:*)"
     ]
   }
 }
