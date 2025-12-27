@@ -1,21 +1,23 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import { query } from "../config/db.js";
-import { auth } from "../middleware/auth.js";
-import { requireAdmin } from "../middleware/requireAdmin.js";
+import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { auditLog } from "../utils/audit.js";
 import { validatePasswordStrength } from "../utils/validators.js";
 
 const router = express.Router();
 
-router.post("/", auth, requireAdmin, async (req, res) => {
+// POST /api/users - Crear usuario (solo admin y direccion)
+router.post("/", auth, requireAdminOrDireccion, async (req, res) => {
   try {
     const { username, password, role, full_name } = req.body || {};
     if (!username || !password || !role) {
       await auditLog(req, { action:"USER_CREATE_FAIL", entity:"users", success:false, status_code:400, details:{ reason:"missing_fields", username } });
       return res.status(400).json({ message: "username, password y role son obligatorios" });
     }
-    if (!["admin", "empleado"].includes(role)) {
+
+    // Validar roles permitidos
+    if (!["admin", "direccion", "encargado", "empleado"].includes(role)) {
       await auditLog(req, { action:"USER_CREATE_FAIL", entity:"users", success:false, status_code:400, details:{ reason:"invalid_role", username, role } });
       return res.status(400).json({ message: "role inválido" });
     }
@@ -56,7 +58,8 @@ router.post("/", auth, requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/", auth, requireAdmin, async (req, res) => {
+// GET /api/users - Listar usuarios (solo admin y direccion)
+router.get("/", auth, requireAdminOrDireccion, async (req, res) => {
   try {
     const r = await query(
       "SELECT id, username, role, full_name, is_active, created_at, created_by FROM users ORDER BY id ASC",
@@ -71,7 +74,8 @@ router.get("/", auth, requireAdmin, async (req, res) => {
   }
 });
 
-router.put("/:id", auth, requireAdmin, async (req, res) => {
+// PUT /api/users/:id - Actualizar usuario (solo admin y direccion)
+router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "id inválido" });
@@ -128,7 +132,8 @@ router.put("/:id", auth, requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/:id/reset-password", auth, requireAdmin, async (req, res) => {
+// POST /api/users/:id/reset-password - Resetear contraseña (solo admin y direccion)
+router.post("/:id/reset-password", auth, requireAdminOrDireccion, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "id inválido" });

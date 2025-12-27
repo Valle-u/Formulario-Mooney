@@ -1,0 +1,115 @@
+═══════════════════════════════════════════════════════════
+  DURACIÓN DE NOTIFICACIONES - ACTUALIZACIÓN
+═══════════════════════════════════════════════════════════
+
+FECHA: 2025-12-26
+CAMBIO: Duraciones significativamente aumentadas
+
+───────────────────────────────────────────────────────────
+ANTES (Primera Mejora)
+───────────────────────────────────────────────────────────
+• Notificación de ÉXITO:    4.5 segundos
+• Notificación de ERROR:    6 segundos
+• Delay cerrar modal:       1.5 segundos
+
+───────────────────────────────────────────────────────────
+AHORA (Segunda Mejora - MÁS LARGAS)
+───────────────────────────────────────────────────────────
+• Notificación de ÉXITO:    8 segundos  ⬆️ (+3.5s)
+• Notificación de ERROR:    10 segundos ⬆️ (+4s)
+• Delay cerrar modal:       2.5 segundos ⬆️ (+1s)
+
+───────────────────────────────────────────────────────────
+DURACIONES POR DEFECTO (sin personalizar)
+───────────────────────────────────────────────────────────
+• type="success":   7 segundos
+• type="error":     8 segundos
+• type="warning":   5 segundos
+• type="info":      5 segundos
+
+───────────────────────────────────────────────────────────
+TIMELINE AL GUARDAR UN EGRESO EXITOSAMENTE
+───────────────────────────────────────────────────────────
+
+0.0s  → Click en "✓ Confirmar y Guardar"
+0.1s  → Botones se deshabilitan
+0.2s  → Petición enviada al backend
+~1.0s → Backend responde OK
+1.0s  → ✅ TOAST APARECE (verde brillante)
+       "✅ Guardado - Egreso registrado correctamente."
+3.5s  → Modal se cierra automáticamente
+       Formulario se resetea
+9.0s  → Toast desaparece
+
+TOTAL VISIBLE: 8 segundos de notificación
+TIEMPO ANTES DE CERRAR MODAL: 2.5 segundos
+
+───────────────────────────────────────────────────────────
+TIMELINE AL HABER UN ERROR
+───────────────────────────────────────────────────────────
+
+0.0s  → Click en "✓ Confirmar y Guardar"
+0.1s  → Botones se deshabilitan
+0.2s  → Petición enviada al backend
+~1.0s → Backend responde ERROR
+1.0s  → ❌ TOAST APARECE (rojo brillante)
+       "❌ Error - [mensaje del error]"
+1.1s  → Botones se reactivan
+       Modal permanece ABIERTO
+11.0s → Toast desaparece
+
+TOTAL VISIBLE: 10 segundos de notificación
+MODAL: Permanece abierto indefinidamente
+
+───────────────────────────────────────────────────────────
+VENTAJAS DE ESTAS DURACIONES
+───────────────────────────────────────────────────────────
+
+✅ 8 segundos: Tiempo suficiente para:
+   • Leer el mensaje completo
+   • Procesarlo mentalmente
+   • Sentir satisfacción del guardado exitoso
+   • No tener que apurar la lectura
+
+✅ 10 segundos en error: Tiempo suficiente para:
+   • Leer el mensaje de error completo
+   • Entender qué salió mal
+   • Decidir cómo proceder
+   • No perder el contexto
+
+✅ 2.5 segundos delay modal:
+   • Ver claramente el toast antes que se cierre
+   • No sentir que "desapareció todo de golpe"
+   • Transición suave y controlada
+
+───────────────────────────────────────────────────────────
+COMPARACIÓN TOTAL
+───────────────────────────────────────────────────────────
+
+                    ORIGINAL | MEJORA 1 | MEJORA 2 (ACTUAL)
+──────────────────────────────────────────────────────────
+Toast éxito         2.6s     | 4.5s     | 8.0s  ✅
+Toast error         4.0s     | 6.0s     | 10.0s ✅
+Delay modal         0.0s     | 1.5s     | 2.5s  ✅
+──────────────────────────────────────────────────────────
+TIEMPO TOTAL ÉXITO  2.6s     | 6.0s     | 10.5s ✅
+
+Incremento: 307% más tiempo que la versión original
+
+───────────────────────────────────────────────────────────
+RESULTADO
+───────────────────────────────────────────────────────────
+
+Ahora las notificaciones son IMPOSIBLES de perder:
+
+✅ 8 segundos de notificación verde al guardar
+✅ 10 segundos de notificación roja en error
+✅ 2.5 segundos antes de que el modal se cierre
+✅ Animación llamativa que atrae la atención
+✅ Colores brillantes con degradados
+✅ Sombras con efecto glow
+
+El usuario tendrá TODO EL TIEMPO del mundo para ver
+si el formulario se guardó correctamente o no.
+
+═══════════════════════════════════════════════════════════

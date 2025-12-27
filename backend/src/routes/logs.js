@@ -1,7 +1,6 @@
 import express from "express";
 import { query } from "../config/db.js";
-import { auth } from "../middleware/auth.js";
-import { requireAdmin } from "../middleware/requireAdmin.js";
+import { auth, requireAdminOrDireccionOrEncargado } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -17,8 +16,9 @@ const router = express.Router();
  * - to   (YYYY-MM-DD)
  * - limit (default 200, max 500)
  * - offset (default 0)
+ * Permisos: admin, direccion, encargado
  */
-router.get("/", auth, requireAdmin, async (req, res) => {
+router.get("/", auth, requireAdminOrDireccionOrEncargado, async (req, res) => {
   try {
     const {
       user_id,

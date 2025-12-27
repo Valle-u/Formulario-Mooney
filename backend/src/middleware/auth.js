@@ -92,3 +92,54 @@ export async function auth(req, res, next) {
     return res.status(500).json({ message: "Error de autenticación" });
   }
 }
+
+/**
+ * Middleware: Solo Admin y Dirección
+ * Permite: admin, direccion
+ */
+export function requireAdminOrDireccion(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: "No autenticado" });
+  }
+
+  if (req.user.role !== 'admin' && req.user.role !== 'direccion') {
+    return res.status(403).json({ message: "Acceso denegado. Se requiere rol de Admin o Dirección" });
+  }
+
+  return next();
+}
+
+/**
+ * Middleware: Admin, Dirección y Encargado
+ * Permite: admin, direccion, encargado
+ * Uso: Para ver logs
+ */
+export function requireAdminOrDireccionOrEncargado(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: "No autenticado" });
+  }
+
+  const allowedRoles = ['admin', 'direccion', 'encargado'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: "Acceso denegado. Permisos insuficientes" });
+  }
+
+  return next();
+}
+
+/**
+ * Middleware: Solo Admin (único)
+ * Permite: solo admin
+ * Uso: Para operaciones críticas exclusivas del admin
+ */
+export function requireAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: "No autenticado" });
+  }
+
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: "Acceso denegado. Solo administradores" });
+  }
+
+  return next();
+}

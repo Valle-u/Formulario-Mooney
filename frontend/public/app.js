@@ -57,7 +57,7 @@ const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
 /* =========================
    TOAST
    ========================= */
-function toast(title, msg, type = "error"){
+function toast(title, msg, type = "error", duration = null){
   const el = document.getElementById("toast");
   if(!el) return;
 
@@ -71,9 +71,11 @@ function toast(title, msg, type = "error"){
   el.querySelector("span").textContent = msg || "";
   el.classList.add("show");
 
-  // Duración según tipo (errores duran más)
-  const duration = type === "error" ? 4000 : 2600;
-  setTimeout(()=> el.classList.remove("show"), duration);
+  // Duración personalizable, o por defecto según tipo
+  // Success y error ahora duran mucho más para que se puedan apreciar bien
+  const finalDuration = duration || (type === "error" ? 8000 : type === "success" ? 7000 : 5000);
+
+  setTimeout(()=> el.classList.remove("show"), finalDuration);
 }
 
 /* =========================
@@ -225,49 +227,28 @@ async function handleLogin(e){
    ========================= */
 function hydrateTopbar(){
   const u = getUser();
+
+  // Mapeo de roles en español para mejor UX
+  const roleLabels = {
+    'admin': 'Admin',
+    'direccion': 'Dirección',
+    'encargado': 'Encargado',
+    'empleado': 'Empleado'
+  };
+
   const el = document.getElementById("whoami");
-  if(el) el.textContent = `${u.username || "Usuario"} • ${u.role || "—"}`;
+  if(el) el.textContent = `${u.username || "Usuario"} • ${roleLabels[u.role] || u.role || "—"}`;
   const elMobile = document.getElementById("whoamiMobile");
-  if(elMobile) elMobile.textContent = `${u.username || "Usuario"} • ${u.role || "—"}`;
+  if(elMobile) elMobile.textContent = `${u.username || "Usuario"} • ${roleLabels[u.role] || u.role || "—"}`;
 
+  // Ocultar elementos según permisos
+  // data-admin-only="1" -> Solo admin y direccion
   document.querySelectorAll("[data-admin-only='1']")
-    .forEach(a => a.style.display = (u.role === "admin") ? "" : "none");
+    .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion") ? "" : "none");
 
-  // Actualizar badge de alertas si es admin
-  if (u.role === "admin") {
-    updateAlertBadge();
-  }
-}
-
-// Actualizar contador de alertas pendientes
-async function updateAlertBadge() {
-  try {
-    const stats = await api('/api/alerts/stats');
-    const pendingCount = stats.pending || 0;
-
-    const badge = document.getElementById('alertBadge');
-    const badgeMobile = document.getElementById('alertBadgeMobile');
-
-    if (pendingCount > 0) {
-      const displayCount = pendingCount > 99 ? '99+' : String(pendingCount);
-
-      if (badge) {
-        badge.textContent = displayCount;
-        badge.style.display = 'inline-block';
-      }
-
-      if (badgeMobile) {
-        badgeMobile.textContent = displayCount;
-        badgeMobile.style.display = 'inline-block';
-      }
-    } else {
-      if (badge) badge.style.display = 'none';
-      if (badgeMobile) badgeMobile.style.display = 'none';
-    }
-  } catch (error) {
-    // Silenciar errores - puede ser que el endpoint no esté disponible
-    console.debug('No se pudo actualizar badge de alertas:', error);
-  }
+  // data-requires-encargado="1" -> Admin, direccion y encargado (para logs)
+  document.querySelectorAll("[data-requires-encargado='1']")
+    .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion" || u.role === "encargado") ? "" : "none");
 }
 
 function logout(){
@@ -564,6 +545,7 @@ async function handleEgresoSubmit(e){
       hora_solicitud_cliente: document.getElementById("hora_solicitud_cliente")?.value || "",
       hora_quema_fichas: document.getElementById("hora_quema_fichas")?.value || "",
       monto_transferencia_raw: (montoRaw || "").trim(),
+      moneda: document.getElementById("moneda").value || "ARS",
       cuenta_receptora: document.getElementById("cuenta_receptora").value.trim(),
       usuario_casino: document.getElementById("usuario_casino").value.trim(),
       cuenta_salida: document.getElementById("cuenta_salida").value.trim(),
@@ -592,8 +574,9 @@ async function handleEgresoSubmit(e){
     if(payload.etiqueta === "Otro" && !payload.otro_concepto){
       throw new Error("Si elegís 'Otro', completá el detalle.");
     }
-    if(ETIQUETAS_PREMIO_MINIMO.has(payload.etiqueta) && montoNum < 3000){
-      throw new Error("Para Premio Pagado el monto debe ser >= 3000.");
+    // Validación de monto mínimo solo para transferencias en ARS (pesos)
+    if(ETIQUETAS_PREMIO_MINIMO.has(payload.etiqueta) && payload.moneda === 'ARS' && montoNum < 3000){
+      throw new Error("Para Premio Pagado en ARS el monto debe ser >= $3000.");
     }
 
     const hs = normalizeHoraTextOptional(payload.hora_solicitud_cliente);
@@ -760,9 +743,14 @@ async function confirmarYEnviarEgreso(){
 
   try{
     const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
+    const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
+
     if(btnConfirmar){
       btnConfirmar.disabled = true;
       btnConfirmar.textContent = "Guardando...";
+    }
+    if(btnCancelar){
+      btnCancelar.disabled = true;
     }
 
     const fd = new FormData();
@@ -775,6 +763,7 @@ async function confirmarYEnviarEgreso(){
       etiqueta: payload.etiqueta,
       otro_concepto: payload.otro_concepto,
       monto_transferencia_raw: payload.monto_transferencia_raw,
+      moneda: payload.moneda,
       cuenta_receptora: payload.cuenta_receptora,
       usuario_casino: payload.usuario_casino,
       cuenta_salida: payload.cuenta_salida,
@@ -786,25 +775,34 @@ async function confirmarYEnviarEgreso(){
 
     await api("/api/egresos", { method:"POST", body: fd, auth:true });
 
-    toast("✅ Guardado", "Egreso registrado correctamente.", "success");
+    // Mostrar mensaje de éxito con duración extendida (8 segundos)
+    toast("✅ Guardado", "Egreso registrado correctamente.", "success", 8000);
 
-    // Cerrar modal y resetear formulario
-    cerrarModalConfirmacion();
-    document.getElementById("egresoForm").reset();
-    fileLabel();
-    toggleCasinoUserField();
-    toggleOtroConcepto();
+    // Cerrar modal después de un delay para que se vea el mensaje
+    setTimeout(() => {
+      cerrarModalConfirmacion();
+      document.getElementById("egresoForm").reset();
+      fileLabel();
+      toggleCasinoUserField();
+      toggleOtroConcepto();
 
-    // Limpiar datos validados
-    datosEgresoValidados = null;
+      // Limpiar datos validados
+      datosEgresoValidados = null;
+    }, 2500); // Esperar 2.5 segundos antes de cerrar modal y resetear
 
   }catch(err){
-    toast("❌ Error", err.message, "error");
-  }finally{
+    toast("❌ Error", err.message, "error", 10000);
+
+    // Re-habilitar botones inmediatamente en caso de error
     const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
+    const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
+
     if(btnConfirmar){
       btnConfirmar.disabled = false;
       btnConfirmar.textContent = "✓ Confirmar y Guardar";
+    }
+    if(btnCancelar){
+      btnCancelar.disabled = false;
     }
   }
 }
@@ -899,8 +897,10 @@ function renderUsers(users){
       <td><input data-edit-name="${u.id}" value="${u.full_name||""}"></td>
       <td>
         <select data-edit-role="${u.id}">
-          <option value="empleado" ${u.role==="empleado"?"selected":""}>empleado</option>
-          <option value="admin" ${u.role==="admin"?"selected":""}>admin</option>
+          <option value="empleado" ${u.role==="empleado"?"selected":""}>Empleado</option>
+          <option value="encargado" ${u.role==="encargado"?"selected":""}>Encargado</option>
+          <option value="direccion" ${u.role==="direccion"?"selected":""}>Dirección</option>
+          <option value="admin" ${u.role==="admin"?"selected":""}>Admin</option>
         </select>
       </td>
       <td><input type="checkbox" data-edit-active="${u.id}" ${u.is_active?"checked":""}></td>
@@ -1122,19 +1122,21 @@ async function buscarEgresos(){
   const tbody = document.getElementById("egresosTbody");
   if(!tbody) return;
 
-  tbody.innerHTML = `<tr><td colspan="9" class="muted">Cargando…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="11" class="muted">Cargando…</td></tr>`;
 
   const fecha_desde = document.getElementById("fecha_desde")?.value || "";
   const fecha_hasta = document.getElementById("fecha_hasta")?.value || "";
   const empresa_salida = document.getElementById("empresa_salida")?.value || "";
   const etiqueta = document.getElementById("etiqueta")?.value || "";
+  const status = document.getElementById("status")?.value || "";
+  const moneda = document.getElementById("moneda")?.value || "";
   const usuario_casino = document.getElementById("usuario_casino")?.value?.trim() || "";
   const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
   const monto_min = document.getElementById("monto_min")?.value || "";
   const monto_max = document.getElementById("monto_max")?.value || "";
 
   currentFilters = {
-    fecha_desde, fecha_hasta, empresa_salida, etiqueta,
+    fecha_desde, fecha_hasta, empresa_salida, etiqueta, status, moneda,
     usuario_casino, id_transferencia, monto_min, monto_max
   };
 
@@ -1146,6 +1148,8 @@ async function buscarEgresos(){
   if(fecha_hasta) qs.set("fecha_hasta", fecha_hasta);
   if(empresa_salida) qs.set("empresa_salida", empresa_salida);
   if(etiqueta) qs.set("etiqueta", etiqueta);
+  if(status) qs.set("status", status);
+  if(moneda) qs.set("moneda", moneda);
   if(usuario_casino) qs.set("usuario_casino", usuario_casino);
   if(id_transferencia) qs.set("id_transferencia", id_transferencia);
   if(monto_min) qs.set("monto_min", monto_min);
@@ -1155,7 +1159,7 @@ async function buscarEgresos(){
     const { egresos, pagination } = await api(`/api/egresos?${qs.toString()}`);
     renderEgresos(egresos, pagination);
   }catch(err){
-    tbody.innerHTML = `<tr><td colspan="9" class="muted">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="muted">${err.message}</td></tr>`;
   }
 }
 
@@ -1164,7 +1168,7 @@ function renderEgresos(egresos, pagination){
   if(!tbody) return;
 
   if(egresos.length === 0){
-    tbody.innerHTML = `<tr><td colspan="9" class="muted">No se encontraron resultados</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="muted">No se encontraron resultados</td></tr>`;
 
     const info = document.getElementById("resultadosInfo");
     if(info) info.textContent = "0 resultados";
@@ -1181,6 +1185,18 @@ function renderEgresos(egresos, pagination){
       maximumFractionDigits: 2
     });
 
+    const moneda = e.moneda || 'ARS';
+    const monedaBadge = moneda === 'USD'
+      ? '<span style="background: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">💵 USD</span>'
+      : '<span style="background: #0891b2; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">💵 ARS</span>';
+
+    const status = e.status || 'activo';
+    const statusBadge = status === 'activo'
+      ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✓ ACTIVO</span>'
+      : status === 'anulado'
+      ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✗ ANULADO</span>'
+      : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">⏳ PENDIENTE</span>';
+
     return `
       <tr>
         <td>${e.fecha}</td>
@@ -1190,9 +1206,11 @@ function renderEgresos(egresos, pagination){
         <td>${e.etiqueta}${e.etiqueta_otro ? ` (${e.etiqueta_otro})` : ""}</td>
         <td>${e.usuario_casino || "-"}</td>
         <td>$${montoFormatted}</td>
+        <td>${monedaBadge}</td>
+        <td>${statusBadge}</td>
         <td>${e.created_by_username}</td>
         <td>
-          <button class="btn btn-small" data-ver-detalle="${e.id}">Ver</button>
+          <button class="btn btn-small btn-primary" data-ver-detalle="${e.id}">👁️ Ver</button>
         </td>
       </tr>
     `;
@@ -1215,19 +1233,41 @@ function renderEgresos(egresos, pagination){
 }
 
 function bindVerDetalleButtons(egresos){
-  document.querySelectorAll("[data-ver-detalle]").forEach(btn => {
+  console.log('🔍 bindVerDetalleButtons llamada con', egresos.length, 'egresos');
+  const buttons = document.querySelectorAll("[data-ver-detalle]");
+  console.log('🔍 Botones encontrados:', buttons.length);
+
+  buttons.forEach(btn => {
     btn.addEventListener("click", () => {
+      console.log('👁️ Click en botón Ver detectado');
       const id = Number(btn.dataset.verDetalle);
-      const egreso = egresos.find(e => e.id === id);
-      if(egreso) mostrarDetalle(egreso);
+      console.log('🔍 ID del egreso:', id, 'tipo:', typeof id);
+      console.log('🔍 Primer egreso del array:', egresos[0]);
+      // Buscar comparando flexiblemente (número o string)
+      const egreso = egresos.find(e => Number(e.id) === id);
+      console.log('🔍 Egreso encontrado:', egreso);
+      if(egreso) {
+        console.log('✅ Llamando a mostrarDetalle...');
+        mostrarDetalle(egreso);
+      } else {
+        console.error('❌ No se encontró el egreso con ID:', id);
+        console.error('❌ Todos los IDs en array:', egresos.map(e => e.id));
+      }
     });
   });
 }
 
 function mostrarDetalle(e){
+  console.log('📋 mostrarDetalle llamada con egreso:', e);
   const modal = document.getElementById("detalleModal");
   const body = document.getElementById("detalleBody");
-  if(!modal || !body) return;
+  console.log('🔍 Modal element:', modal);
+  console.log('🔍 Body element:', body);
+
+  if(!modal || !body) {
+    console.error('❌ ERROR: Modal o body no encontrado!', { modal, body });
+    return;
+  }
 
   const montoFormatted = Number(e.monto).toLocaleString("es-AR", {
     minimumFractionDigits: 2,
@@ -1249,18 +1289,18 @@ function mostrarDetalle(e){
     : '<span style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⏳ PENDIENTE</span>';
 
   const user = getUser();
-  const isAdmin = user.role === 'admin';
+  const canEdit = (user.role === 'admin' || user.role === 'direccion');
 
   body.innerHTML = `
     <div class="grid">
       <div class="field span12" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <div>${statusBadge}</div>
         <div style="display: flex; gap: 8px;">
-          ${isAdmin && status === 'activo' ? `
+          ${canEdit && status === 'activo' ? `
             <button class="btn btn-small" onclick="verHistorial(${e.id})">📜 Historial</button>
             <button class="btn btn-small btn-danger" onclick="mostrarModalAnular(${e.id})">✗ Anular</button>
           ` : ''}
-          ${isAdmin && status === 'activo' ? `
+          ${canEdit && status === 'activo' ? `
             <button class="btn btn-small btn-primary" onclick="editarEgreso(${JSON.stringify(e).replace(/"/g, '&quot;')})">✏️ Editar</button>
           ` : ''}
         </div>
@@ -1298,6 +1338,10 @@ function mostrarDetalle(e){
       <div class="field span6">
         <label>MONTO</label>
         <div class="note">$${escapeHtml(montoFormatted)}</div>
+      </div>
+      <div class="field span6">
+        <label>MONEDA</label>
+        <div class="note">${escapeHtml(e.moneda || 'ARS')}</div>
       </div>
       <div class="field span12">
         <label>ETIQUETA</label>
@@ -1348,12 +1392,19 @@ function mostrarDetalle(e){
     </div>
   `;
 
-  modal.style.display = "block";
+  console.log('✅ HTML generado, mostrando modal...');
+  console.log('🔍 Estado actual del modal:', modal.style.display);
+  modal.style.display = "flex";
+  console.log('✅ Modal mostrado con display:', modal.style.display);
 }
 
 function cerrarModal(){
+  console.log('🚪 cerrarModal llamada');
   const modal = document.getElementById("detalleModal");
-  if(modal) modal.style.display = "none";
+  if(modal) {
+    modal.style.display = "none";
+    console.log('✅ Modal cerrado');
+  }
 }
 
 function limpiarFiltros(){

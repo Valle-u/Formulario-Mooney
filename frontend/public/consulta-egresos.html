@@ -29,11 +29,7 @@
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item active">Historial</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="nav-item" data-admin-only="1">Logs</a>
-      <a href="alertas.html" class="nav-item" data-admin-only="1">
-        Alertas
-        <span id="alertBadge" class="alert-badge-nav" style="display:none;"></span>
-      </a>
+      <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <!-- Acciones desktop -->
@@ -54,11 +50,7 @@
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item active">Historial</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="mobile-item" data-admin-only="1">Logs</a>
-      <a href="alertas.html" class="mobile-item" data-admin-only="1">
-        Alertas
-        <span id="alertBadgeMobile" class="alert-badge-nav" style="display:none;"></span>
-      </a>
+      <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
@@ -105,6 +97,25 @@
                 <label>ETIQUETA</label>
                 <select id="etiqueta">
                   <option value="">Todas</option>
+                </select>
+              </div>
+
+              <div class="field span3">
+                <label>ESTADO</label>
+                <select id="status">
+                  <option value="">Todos</option>
+                  <option value="activo">✓ Activo</option>
+                  <option value="pendiente">⏳ Pendiente</option>
+                  <option value="anulado">✗ Anulado</option>
+                </select>
+              </div>
+
+              <div class="field span3">
+                <label>MONEDA</label>
+                <select id="moneda">
+                  <option value="">Todas</option>
+                  <option value="ARS">💵 Pesos (ARS)</option>
+                  <option value="USD">💵 Dólares (USD)</option>
                 </select>
               </div>
 
@@ -161,12 +172,14 @@
                     <th>Etiqueta</th>
                     <th>Usuario Casino</th>
                     <th>Monto</th>
+                    <th>Moneda</th>
+                    <th>Estado</th>
                     <th>Creado por</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="egresosTbody">
-                  <tr><td colspan="9" class="muted">Usá los filtros para buscar transferencias</td></tr>
+                  <tr><td colspan="11" class="muted">Usá los filtros para buscar transferencias</td></tr>
                 </tbody>
               </table>
             </div>
@@ -184,13 +197,13 @@
 
     <!-- MODAL DETALLE -->
     <div id="detalleModal" class="modal" style="display: none;">
-      <div class="modal-backdrop"></div>
+      <div class="modal-backdrop" onclick="cerrarModal()"></div>
       <div class="modal-content">
         <div class="modal-header">
           <h3>Detalle de transferencia</h3>
-          <button id="btnCerrarModal" class="btn-close">✕</button>
+          <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">✕</button>
         </div>
-        <div class="modal-body" id="detalleBody">
+        <div id="detalleBody" style="padding: 20px 24px;">
           <!-- Contenido dinámico -->
         </div>
       </div>

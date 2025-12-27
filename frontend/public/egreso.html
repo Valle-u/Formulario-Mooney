@@ -29,11 +29,7 @@
       <a href="egreso.html" class="nav-item active">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="nav-item" data-admin-only="1">Logs</a>
-      <a href="alertas.html" class="nav-item" data-admin-only="1">
-        Alertas
-        <span id="alertBadge" class="alert-badge-nav" style="display:none;"></span>
-      </a>
+      <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <!-- Acciones desktop -->
@@ -54,11 +50,7 @@
       <a href="egreso.html" class="mobile-item active">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="mobile-item" data-admin-only="1">Logs</a>
-      <a href="alertas.html" class="mobile-item" data-admin-only="1">
-        Alertas
-        <span id="alertBadgeMobile" class="alert-badge-nav" style="display:none;"></span>
-      </a>
+      <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
@@ -174,13 +166,22 @@
                 </div>
 
                 <div class="section-body grid">
-                  <div class="field span6">
-                    <label>MONTO DE TRANSFERENCIA *</label>
-                    <input id="monto" placeholder="Ej: 12000 o 12000,50" required>
-                    <div class="note">Formato: 12000 o 12000,50 (sin puntos)</div>
+                  <div class="field span4">
+                    <label>MONEDA *</label>
+                    <select id="moneda" required>
+                      <option value="ARS" selected>💵 Pesos (ARS)</option>
+                      <option value="USD">💵 Dólares (USD)</option>
+                    </select>
+                    <div class="note">Seleccioná la moneda de la transferencia</div>
                   </div>
 
-                  <div class="field span6">
+                  <div class="field span4">
+                    <label>MONTO DE TRANSFERENCIA *</label>
+                    <input id="monto" placeholder="Ej: 12000 o 12000,50" required>
+                    <div class="note" id="montoNote">Formato: 12000 o 12000,50 (sin puntos)</div>
+                  </div>
+
+                  <div class="field span4">
                     <label>ID TRANSFERENCIA *</label>
                     <input
                       id="id_transferencia"

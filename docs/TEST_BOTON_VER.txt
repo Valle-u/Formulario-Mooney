@@ -1,0 +1,93 @@
+═══════════════════════════════════════════════════════════
+  PRUEBA: Botón "Ver" en Historial
+═══════════════════════════════════════════════════════════
+
+CAMBIOS REALIZADOS:
+✅ Modal corregido: display: flex (antes: block)
+✅ Filtro de estado agregado
+✅ Columna de estado agregada a tabla
+✅ Backend soporta filtro status
+
+─────────────────────────────────────────────────────────
+PASOS PARA PROBAR:
+─────────────────────────────────────────────────────────
+
+1. Abre el navegador
+2. Presiona F12 para abrir DevTools
+3. Ve a la pestaña "Console"
+4. Navega a: http://localhost:3000/consulta-egresos.html
+5. En los filtros, click en "Buscar" (sin cambiar nada)
+6. Deberías ver una tabla con egresos
+7. Click en el botón "👁️ Ver" de cualquier fila
+
+RESULTADO ESPERADO:
+✅ Se abre un modal centrado
+✅ Fondo oscuro detrás (backdrop)
+✅ Muestra todos los datos del egreso
+✅ Se puede cerrar con X o click fuera
+✅ NO hay errores en console
+
+SI EL MODAL NO SE ABRE:
+─────────────────────────────────────────────────────────
+
+Revisa la consola del navegador para ver errores:
+
+1. Errores comunes:
+   - "Cannot read property 'id' of undefined" → No se encontró el egreso
+   - "detalleModal is null" → ID del modal incorrecto
+   - "cerrarModal is not defined" → Función no cargada
+
+2. Debugging manual:
+   Abre la consola y escribe:
+
+   ```javascript
+   // Verificar que el modal existe
+   document.getElementById("detalleModal")
+
+   // Verificar que la función existe
+   typeof mostrarDetalle
+
+   // Verificar que hay egresos cargados
+   document.querySelectorAll("[data-ver-detalle]").length
+   ```
+
+3. Si el modal existe pero no se ve:
+   ```javascript
+   const modal = document.getElementById("detalleModal");
+   console.log(modal.style.display); // Debe ser "none" o "flex"
+   modal.style.display = "flex"; // Forzar apertura
+   ```
+
+─────────────────────────────────────────────────────────
+CHECKLIST DE VERIFICACIÓN:
+─────────────────────────────────────────────────────────
+
+Frontend:
+[ ] app.js línea 1341 usa "flex" (no "block")
+[ ] consulta-egresos.html tiene id="detalleBody"
+[ ] Botón tiene data-ver-detalle="${e.id}"
+[ ] Función bindVerDetalleButtons se llama después de renderizar
+
+Backend:
+[ ] Backend retorna campo "status" en egresos
+[ ] Filtro "status" funciona en query
+
+CSS:
+[ ] .modal tiene display: flex
+[ ] z-index es 9999
+[ ] modal-backdrop tiene z-index menor
+
+═══════════════════════════════════════════════════════════
+
+SOLUCIÓN RÁPIDA SI SIGUE SIN FUNCIONAR:
+
+Reemplaza línea 1341 de app.js con:
+
+  modal.style.display = "flex";
+  modal.style.zIndex = "9999";
+
+Y verifica que línea 1346 sea:
+
+  modal.style.display = "none";
+
+═══════════════════════════════════════════════════════════

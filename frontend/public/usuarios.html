@@ -29,11 +29,7 @@
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
       <a href="usuarios.html" class="nav-item active" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="nav-item" data-admin-only="1">Logs</a>
-      <a href="alertas.html" class="nav-item" data-admin-only="1">
-        Alertas
-        <span id="alertBadge" class="alert-badge-nav" style="display:none;"></span>
-      </a>
+      <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <!-- Acciones desktop -->
@@ -54,11 +50,7 @@
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
       <a href="usuarios.html" class="mobile-item active" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="mobile-item" data-admin-only="1">Logs</a>
-      <a href="alertas.html" class="mobile-item" data-admin-only="1">
-        Alertas
-        <span id="alertBadgeMobile" class="alert-badge-nav" style="display:none;"></span>
-      </a>
+      <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
@@ -110,8 +102,10 @@
                 <div class="field span3">
                   <label>ROL *</label>
                   <select id="u_role">
-                    <option value="empleado">empleado</option>
-                    <option value="admin">admin</option>
+                    <option value="empleado">Empleado</option>
+                    <option value="encargado">Encargado</option>
+                    <option value="direccion">Dirección</option>
+                    <option value="admin">Admin</option>
                   </select>
                 </div>
 

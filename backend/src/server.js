@@ -9,7 +9,6 @@ import authRoutes from "./routes/auth.js";
 import usersRoutes from "./routes/users.js";
 import egresosRoutes from "./routes/egresos.js";
 import logsRoutes from "./routes/logs.js";
-import alertsRoutes from "./routes/alerts.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 
@@ -90,7 +89,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/egresos", egresosRoutes);
 app.use("/api/logs", logsRoutes);
-app.use("/api/alerts", alertsRoutes);
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 

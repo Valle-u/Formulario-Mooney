@@ -3,7 +3,7 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { query } from "../config/db.js";
-import { auth } from "../middleware/auth.js";
+import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
 import {
   EMPRESAS_SALIDA,
@@ -79,7 +79,8 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       id_transferencia,
       notas,
       hora_solicitud_cliente,
-      hora_quema_fichas
+      hora_quema_fichas,
+      moneda
     } = data;
 
     const errFecha = requireNonEmpty(fecha, "fecha");
@@ -116,12 +117,20 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     if (!idTrim) return res.status(400).json({ message: "id_transferencia es obligatorio" });
     if (!isDigitsOnly(idTrim)) return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo números" });
 
+    // Validar moneda primero (antes de validar monto mínimo)
+    const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
+    if (!["USD", "ARS"].includes(monedaNorm)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser USD o ARS" });
+    }
+
     const raw = (monto_transferencia_raw || "").trim();
     const montoNum = parseMontoARSStrict(raw);
     if (montoNum === null) return res.status(400).json({ message: "Monto inválido" });
     if (montoNum <= 0) return res.status(400).json({ message: "Monto debe ser mayor a 0" });
-    if (ETIQUETAS_PREMIO_MINIMO.has(etiqueta) && montoNum < 3000) {
-      return res.status(400).json({ message: "Para Premio Pagado el monto debe ser >= 3000" });
+
+    // Validación de monto mínimo solo para transferencias en ARS (pesos)
+    if (ETIQUETAS_PREMIO_MINIMO.has(etiqueta) && monedaNorm === 'ARS' && montoNum < 3000) {
+      return res.status(400).json({ message: "Para Premio Pagado en ARS el monto debe ser >= $3000" });
     }
 
     const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
@@ -139,13 +148,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
          cuenta_receptora,usuario_casino,cuenta_salida,empresa_salida,id_transferencia,
          comprobante_url,comprobante_filename,comprobante_mime,comprobante_size,
          notas,created_by,
-         hora_solicitud_cliente,hora_quema_fichas)
+         hora_solicitud_cliente,hora_quema_fichas,moneda)
        VALUES
         ($1,$2,$3,$4,$5,$6,$7,
          $8,$9,$10,$11,$12,
          $13,$14,$15,$16,
          $17,$18,
-         $19,$20)
+         $19,$20,$21)
        RETURNING id`,
       [
         fecha,
@@ -167,7 +176,8 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
         String(notas || "").trim() || null,
         req.user.id,
         hsNorm,
-        hqNorm
+        hqNorm,
+        monedaNorm
       ]
     );
 
@@ -221,6 +231,8 @@ router.get("/", auth, async (req, res) => {
       fecha_hasta,
       empresa_salida,
       etiqueta,
+      status,
+      moneda,
       usuario_casino,
       id_transferencia,
       monto_min,
@@ -251,6 +263,16 @@ router.get("/", auth, async (req, res) => {
     if (etiqueta) {
       params.push(etiqueta);
       where.push(`e.etiqueta = $${params.length}`);
+    }
+
+    if (status) {
+      params.push(status);
+      where.push(`e.status = $${params.length}`);
+    }
+
+    if (moneda) {
+      params.push(moneda.toUpperCase());
+      where.push(`e.moneda = $${params.length}`);
     }
 
     if (usuario_casino) {
@@ -317,6 +339,7 @@ router.get("/", auth, async (req, res) => {
       etiqueta_otro: e.etiqueta_otro,
       monto: Number(e.monto),
       monto_raw: e.monto_raw,
+      moneda: e.moneda || 'ARS',
       cuenta_receptora: e.cuenta_receptora,
       usuario_casino: e.usuario_casino,
       cuenta_salida: e.cuenta_salida,
@@ -326,6 +349,10 @@ router.get("/", auth, async (req, res) => {
       comprobante_filename: e.comprobante_filename,
       comprobante_mime: e.comprobante_mime,
       notas: e.notas,
+      status: e.status || 'activo',
+      motivo_anulacion: e.motivo_anulacion || null,
+      anulado_at: e.anulado_at || null,
+      updated_at: e.updated_at || null,
       created_by: e.created_by,
       created_by_username: e.created_by_username,
       created_at: e.created_at
@@ -355,10 +382,9 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
-// CSV con filtros (solo admin)
-router.get("/csv", auth, async (req, res) => {
+// CSV con filtros (solo admin y direccion)
+router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ message: "Solo administrador" });
 
     const {
       fecha_desde,
@@ -443,7 +469,7 @@ router.get("/csv", auth, async (req, res) => {
       "cuenta_receptora",
       "etiqueta","etiqueta_otro",
       "usuario_casino",
-      "monto","monto_raw",
+      "monto","monto_raw","moneda",
       "comprobante_url",
       "notas",
       "created_by_username","created_at"
@@ -464,6 +490,7 @@ router.get("/csv", auth, async (req, res) => {
       x.usuario_casino || "",
       montoToCommaString(Number(x.monto)),
       x.monto_raw || "",
+      x.moneda || "ARS",
       x.comprobante_url || "",
       x.notas || "",
       x.created_by_username || "",
@@ -544,13 +571,9 @@ router.get("/:id/comprobante", auth, async (req, res) => {
   }
 });
 
-// PUT /api/egresos/:id - Actualizar egreso (solo admin)
-router.put("/:id", auth, async (req, res) => {
+// PUT /api/egresos/:id - Editar egreso (solo admin y direccion)
+router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
   try {
-    // Solo admin puede editar
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Solo administradores pueden editar egresos" });
-    }
 
     const { id } = req.params;
     const {
