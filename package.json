@@ -1,0 +1,13 @@
+{
+  "name": "formulario-mooney",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de transferencias MooneyMaker",
+  "scripts": {
+    "start": "cd backend && npm start",
+    "build": "cd backend && npm run build",
+    "postinstall": "cd backend && npm install"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

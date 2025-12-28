@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "build": "echo 'No build step required for backend'",
     "dev": "node src/server.js",
     "seed:admin": "node scripts/seed_admin.js",
     "backup": "node scripts/backup-database.js",
