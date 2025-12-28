@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 import authRoutes from "./routes/auth.js";
@@ -93,12 +94,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendPath = path.join(__dirname, '../../frontend/public');
 
+console.log('📁 Frontend path:', frontendPath);
+console.log('📄 Index.html exists:', fs.existsSync(path.join(frontendPath, 'index.html')));
+
 // Servir archivos estáticos (CSS, JS, imágenes)
 app.use(express.static(frontendPath));
 
 // Ruta para servir index.html en la raíz
 app.get('/', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
+  const indexPath = path.join(frontendPath, 'index.html');
+  console.log('🔍 Trying to serve:', indexPath);
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('❌ Error serving index.html:', err);
+      res.status(500).json({
+        message: 'Error loading frontend',
+        frontendPath: frontendPath,
+        error: err.message
+      });
+    }
+  });
 });
 
 // Routes
