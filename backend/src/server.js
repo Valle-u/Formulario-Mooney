@@ -88,11 +88,18 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
-// Static uploads - DESHABILITADO por seguridad
-// Los archivos ahora se sirven a través de /api/egresos/:id/comprobante con validación de permisos
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-// app.use(`/${UPLOAD_DIR}`, express.static(path.join(__dirname, UPLOAD_DIR)));
+// Servir archivos estáticos del frontend
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendPath = path.join(__dirname, '../../frontend/public');
+
+// Servir archivos estáticos (CSS, JS, imágenes)
+app.use(express.static(frontendPath));
+
+// Ruta para servir index.html en la raíz
+app.get('/', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
 
 // Routes
 app.use("/api/auth", authRoutes);

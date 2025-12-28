@@ -11,12 +11,12 @@ const API_BASE = (() => {
   // Detección automática basada en hostname
   const hostname = window.location.hostname;
 
-  // Producción (ajustar según tu dominio real)
-  if (hostname.includes('render.com') || hostname.includes('railway.app') || hostname.includes('mooney')) {
-    return window.location.origin.replace(/:\d+$/, '') + ':4000';
+  // Producción en Seenode o similares (mismo servidor sirve frontend y backend)
+  if (hostname.includes('seenode.com') || hostname.includes('render.com') || hostname.includes('railway.app')) {
+    return window.location.origin; // Mismo origen, sin puerto adicional
   }
 
-  // Desarrollo local
+  // Desarrollo local (frontend y backend en puertos diferentes)
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'http://localhost:4000';
   }
