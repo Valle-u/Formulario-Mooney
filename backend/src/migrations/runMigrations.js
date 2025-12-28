@@ -9,6 +9,19 @@ const __dirname = path.dirname(__filename);
 export async function runMigrations() {
   console.log("🔧 Running database migrations...");
 
+  try {
+    // Test de conexión primero
+    console.log("📡 Testing database connection...");
+    await pool.query('SELECT NOW()');
+    console.log("✅ Database connection successful");
+  } catch (err) {
+    console.error("❌ Database connection failed!");
+    console.error("Error code:", err?.code);
+    console.error("Error message:", err?.message);
+    console.error("Error stack:", err?.stack);
+    throw err;
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id SERIAL PRIMARY KEY,

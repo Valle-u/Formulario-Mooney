@@ -15,6 +15,15 @@ import { validateRequiredEnv } from "./utils/validateEnv.js";
 dotenv.config();
 validateRequiredEnv();
 
+// Log de configuración (sin mostrar valores completos por seguridad)
+console.log("🔧 Environment configuration:");
+console.log("  - NODE_ENV:", process.env.NODE_ENV || "development");
+console.log("  - DATABASE_URL:", process.env.DATABASE_URL ? "✅ Set" : "❌ Missing");
+console.log("  - JWT_SECRET:", process.env.JWT_SECRET ? "✅ Set" : "❌ Missing");
+console.log("  - PGSSL:", process.env.PGSSL || "not set");
+console.log("  - PORT:", process.env.PORT || "not set (will use 4000)");
+console.log("  - BASE_URL:", process.env.BASE_URL || "not set");
+
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
