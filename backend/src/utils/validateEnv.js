@@ -5,8 +5,7 @@
 export function validateRequiredEnv() {
   const required = [
     "DATABASE_URL",
-    "JWT_SECRET",
-    "PORT"
+    "JWT_SECRET"
   ];
 
   const missing = [];
