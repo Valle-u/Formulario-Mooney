@@ -1658,6 +1658,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
     });
     document.getElementById("comprobante")?.addEventListener("change", fileLabel);
     document.getElementById("egresoForm")?.addEventListener("submit", handleEgresoSubmit);
+
+    // Event listeners para el modal de confirmación
+    document.getElementById("btnCerrarModal")?.addEventListener("click", cerrarModalConfirmacion);
+    document.getElementById("btnCancelarEgreso")?.addEventListener("click", cerrarModalConfirmacion);
+    document.getElementById("btnConfirmarEgreso")?.addEventListener("click", confirmarYEnviarEgreso);
+    document.getElementById("modalBackdrop")?.addEventListener("click", cerrarModalConfirmacion);
   }
 
   // Usuarios
