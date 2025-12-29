@@ -186,12 +186,12 @@
                     <input
                       id="id_transferencia"
                       required
-                      inputmode="numeric"
-                      pattern="[0-9]*"
+                      inputmode="text"
+                      pattern="[a-zA-Z0-9\-_]+"
                       autocomplete="off"
-                      placeholder="Solo números"
+                      placeholder="Ej: ABC123, TR-456"
                     >
-                    <div class="note">Solo números</div>
+                    <div class="note">Letras, números, guiones y guiones bajos</div>
                   </div>
                 </div>
               </div>
@@ -264,18 +264,18 @@
 
     <!-- MODAL DE CONFIRMACIÓN -->
     <div id="modalConfirmacion" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-backdrop" onclick="cerrarModalConfirmacion()"></div>
+      <div class="modal-backdrop" id="modalBackdrop"></div>
       <div class="modal-content">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
           <span id="modalTitle">⚠️ Confirmar Egreso</span>
-          <button type="button" onclick="cerrarModalConfirmacion()" style="background:none; border:none; color:var(--text); font-size:24px; cursor:pointer; padding:0; line-height:1;" aria-label="Cerrar modal">&times;</button>
+          <button type="button" id="btnCerrarModal" style="background:none; border:none; color:var(--text); font-size:24px; cursor:pointer; padding:0; line-height:1;" aria-label="Cerrar modal">&times;</button>
         </div>
         <div class="card-body" id="confirmacionBody" style="max-height:70vh; overflow-y:auto;">
           <!-- Contenido dinámico -->
         </div>
         <div style="padding:16px; border-top:1px solid var(--border); display:flex; gap:12px; justify-content:flex-end;">
-          <button type="button" onclick="cerrarModalConfirmacion()" class="btn btn-ghost">Cancelar</button>
-          <button type="button" id="btnConfirmarEgreso" onclick="confirmarYEnviarEgreso()" class="btn btn-primary">✓ Confirmar y Guardar</button>
+          <button type="button" id="btnCancelarEgreso" class="btn btn-ghost">Cancelar</button>
+          <button type="button" id="btnConfirmarEgreso" class="btn btn-primary">✓ Confirmar y Guardar</button>
         </div>
       </div>
     </div>
