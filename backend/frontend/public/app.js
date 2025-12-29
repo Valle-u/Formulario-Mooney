@@ -325,10 +325,13 @@ function fileLabel(){
   out.textContent = f.files?.[0]?.name ? f.files[0].name : "Ningún archivo seleccionado";
 }
 
-function wireIdTransferenciaDigitsOnly(){
+function wireIdTransferenciaAlphanumeric(){
   const el = document.getElementById("id_transferencia");
   if(!el) return;
-  el.addEventListener("input", ()=> { el.value = el.value.replace(/\D+/g, ""); });
+  // Permitir solo letras, números, guiones y guiones bajos
+  el.addEventListener("input", ()=> {
+    el.value = el.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+  });
 }
 
 function parseMontoARSStrict(raw){
@@ -565,7 +568,9 @@ async function handleEgresoSubmit(e){
     if(!payload.cuenta_salida) throw new Error("Completá CUENTA DE SALIDA.");
     if(!payload.empresa_cuenta_salida) throw new Error("Seleccioná EMPRESA DE SALIDA.");
     if(!payload.id_transferencia) throw new Error("Completá ID TRANSFERENCIA.");
-    if(!/^\d+$/.test(payload.id_transferencia)) throw new Error("ID TRANSFERENCIA: solo números.");
+    if(!/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
+      throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
+    }
     if(!payload.etiqueta) throw new Error("Seleccioná ETIQUETA.");
 
     if(ETIQUETAS_CON_USUARIO_CASINO.has(payload.etiqueta) && !payload.usuario_casino){
@@ -1648,7 +1653,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     toggleCasinoUserField();
     toggleOtroConcepto();
     fileLabel();
-    wireIdTransferenciaDigitsOnly();
+    wireIdTransferenciaAlphanumeric();
     conectarValidacionTiempoReal(); // Validación en tiempo real
 
     document.getElementById("etiqueta")?.addEventListener("change", ()=>{

@@ -115,7 +115,10 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 
     const idTrim = String(id_transferencia || "").trim();
     if (!idTrim) return res.status(400).json({ message: "id_transferencia es obligatorio" });
-    if (!isDigitsOnly(idTrim)) return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo números" });
+    // Validar que sea alfanumérico (letras, números, guiones, guiones bajos)
+    if (!/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
+      return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo letras, números, guiones y guiones bajos" });
+    }
 
     // Validar moneda primero (antes de validar monto mínimo)
     const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
