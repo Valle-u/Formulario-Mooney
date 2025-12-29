@@ -481,8 +481,8 @@ function validarCampo(campo){
         mostrarError(campo, 'El ID de transferencia es obligatorio');
         return false;
       }
-      if(!/^\d+$/.test(valor)){
-        mostrarError(campo, 'Solo se permiten números');
+      if(!/^[a-zA-Z0-9\-_]+$/.test(valor)){
+        mostrarError(campo, 'Solo letras, números, guiones y guiones bajos');
         return false;
       }
       mostrarExito(campo);
