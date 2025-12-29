@@ -40,7 +40,7 @@ const ETIQUETAS = [
   "Gasto de publicidad","Gasto de CRM","Pago de Utilidades",
   "Cambio a USD","Cambio a USDT","Cambio a Peso Fisico",
   "Gasto de cuenta","Transferencia Rechazada",
-  "Gasto Personal L","Gasto Personal F","Gasto Personl A",
+  "Gasto Personal L","Gasto Personl A",
   "Inversion Publicidad","Pago Programacion","Pago Costo de estructura",
   "Gasto limpieza","Gasto de Cocina","Fondeo de cuenta","Gasto Personal",
   "Adelanto de sueldo","Redireccion de capital","Pago de premios duplicado",
