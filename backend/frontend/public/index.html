@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Login</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-body">
+        <div class="login-icon">👤</div>
+        <h3 class="login-title">Ingrese a su cuenta</h3>
+
+        <form id="loginForm">
+          <div class="input">
+            <span>👤</span>
+            <input id="username" type="text" placeholder="usuario" autocomplete="username" required>
+          </div>
+
+          <div class="input">
+            <span>🔒</span>
+            <input id="password" type="password" placeholder="contraseña" autocomplete="current-password" required>
+          </div>
+
+          <button class="btn btn-primary" type="submit">Iniciar sesión</button>
+          <p class="note" style="text-align:center;margin-top:12px">
+          </p>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast">
+      <strong>—</strong><span>—</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

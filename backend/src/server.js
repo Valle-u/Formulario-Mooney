@@ -92,7 +92,7 @@ app.use(express.json({ limit: "1mb" }));
 // Servir archivos estáticos del frontend
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const frontendPath = path.join(__dirname, '../../frontend/public');
+const frontendPath = path.join(__dirname, '../frontend/public');
 
 console.log('📁 Frontend path:', frontendPath);
 console.log('📄 Index.html exists:', fs.existsSync(path.join(frontendPath, 'index.html')));
