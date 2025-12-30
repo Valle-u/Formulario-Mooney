@@ -629,6 +629,31 @@ function mostrarModalConfirmacion(payload, montoNum, file){
 
   const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
+  // Generar vista previa del comprobante
+  // Liberar URL anterior si existe
+  if(currentFileURL){
+    URL.revokeObjectURL(currentFileURL);
+  }
+  currentFileURL = URL.createObjectURL(file);
+  const fileURL = currentFileURL;
+  const isPDF = file.type === 'application/pdf';
+  const isImage = file.type.startsWith('image/');
+
+  let previewHTML = '';
+  if (isImage) {
+    previewHTML = `
+      <div style="margin-top:8px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; max-height:300px; display:flex; align-items:center; justify-content:center; background:var(--bg-alt);">
+        <img src="${fileURL}" alt="Vista previa" style="max-width:100%; max-height:300px; object-fit:contain;">
+      </div>
+    `;
+  } else if (isPDF) {
+    previewHTML = `
+      <div style="margin-top:8px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; height:400px;">
+        <embed src="${fileURL}" type="application/pdf" width="100%" height="100%" style="border:none;">
+      </div>
+    `;
+  }
+
   body.innerHTML = `
     <p style="margin-bottom:16px; color:var(--muted);">
       Revisá que todos los datos sean correctos antes de confirmar:
@@ -697,6 +722,7 @@ function mostrarModalConfirmacion(payload, montoNum, file){
       <div class="field span12">
         <label>COMPROBANTE</label>
         <div class="note">📎 ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</div>
+        ${previewHTML}
       </div>
       ${payload.notas ? `
       <div class="field span12">
@@ -716,10 +742,19 @@ function mostrarModalConfirmacion(payload, montoNum, file){
   }, 100);
 }
 
+// Variable global para almacenar la URL del comprobante
+let currentFileURL = null;
+
 // Cerrar modal
 function cerrarModalConfirmacion(){
   const modal = document.getElementById("modalConfirmacion");
   if(modal) modal.style.display = "none";
+
+  // Liberar la URL del objeto para evitar memory leaks
+  if(currentFileURL){
+    URL.revokeObjectURL(currentFileURL);
+    currentFileURL = null;
+  }
 
   // Restaurar focus al botón submit del formulario
   const submitBtn = document.querySelector("#egresoForm button[type='submit']");
