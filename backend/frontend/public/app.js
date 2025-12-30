@@ -648,8 +648,13 @@ function mostrarModalConfirmacion(payload, montoNum, file){
     `;
   } else if (isPDF) {
     previewHTML = `
-      <div style="margin-top:8px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; height:400px;">
-        <embed src="${fileURL}" type="application/pdf" width="100%" height="100%" style="border:none;">
+      <div style="margin-top:8px;">
+        <iframe src="${fileURL}#toolbar=0" style="width:100%; height:500px; border:1px solid var(--border); border-radius:var(--radius);"></iframe>
+        <div style="margin-top:8px; text-align:center;">
+          <a href="${fileURL}" target="_blank" style="color:var(--primary); text-decoration:none; font-size:14px;">
+            📄 Abrir PDF en nueva pestaña
+          </a>
+        </div>
       </div>
     `;
   }
