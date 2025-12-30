@@ -44,8 +44,8 @@ app.use(helmet({
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"]
+      mediaSrc: ["'self'", "blob:"],
+      frameSrc: ["'self'", "blob:"] // Permitir blob: para vista previa de PDFs
     }
   },
   // Prevent clickjacking
