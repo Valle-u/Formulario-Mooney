@@ -143,27 +143,41 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
     const fileName = `${Date.now()}_${safe}`;
 
+    console.log(`📁 Archivo recibido: ${file.originalname}, Size: ${file.size} bytes, MIME: ${file.mimetype}`);
+    console.log(`🔧 R2 configurado: ${isR2Configured()}`);
+
     if (isR2Configured()) {
       // Subir a Cloudflare R2
       try {
+        console.log(`☁️ Intentando subir a R2: ${fileName}`);
         comprobanteUrl = await uploadToR2(file.buffer, fileName, file.mimetype);
-        console.log(`✅ Comprobante subido a R2: ${fileName}`);
+        console.log(`✅ Comprobante subido a R2: ${fileName} -> ${comprobanteUrl}`);
       } catch (error) {
         console.error('❌ Error subiendo a R2:', error);
-        return res.status(500).json({ message: "Error al subir comprobante a almacenamiento en la nube" });
+        console.error('Error details:', error.message, error.stack);
+        return res.status(500).json({ message: `Error al subir comprobante a R2: ${error.message}` });
       }
     } else {
       // Fallback: guardar en disco local
       try {
+        console.log(`💾 Guardando localmente en: ${UPLOAD_DIR}/${fileName}`);
+
+        // Asegurar que el directorio existe
+        if (!fs.existsSync(UPLOAD_DIR)) {
+          fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+          console.log(`📂 Directorio creado: ${UPLOAD_DIR}`);
+        }
+
         const filePath = path.join(UPLOAD_DIR, fileName);
         fs.writeFileSync(filePath, file.buffer);
 
         const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
         comprobanteUrl = `${baseUrl}/${UPLOAD_DIR}/${encodeURIComponent(fileName)}`;
-        console.log(`✅ Comprobante guardado localmente: ${fileName}`);
+        console.log(`✅ Comprobante guardado localmente: ${filePath} -> ${comprobanteUrl}`);
       } catch (error) {
         console.error('❌ Error guardando archivo localmente:', error);
-        return res.status(500).json({ message: "Error al guardar comprobante" });
+        console.error('Error details:', error.message, error.stack);
+        return res.status(500).json({ message: `Error al guardar comprobante: ${error.message}` });
       }
     }
 
