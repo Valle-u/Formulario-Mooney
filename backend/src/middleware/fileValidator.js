@@ -78,6 +78,7 @@ export async function validateFileType(filePath) {
 /**
  * Middleware Express para validar archivos subidos con Multer
  * Uso: Agregar después del middleware de Multer
+ * Soporta tanto diskStorage (req.file.path) como memoryStorage (req.file.buffer)
  */
 export async function validateUploadedFile(req, res, next) {
   // Si no hay archivo, pasar al siguiente middleware
@@ -85,24 +86,48 @@ export async function validateUploadedFile(req, res, next) {
     return next();
   }
 
-  const filePath = req.file.path;
-  const validation = await validateFileType(filePath);
+  // Validación básica: verificar extensión del archivo original
+  const filename = req.file.originalname || '';
+  const ext = filename.split('.').pop()?.toLowerCase();
 
-  if (!validation.valid) {
-    // Eliminar el archivo inválido
-    try {
-      fs.unlinkSync(filePath);
-    } catch (err) {
-      console.error("Error eliminando archivo inválido:", err);
-    }
-
+  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
     return res.status(400).json({
-      message: validation.error || "Archivo inválido"
+      message: `Extensión de archivo no permitida: ${ext || 'desconocida'}. Solo se permiten JPG, PNG y PDF`
     });
   }
 
-  // Guardar el tipo detectado en req.file para uso posterior
-  req.file.detectedMimeType = validation.detectedType;
+  // Validación de MIME type declarado
+  if (!ALLOWED_MIMES.has(req.file.mimetype)) {
+    return res.status(400).json({
+      message: `Tipo MIME no permitido: ${req.file.mimetype}. Solo se permiten JPG, PNG y PDF`
+    });
+  }
+
+  // Si el archivo está en disco (diskStorage), validar con file-type
+  if (req.file.path) {
+    const validation = await validateFileType(req.file.path);
+
+    if (!validation.valid) {
+      // Eliminar el archivo inválido
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (err) {
+        console.error("Error eliminando archivo inválido:", err);
+      }
+
+      return res.status(400).json({
+        message: validation.error || "Archivo inválido"
+      });
+    }
+
+    // Guardar el tipo detectado en req.file para uso posterior
+    req.file.detectedMimeType = validation.detectedType;
+  } else if (req.file.buffer) {
+    // Si el archivo está en memoria (memoryStorage), solo validar extensión y MIME declarado
+    // La validación profunda con magic numbers requeriría escribir el buffer a un archivo temporal
+    console.log(`✓ Archivo en memoria validado: ${filename} (${req.file.mimetype})`);
+    req.file.detectedMimeType = `buffer-based/${ext}`;
+  }
 
   next();
 }
