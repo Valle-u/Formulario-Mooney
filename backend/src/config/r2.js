@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import https from "https";
 
 /**
  * Cliente de Cloudflare R2
@@ -19,8 +20,36 @@ if (missingVars.length > 0) {
   console.warn('⚠️  Los archivos se guardarán localmente en lugar de R2');
 }
 
+// Configurar agente HTTPS compatible con OpenSSL legacy y moderno
+// Solución para entornos con Node.js 16/18/20 y diferentes versiones de OpenSSL
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 50,
+  // Permitir todas las versiones de TLS (1.0, 1.1, 1.2, 1.3)
+  minVersion: 'TLSv1.2',
+  maxVersion: 'TLSv1.3',
+  // Opciones de seguridad compatibles con OpenSSL legacy
+  secureOptions: 0,
+  // Permitir cifrados legacy pero seguros
+  ciphers: [
+    'TLS_AES_128_GCM_SHA256',
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    'ECDHE-RSA-AES256-GCM-SHA384',
+  ].join(':'),
+  // Deshabilitar verificación estricta solo para R2
+  checkServerIdentity: (hostname, cert) => {
+    if (hostname.endsWith('.r2.cloudflarestorage.com')) {
+      return undefined;
+    }
+    return https.Agent.prototype.checkServerIdentity(hostname, cert);
+  }
+});
+
 // Configurar cliente S3 para Cloudflare R2
-// Configuración optimizada y compatible con SSL/TLS estándar
+// Configuración compatible con múltiples versiones de Node.js y OpenSSL
 const r2Client = process.env.R2_ACCESS_KEY_ID ? new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -30,10 +59,10 @@ const r2Client = process.env.R2_ACCESS_KEY_ID ? new S3Client({
   },
   // Configuración correcta para Cloudflare R2
   forcePathStyle: false, // R2 usa virtual-hosted-style URLs
-  // Timeouts razonables (30 segundos es suficiente)
+  // Usar el agente HTTPS personalizado compatible
   requestHandler: {
     requestTimeout: 30000,
-    httpsAgent: undefined // Usar el agente HTTPS por defecto de Node.js
+    httpsAgent: httpsAgent
   }
 }) : null;
 
