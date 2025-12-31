@@ -41,16 +41,8 @@ function normalizeHoraOptional(hora){
   return normalizeHoraToTime(v);
 }
 
-// Usar memoria si R2 está configurado, disco si no
-const storage = isR2Configured()
-  ? multer.memoryStorage()  // Almacenar en memoria para subir a R2
-  : multer.diskStorage({     // Fallback a disco local
-      destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-      filename: (req, file, cb) => {
-        const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
-        cb(null, `${Date.now()}_${safe}`);
-      }
-    });
+// Siempre usar memoryStorage para flexibilidad (R2 o disco)
+const storage = multer.memoryStorage();
 
 function fileFilter(req, file, cb) {
   const allowed = ["image/jpeg", "image/png", "application/pdf"];
@@ -148,11 +140,10 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 
     // Subir archivo a R2 o guardar localmente
     let comprobanteUrl;
-    if (isR2Configured()) {
-      // Generar nombre único para el archivo
-      const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
-      const fileName = `${Date.now()}_${safe}`;
+    const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
+    const fileName = `${Date.now()}_${safe}`;
 
+    if (isR2Configured()) {
       // Subir a Cloudflare R2
       try {
         comprobanteUrl = await uploadToR2(file.buffer, fileName, file.mimetype);
@@ -162,9 +153,18 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
         return res.status(500).json({ message: "Error al subir comprobante a almacenamiento en la nube" });
       }
     } else {
-      // Fallback: usar almacenamiento local
-      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
-      comprobanteUrl = `${baseUrl}/${UPLOAD_DIR}/${encodeURIComponent(file.filename)}`;
+      // Fallback: guardar en disco local
+      try {
+        const filePath = path.join(UPLOAD_DIR, fileName);
+        fs.writeFileSync(filePath, file.buffer);
+
+        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+        comprobanteUrl = `${baseUrl}/${UPLOAD_DIR}/${encodeURIComponent(fileName)}`;
+        console.log(`✅ Comprobante guardado localmente: ${fileName}`);
+      } catch (error) {
+        console.error('❌ Error guardando archivo localmente:', error);
+        return res.status(500).json({ message: "Error al guardar comprobante" });
+      }
     }
 
     const insert = await query(
