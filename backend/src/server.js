@@ -26,6 +26,13 @@ console.log("  - PGSSL:", process.env.PGSSL || "not set");
 console.log("  - PORT:", process.env.PORT || "not set (will use 4000)");
 console.log("  - BASE_URL:", process.env.BASE_URL || "not set");
 
+// Log de configuración de almacenamiento
+const r2Configured = !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID &&
+                        process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET_NAME);
+console.log("📦 Storage configuration:");
+console.log("  - Mode:", r2Configured ? "☁️  Cloudflare R2 (Cloud)" : "💾 Local Disk");
+console.log("  - Upload directory:", process.env.UPLOAD_DIR || "uploads");
+
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
@@ -96,6 +103,18 @@ const frontendPath = path.join(__dirname, '../frontend/public');
 
 console.log('📁 Frontend path:', frontendPath);
 console.log('📄 Index.html exists:', fs.existsSync(path.join(frontendPath, 'index.html')));
+
+// Crear directorio de uploads si no existe
+const uploadsPath = path.join(__dirname, '..', UPLOAD_DIR);
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+  console.log('📂 Created uploads directory:', uploadsPath);
+}
+
+// Servir archivos de uploads (comprobantes)
+// Esto permite acceder a los PDFs subidos vía URL
+app.use(`/${UPLOAD_DIR}`, express.static(uploadsPath));
+console.log(`📤 Serving uploads from: /${UPLOAD_DIR}`);
 
 // Servir archivos estáticos (CSS, JS, imágenes)
 app.use(express.static(frontendPath));
