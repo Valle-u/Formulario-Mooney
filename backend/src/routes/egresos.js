@@ -16,6 +16,7 @@ import {
 } from "../utils/validators.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
+import { uploadToR2, isR2Configured } from "../config/r2.js";
 
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
@@ -40,13 +41,16 @@ function normalizeHoraOptional(hora){
   return normalizeHoraToTime(v);
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
-    cb(null, `${Date.now()}_${safe}`);
-  }
-});
+// Usar memoria si R2 está configurado, disco si no
+const storage = isR2Configured()
+  ? multer.memoryStorage()  // Almacenar en memoria para subir a R2
+  : multer.diskStorage({     // Fallback a disco local
+      destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+      filename: (req, file, cb) => {
+        const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
+        cb(null, `${Date.now()}_${safe}`);
+      }
+    });
 
 function fileFilter(req, file, cb) {
   const allowed = ["image/jpeg", "image/png", "application/pdf"];
@@ -142,8 +146,26 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const hqNorm = normalizeHoraOptional(hora_quema_fichas);
     if (String(hora_quema_fichas || "").trim() && !hqNorm) return res.status(400).json({ message: "Hora quema de fichas inválida. Usá HH:MM" });
 
-    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
-    const comprobanteUrl = `${baseUrl}/${UPLOAD_DIR}/${encodeURIComponent(file.filename)}`;
+    // Subir archivo a R2 o guardar localmente
+    let comprobanteUrl;
+    if (isR2Configured()) {
+      // Generar nombre único para el archivo
+      const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
+      const fileName = `${Date.now()}_${safe}`;
+
+      // Subir a Cloudflare R2
+      try {
+        comprobanteUrl = await uploadToR2(file.buffer, fileName, file.mimetype);
+        console.log(`✅ Comprobante subido a R2: ${fileName}`);
+      } catch (error) {
+        console.error('❌ Error subiendo a R2:', error);
+        return res.status(500).json({ message: "Error al subir comprobante a almacenamiento en la nube" });
+      }
+    } else {
+      // Fallback: usar almacenamiento local
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+      comprobanteUrl = `${baseUrl}/${UPLOAD_DIR}/${encodeURIComponent(file.filename)}`;
+    }
 
     const insert = await query(
       `INSERT INTO egresos
