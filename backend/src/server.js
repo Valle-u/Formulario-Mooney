@@ -13,6 +13,7 @@ import logsRoutes from "./routes/logs.js";
 import initRoutes from "./routes/init.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
+import { csrfOriginCheck } from "./middleware/csrf.js";
 
 dotenv.config();
 validateRequiredEnv();
@@ -41,18 +42,21 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
    SEGURIDAD - Headers con Helmet
    ========================= */
 app.use(helmet({
-  // Content Security Policy
+  // Content Security Policy - MEJORADO sin unsafe-inline
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necesario para scripts inline
-      styleSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necesario para estilos inline
+      scriptSrc: ["'self'"], // SIN unsafe-inline para mejor seguridad
+      styleSrc: ["'self'"], // SIN unsafe-inline para mejor seguridad
       imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", "blob:"],
-      frameSrc: ["'self'", "blob:"] // Permitir blob: para vista previa de PDFs
+      frameSrc: ["'self'", "blob:"], // Permitir blob: para vista previa de PDFs
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"] // Prevenir clickjacking
     }
   },
   // Prevent clickjacking
@@ -74,26 +78,68 @@ app.use(helmet({
 }));
 
 /* =========================
-   CORS
+   CORS - CONFIGURACIÓN RESTRICTIVA
    ========================= */
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
-const corsOptions =
-  CORS_ORIGIN === "*"
-    ? {
-        origin: true,
-        credentials: false,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "";
+
+// Función de validación dinámica con logging
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (ej: Postman, curl, mobile apps)
+    if (!origin) {
+      console.log('✅ CORS: Request sin origin header (permitido)');
+      return callback(null, true);
+    }
+
+    // Si CORS_ORIGIN está vacío o es "*", RECHAZAR en producción
+    if (!CORS_ORIGIN || CORS_ORIGIN === "*") {
+      if (process.env.NODE_ENV === 'production') {
+        console.error(`❌ CORS: Rechazado - CORS_ORIGIN no configurado en producción. Origin: ${origin}`);
+        return callback(new Error('CORS not configured properly'), false);
+      } else {
+        // Solo permitir en desarrollo
+        console.warn(`⚠️ CORS: Permitido en desarrollo (configurar CORS_ORIGIN para producción). Origin: ${origin}`);
+        return callback(null, true);
       }
-    : {
-        origin: CORS_ORIGIN.split(",").map(o => o.trim()),
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
-      };
+    }
+
+    // Validar contra whitelist
+    const whitelist = CORS_ORIGIN.split(",").map(o => o.trim());
+
+    if (whitelist.includes(origin)) {
+      console.log(`✅ CORS: Permitido - ${origin}`);
+      callback(null, true);
+    } else {
+      console.error(`❌ CORS: Rechazado - Origin no autorizado: ${origin}`);
+      console.error(`   Whitelist: ${whitelist.join(', ')}`);
+      callback(new Error('Not allowed by CORS'), false);
+    }
+  },
+  credentials: true, // Permitir cookies/auth headers
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'], // Agregado X-CSRF-Token
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400, // Cachear preflight por 24 horas
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+
+console.log('🔒 CORS Configurado:');
+console.log('  - CORS_ORIGIN:', CORS_ORIGIN || '(no configurado - solo desarrollo)');
+console.log('  - Credentials:', corsOptions.credentials);
+console.log('  - Métodos:', corsOptions.methods.join(', '));
+
+/* =========================
+   CSRF PROTECTION
+   ========================= */
+// Protección CSRF basada en Origin/Referer
+// Valida que requests mutantes vengan de orígenes permitidos
+app.use(csrfOriginCheck);
+console.log('🛡️ CSRF Protection: Validación de Origin/Referer activada');
+
 app.use(express.json({ limit: "1mb" }));
 
 // Servir archivos estáticos del frontend

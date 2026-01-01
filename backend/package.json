@@ -9,7 +9,10 @@
     "dev": "node src/server.js",
     "seed:admin": "node scripts/seed_admin.js",
     "backup": "node scripts/backup-database.js",
-    "backup:now": "node scripts/backup-database.js"
+    "backup:now": "node scripts/backup-database.js",
+    "cleanup:dry": "node scripts/cleanup-audit-logs.js --dry-run",
+    "cleanup:run": "node scripts/cleanup-audit-logs.js",
+    "cleanup:setup": "bash scripts/setup-cron.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",

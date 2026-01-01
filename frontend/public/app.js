@@ -26,6 +26,7 @@ const API_BASE = (() => {
 })();
 
 const STORAGE_KEY_TOKEN = "mm_token";
+const STORAGE_KEY_REFRESH_TOKEN = "mm_refresh_token";
 const STORAGE_KEY_USER = "mm_user";
 
 console.log('🔌 API_BASE:', API_BASE);
@@ -98,6 +99,10 @@ function setToken(t){ localStorage.setItem(STORAGE_KEY_TOKEN, t); }
 function getToken(){ return localStorage.getItem(STORAGE_KEY_TOKEN); }
 function clearToken(){ localStorage.removeItem(STORAGE_KEY_TOKEN); }
 
+function setRefreshToken(t){ localStorage.setItem(STORAGE_KEY_REFRESH_TOKEN, t); }
+function getRefreshToken(){ return localStorage.getItem(STORAGE_KEY_REFRESH_TOKEN); }
+function clearRefreshToken(){ localStorage.removeItem(STORAGE_KEY_REFRESH_TOKEN); }
+
 function setUser(u){ localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u||{})); }
 function getUser(){
   try{ return JSON.parse(localStorage.getItem(STORAGE_KEY_USER) || "{}"); }
@@ -111,6 +116,66 @@ function requireAuth(){
     return false;
   }
   return true;
+}
+
+/* =========================
+   REFRESH TOKEN AUTOMÁTICO
+   ========================= */
+let isRefreshing = false;
+let refreshPromise = null;
+
+async function refreshAccessToken(){
+  // Si ya hay un refresh en progreso, esperar a ese
+  if(isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+
+  refreshPromise = (async () => {
+    const refreshToken = getRefreshToken();
+
+    if(!refreshToken){
+      console.error('❌ No hay refresh token disponible');
+      clearToken();
+      clearUser();
+      clearRefreshToken();
+      window.location.href = "index.html";
+      throw new Error("Sesión expirada");
+    }
+
+    try{
+      console.log('🔄 Renovando access token...');
+
+      const data = await fetch(API_BASE + "/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken })
+      }).then(r => r.json());
+
+      if(data.token){
+        setToken(data.token);
+        console.log('✅ Access token renovado exitosamente');
+        return data.token;
+      } else {
+        throw new Error("No se recibió token");
+      }
+
+    }catch(err){
+      console.error('❌ Error renovando token:', err);
+      // Refresh token inválido o expirado -> logout
+      clearToken();
+      clearUser();
+      clearRefreshToken();
+      window.location.href = "index.html";
+      throw err;
+    }finally{
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 /* =========================
@@ -142,6 +207,7 @@ function resetInactivityTimer(){
     setTimeout(() => {
       clearToken();
       clearUser();
+      clearRefreshToken();
       window.location.href = "index.html";
     }, 1500);
   }, INACTIVITY_TIMEOUT_MS);
@@ -165,9 +231,9 @@ function setupInactivityMonitor(){
 }
 
 /* =========================
-   API
+   API CON AUTO-REFRESH
    ========================= */
-async function api(path, {method="GET", body=null, auth=true} = {}){
+async function api(path, {method="GET", body=null, auth=true, _retry=true} = {}){
   const headers = {};
   if(!(body instanceof FormData)) headers["Content-Type"] = "application/json";
   if(auth){
@@ -181,8 +247,27 @@ async function api(path, {method="GET", body=null, auth=true} = {}){
     body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : null
   });
 
+  // Si es 401 y tenemos refresh token, intentar renovar
+  if(res.status === 401 && auth && _retry && getRefreshToken()){
+    console.log('🔓 Access token expirado, intentando renovar...');
+
+    try{
+      await refreshAccessToken();
+
+      // Reintentar request original con nuevo token
+      return api(path, {method, body, auth, _retry: false});
+
+    }catch(err){
+      // Si falla el refresh, ya se hizo logout en refreshAccessToken()
+      throw new Error("Sesión expirada. Volvé a iniciar sesión.");
+    }
+  }
+
+  // Si es 401 sin refresh token, logout directo
   if(res.status === 401 && auth){
-    clearToken(); clearUser();
+    clearToken();
+    clearUser();
+    clearRefreshToken();
     window.location.href = "index.html";
     throw new Error("Sesión expirada. Volvé a iniciar sesión.");
   }
@@ -214,7 +299,9 @@ async function handleLogin(e){
   try{
     const data = await api("/api/auth/login", { method:"POST", body:{ username, password }, auth:false });
     setToken(data.token);
+    setRefreshToken(data.refreshToken); // Guardar refresh token
     setUser(data.user);
+    console.log(`✅ Login exitoso. Token expira en ${data.expiresIn}s (${data.expiresIn/60} min)`);
     toast("✅ Sesión iniciada", "Redirigiendo...", "success");
     setTimeout(()=> window.location.href = "egreso.html", 250);
   }catch(err){
@@ -251,8 +338,26 @@ function hydrateTopbar(){
     .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion" || u.role === "encargado") ? "" : "none");
 }
 
-function logout(){
-  clearToken(); clearUser();
+async function logout(){
+  const refreshToken = getRefreshToken();
+
+  // Intentar revocar refresh token en backend
+  if(refreshToken){
+    try{
+      await api("/api/auth/logout", {
+        method: "POST",
+        body: { refreshToken },
+        auth: true
+      });
+    }catch(err){
+      console.error('Error revocando token:', err);
+      // Continuar con logout local aunque falle
+    }
+  }
+
+  clearToken();
+  clearUser();
+  clearRefreshToken();
   window.location.href = "index.html";
 }
 
