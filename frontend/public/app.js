@@ -1264,7 +1264,11 @@ function bindVerDetalleButtons(egresos){
   });
 }
 
+// Variable global para almacenar el egreso actual
+let currentEgreso = null;
+
 function mostrarDetalle(e){
+  currentEgreso = e; // Guardar egreso en variable global
   console.log('📋 mostrarDetalle llamada con egreso:', e);
   const modal = document.getElementById("detalleModal");
   const body = document.getElementById("detalleBody");
@@ -1309,7 +1313,7 @@ function mostrarDetalle(e){
             <button class="btn btn-small" onclick="verHistorial(${e.id})">📜 Historial</button>
           ` : ''}
           ${canEdit && (status === 'activo' || status === 'editada') ? `
-            <button class="btn btn-small btn-primary" onclick="editarEgresoModal(${JSON.stringify(e).replace(/"/g, '&quot;')})">✏️ Editar</button>
+            <button class="btn btn-small btn-primary" onclick="editarEgresoModal()">✏️ Editar</button>
           ` : ''}
         </div>
       </div>
@@ -1460,7 +1464,9 @@ async function handleFiltrosSubmit(e){
 /* =========================
    EDICIÓN Y ANULACIÓN DE EGRESOS
    ========================= */
-function editarEgresoModal(egreso){
+function editarEgresoModal(){
+  const egreso = currentEgreso;
+  if(!egreso) return;
   const modal = document.getElementById("detalleModal");
   const body = document.getElementById("detalleBody");
   if(!modal || !body) return;
@@ -1526,7 +1532,7 @@ function editarEgresoModal(egreso){
       </div>
 
       <div class="actions span12" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
-        <button type="button" class="btn btn-ghost" onclick="mostrarDetalle(${JSON.stringify(egreso).replace(/"/g, '&quot;')})">Cancelar</button>
+        <button type="button" class="btn btn-ghost" onclick="mostrarDetalle(currentEgreso)">Cancelar</button>
         <button type="submit" class="btn btn-primary">✓ Guardar Cambios</button>
       </div>
     </form>
