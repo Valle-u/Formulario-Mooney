@@ -593,8 +593,15 @@ router.get("/:id/comprobante", auth, async (req, res) => {
     console.log(`  - UPLOAD_DIR: ${UPLOAD_DIR}`);
     console.log(`  - process.cwd(): ${process.cwd()}`);
 
-    // Si el comprobante está en R2 (tiene URL pública), redirigir
-    if (egreso.comprobante_url && egreso.comprobante_url.startsWith('http')) {
+    // Si el comprobante está en R2 (URL pública externa), redirigir
+    // Verificar que sea URL de R2 y no URL local de uploads
+    const isR2Url = egreso.comprobante_url &&
+                    egreso.comprobante_url.startsWith('http') &&
+                    (egreso.comprobante_url.includes('.r2.dev') ||
+                     egreso.comprobante_url.includes('.r2.cloudflarestorage.com') ||
+                     egreso.comprobante_url.includes('pub-'));
+
+    if (isR2Url) {
       console.log(`  ✅ Redirigiendo a R2: ${egreso.comprobante_url}`);
       await auditLog(req, {
         action: "COMPROBANTE_VIEW",
