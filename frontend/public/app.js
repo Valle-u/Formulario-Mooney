@@ -1310,10 +1310,10 @@ function mostrarDetalle(e){
         <div>${statusBadge}</div>
         <div style="display: flex; gap: 8px;">
           ${canEdit && status === 'activo' ? `
-            <button class="btn btn-small" onclick="verHistorial(${e.id})">📜 Historial</button>
+            <button class="btn btn-small" id="btnHistorialModal" data-egreso-id="${e.id}">📜 Historial</button>
           ` : ''}
           ${canEdit && (status === 'activo' || status === 'editada') ? `
-            <button class="btn btn-small btn-primary" onclick="editarEgresoModal()">✏️ Editar</button>
+            <button class="btn btn-small btn-primary" id="btnEditarModal">✏️ Editar</button>
           ` : ''}
         </div>
       </div>
@@ -1410,6 +1410,18 @@ function mostrarDetalle(e){
   console.log('✅ HTML generado, mostrando modal...');
   console.log('🔍 Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
+
+  // Agregar event listeners a los botones del modal
+  setTimeout(() => {
+    const btnEditar = document.getElementById("btnEditarModal");
+    if(btnEditar) btnEditar.addEventListener("click", () => editarEgresoModal());
+
+    const btnHistorial = document.getElementById("btnHistorialModal");
+    if(btnHistorial) {
+      const egresoId = btnHistorial.getAttribute("data-egreso-id");
+      btnHistorial.addEventListener("click", () => verHistorial(parseInt(egresoId)));
+    }
+  }, 0);
   console.log('✅ Modal mostrado con display:', modal.style.display);
 }
 
@@ -1532,7 +1544,7 @@ function editarEgresoModal(){
       </div>
 
       <div class="actions span12" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
-        <button type="button" class="btn btn-ghost" onclick="mostrarDetalle(currentEgreso)">Cancelar</button>
+        <button type="button" class="btn btn-ghost" id="btnCancelarEdicion">Cancelar</button>
         <button type="submit" class="btn btn-primary">✓ Guardar Cambios</button>
       </div>
     </form>
@@ -1580,6 +1592,12 @@ function editarEgresoModal(){
   modal.style.display = "flex";
 }
 
+
+  // Agregar event listener al botón Cancelar
+  setTimeout(() => {
+    const btnCancelar = document.getElementById("btnCancelarEdicion");
+    if(btnCancelar) btnCancelar.addEventListener("click", () => mostrarDetalle(currentEgreso));
+  }, 0);
 async function actualizarEgreso(id, updates){
   try{
     await api(`/api/egresos/${id}`, { method: 'PUT', body: updates });
@@ -1698,11 +1716,17 @@ function mostrarHistorialModal(egresoId, changes){
       ${rows}
     </div>
     <div style="margin-top: 16px; text-align: right;">
-      <button class="btn btn-ghost" onclick="cerrarModal()">Cerrar</button>
+      <button class="btn btn-ghost" id="btnCerrarHistorial">Cerrar</button>
     </div>
   `;
 
   modal.style.display = "block";
+
+  // Agregar event listener al botón Cerrar
+  setTimeout(() => {
+    const btnCerrar = document.getElementById("btnCerrarHistorial");
+    if(btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+  }, 0);
 }
 
 /* =========================
