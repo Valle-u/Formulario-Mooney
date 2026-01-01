@@ -1340,15 +1340,6 @@ function mostrarDetalle(e){
     <div class="grid">
       <div class="field span12" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <div>${statusBadge}</div>
-        <div style="display: flex; gap: 8px;">
-          ${canEdit && status === 'activo' ? `
-            <button class="btn btn-small" onclick="verHistorial(${e.id})">📜 Historial</button>
-            <button class="btn btn-small btn-danger" onclick="mostrarModalAnular(${e.id})">✗ Anular</button>
-          ` : ''}
-          ${canEdit && status === 'activo' ? `
-            <button class="btn btn-small btn-primary" onclick="editarEgreso(${JSON.stringify(e).replace(/"/g, '&quot;')})">✏️ Editar</button>
-          ` : ''}
-        </div>
       </div>
 
       ${status === 'anulado' && e.motivo_anulacion ? `
