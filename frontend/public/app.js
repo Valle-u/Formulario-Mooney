@@ -1200,6 +1200,8 @@ function renderEgresos(egresos, pagination){
       ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✓ ACTIVO</span>'
       : status === 'anulado'
       ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✗ ANULADO</span>'
+      : status === 'editada'
+      ? '<span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✏️ EDITADA</span>'
       : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">⏳ PENDIENTE</span>';
 
     return `
@@ -1282,8 +1284,8 @@ function mostrarDetalle(e){
   const isPdf = e.comprobante_mime === "application/pdf";
   const comprobanteUrl = `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`;
   const comprobantePreview = isPdf
-    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" class="btn btn-primary">📄 Ver PDF</a>`
-    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
+    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">📄 Ver PDF en nueva ventana</a>`
+    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
 
   // Estado visual
   const status = e.status || 'activo';
@@ -1291,6 +1293,8 @@ function mostrarDetalle(e){
     ? '<span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✓ ACTIVO</span>'
     : status === 'anulado'
     ? '<span style="background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✗ ANULADO</span>'
+    : status === 'editada'
+    ? '<span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✏️ EDITADA</span>'
     : '<span style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⏳ PENDIENTE</span>';
 
   const user = getUser();
@@ -1303,10 +1307,9 @@ function mostrarDetalle(e){
         <div style="display: flex; gap: 8px;">
           ${canEdit && status === 'activo' ? `
             <button class="btn btn-small" onclick="verHistorial(${e.id})">📜 Historial</button>
-            <button class="btn btn-small btn-danger" onclick="mostrarModalAnular(${e.id})">✗ Anular</button>
           ` : ''}
-          ${canEdit && status === 'activo' ? `
-            <button class="btn btn-small btn-primary" onclick="editarEgreso(${JSON.stringify(e).replace(/"/g, '&quot;')})">✏️ Editar</button>
+          ${canEdit && (status === 'activo' || status === 'editada') ? `
+            <button class="btn btn-small btn-primary" onclick="editarEgresoModal(${JSON.stringify(e).replace(/"/g, '&quot;')})">✏️ Editar</button>
           ` : ''}
         </div>
       </div>
@@ -1381,10 +1384,6 @@ function mostrarDetalle(e){
         <div class="note">${escapeHtml(e.notas)}</div>
       </div>` : ""}
       <div class="field span12">
-        <label>COMPROBANTE</label>
-        ${comprobantePreview}
-      </div>
-      <div class="field span12">
         <label>CREADO POR</label>
         <div class="note">${escapeHtml(e.created_by_username)} - ${escapeHtml(new Date(e.created_at).toLocaleString())}</div>
       </div>
@@ -1394,6 +1393,13 @@ function mostrarDetalle(e){
         <label>ÚLTIMA MODIFICACIÓN</label>
         <div class="note">${new Date(e.updated_at).toLocaleString()}</div>
       </div>` : ''}
+
+      <div class="field span12" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <label>COMPROBANTE</label>
+        <div style="margin-top: 8px;">
+          ${comprobantePreview}
+        </div>
+      </div>
     </div>
   `;
 
@@ -1454,31 +1460,118 @@ async function handleFiltrosSubmit(e){
 /* =========================
    EDICIÓN Y ANULACIÓN DE EGRESOS
    ========================= */
-function editarEgreso(egreso){
-  // TODO: Implementar modal de edición completo
-  const motivo = prompt(`Vas a editar el egreso #${egreso.id}\n\n¿Motivo del cambio?`);
-  if(!motivo) return;
+function editarEgresoModal(egreso){
+  const modal = document.getElementById("detalleModal");
+  const body = document.getElementById("detalleBody");
+  if(!modal || !body) return;
 
-  const nuevoMonto = prompt(`Monto actual: $${egreso.monto}\n\nNuevo monto (dejar vacío para no cambiar):`, egreso.monto);
-  const nuevaCuenta = prompt(`Cuenta receptora actual: ${egreso.cuenta_receptora}\n\nNueva cuenta (dejar vacío para no cambiar):`, egreso.cuenta_receptora);
+  // Formulario de edición
+  body.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0 0 8px 0;">✏️ Editar Transferencia</h3>
+      <div class="note">Egreso #${egreso.id} - Solo modificá los campos necesarios</div>
+    </div>
 
-  const updates = {};
-  if(nuevoMonto && parseFloat(nuevoMonto) !== parseFloat(egreso.monto)){
-    updates.monto = parseFloat(nuevoMonto);
-    updates.monto_raw = nuevoMonto;
-  }
-  if(nuevaCuenta && nuevaCuenta !== egreso.cuenta_receptora){
-    updates.cuenta_receptora = nuevaCuenta;
-  }
+    <form id="formEditarEgreso" class="grid">
+      <div class="field span6">
+        <label>FECHA</label>
+        <input type="date" id="edit_fecha" value="${escapeHtml(egreso.fecha)}">
+      </div>
 
-  if(Object.keys(updates).length === 0){
-    toast("Sin cambios", "No se realizaron modificaciones", "info");
-    return;
-  }
+      <div class="field span6">
+        <label>HORA</label>
+        <input type="time" id="edit_hora" value="${escapeHtml(egreso.hora || '')}">
+      </div>
 
-  updates.change_reason = motivo;
+      <div class="field span6">
+        <label>TURNO</label>
+        <select id="edit_turno">
+          <option value="Turno mañana" ${egreso.turno === 'Turno mañana' ? 'selected' : ''}>Turno mañana</option>
+          <option value="Turno tarde" ${egreso.turno === 'Turno tarde' ? 'selected' : ''}>Turno tarde</option>
+          <option value="Turno noche" ${egreso.turno === 'Turno noche' ? 'selected' : ''}>Turno noche</option>
+        </select>
+      </div>
 
-  actualizarEgreso(egreso.id, updates);
+      <div class="field span6">
+        <label>MONTO</label>
+        <input type="text" id="edit_monto" value="${escapeHtml(egreso.monto)}" placeholder="Ej: 12000 o 12000,50">
+      </div>
+
+      <div class="field span6">
+        <label>EMPRESA SALIDA</label>
+        <select id="edit_empresa_salida">
+          ${EMPRESAS_SALIDA.map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field span6">
+        <label>CUENTA SALIDA</label>
+        <input type="text" id="edit_cuenta_salida" value="${escapeHtml(egreso.cuenta_salida)}">
+      </div>
+
+      <div class="field span12">
+        <label>CUENTA RECEPTORA</label>
+        <input type="text" id="edit_cuenta_receptora" value="${escapeHtml(egreso.cuenta_receptora)}">
+      </div>
+
+      <div class="field span12">
+        <label>NOTAS</label>
+        <textarea id="edit_notas">${escapeHtml(egreso.notas || '')}</textarea>
+      </div>
+
+      <div class="field span12" style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
+        <label style="color: #92400e; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
+        <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required style="margin-top: 8px;">
+        <div class="note" style="color: #78350f; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
+      </div>
+
+      <div class="actions span12" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-ghost" onclick="mostrarDetalle(${JSON.stringify(egreso).replace(/"/g, '&quot;')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary">✓ Guardar Cambios</button>
+      </div>
+    </form>
+  `;
+
+  // Manejar submit del formulario
+  document.getElementById('formEditarEgreso').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const motivo = document.getElementById('edit_motivo').value.trim();
+    if(!motivo){
+      toast("⚠️ Falta motivo", "Debés especificar el motivo del cambio", "warning");
+      return;
+    }
+
+    const updates = {
+      fecha: document.getElementById('edit_fecha').value,
+      hora: document.getElementById('edit_hora').value,
+      turno: document.getElementById('edit_turno').value,
+      monto_raw: document.getElementById('edit_monto').value,
+      monto: parseMontoARSStrict(document.getElementById('edit_monto').value),
+      empresa_salida: document.getElementById('edit_empresa_salida').value,
+      cuenta_salida: document.getElementById('edit_cuenta_salida').value,
+      cuenta_receptora: document.getElementById('edit_cuenta_receptora').value,
+      notas: document.getElementById('edit_notas').value,
+      change_reason: motivo
+    };
+
+    // Validar monto
+    if(!updates.monto || updates.monto <= 0){
+      toast("⚠️ Monto inválido", "Ingresá un monto válido (ej: 12000 o 12000,50)", "warning");
+      return;
+    }
+
+    try {
+      await api(`/api/egresos/${egreso.id}`, { method: 'PUT', body: updates });
+      toast("✅ Actualizado", "Egreso modificado correctamente. Estado cambiado a EDITADA.", "success");
+      cerrarModal();
+      buscarEgresos(); // Recargar listado
+    } catch(err) {
+      toast("❌ Error", err.message, "error");
+    }
+  });
+
+  modal.style.display = "flex";
 }
 
 async function actualizarEgreso(id, updates){

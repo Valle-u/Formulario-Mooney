@@ -648,7 +648,7 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
       return res.status(400).json({ message: "No se puede editar un egreso anulado" });
     }
 
-    // Actualizar egreso
+    // Actualizar egreso y cambiar status a 'editada'
     await query(
       `UPDATE egresos
        SET fecha = COALESCE($1, fecha),
@@ -663,6 +663,7 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
            cuenta_salida = COALESCE($10, cuenta_salida),
            empresa_salida = COALESCE($11, empresa_salida),
            notas = COALESCE($12, notas),
+           status = 'editada',
            updated_by = $13,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $14`,
