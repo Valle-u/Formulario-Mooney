@@ -1321,7 +1321,7 @@ function mostrarDetalle(e){
 
   const isPdf = e.comprobante_mime === "application/pdf";
   // Agregar token JWT a la URL para autenticación en nueva pestaña
-  const token = localStorage.getItem("token");
+  const token = getToken(); // Usar la función correcta que obtiene mm_token
   const comprobanteUrl = `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante?token=${encodeURIComponent(token)}`;
   const comprobantePreview = isPdf
     ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" class="btn btn-primary">📄 Ver PDF</a>`
