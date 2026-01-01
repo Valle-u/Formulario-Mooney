@@ -642,10 +642,55 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       details: { filename: egreso.comprobante_filename }
     });
 
+    console.log(`  ✅ Sirviendo archivo desde disco`);
     return res.sendFile(filePath);
   } catch (err) {
     console.error("🔥 Error sirviendo comprobante:", err);
     return res.status(500).json({ message: "Error al obtener comprobante" });
+  }
+});
+
+// ENDPOINT DE DEBUGGING - Temporal para diagnosticar el problema
+router.get("/debug/uploads", auth, async (req, res) => {
+  try {
+    const uploadDir = path.join(process.cwd(), UPLOAD_DIR);
+
+    const info = {
+      uploadDir: uploadDir,
+      exists: fs.existsSync(uploadDir),
+      cwd: process.cwd(),
+      files: []
+    };
+
+    if (fs.existsSync(uploadDir)) {
+      const files = fs.readdirSync(uploadDir);
+      info.files = files.map(f => {
+        const stats = fs.statSync(path.join(uploadDir, f));
+        return {
+          name: f,
+          size: stats.size,
+          created: stats.birthtime,
+          modified: stats.mtime
+        };
+      });
+      info.totalFiles = files.length;
+    }
+
+    // También listar registros en la BD
+    const dbRecords = await query(
+      `SELECT id, comprobante_filename, comprobante_url, created_at
+       FROM egresos
+       WHERE comprobante_filename IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT 10`
+    );
+
+    info.dbRecords = dbRecords.rows;
+
+    return res.json(info);
+  } catch (err) {
+    console.error("Error en debug endpoint:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
