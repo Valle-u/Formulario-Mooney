@@ -7,17 +7,27 @@ import { query } from "../config/db.js";
  * - Verifica firma y expiración
  * - Valida que el usuario siga activo en la BD
  * - Protege contra tokens robados de usuarios desactivados
+ * - Acepta token desde header Authorization o query param ?token=
  */
 export async function auth(req, res, next) {
+  let token = null;
+
+  // Intentar obtener token desde header Authorization
   const header = req.headers.authorization || "";
   const parts = header.split(" ");
 
-  // Validar formato "Bearer <token>"
-  if (parts.length !== 2 || parts[0] !== "Bearer") {
-    return res.status(401).json({ message: "Formato de token inválido" });
+  if (parts.length === 2 && parts[0] === "Bearer") {
+    token = parts[1];
+  }
+  // Si no hay token en header, intentar desde query params
+  else if (req.query.token) {
+    token = req.query.token;
   }
 
-  const token = parts[1];
+  // Si no hay token en ningún lado
+  if (!token) {
+    return res.status(401).json({ message: "Token no proporcionado" });
+  }
 
   // Validar que el token no esté vacío
   if (!token || token.trim() === "") {

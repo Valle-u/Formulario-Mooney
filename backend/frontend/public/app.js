@@ -1320,7 +1320,9 @@ function mostrarDetalle(e){
   });
 
   const isPdf = e.comprobante_mime === "application/pdf";
-  const comprobanteUrl = `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`;
+  // Agregar token JWT a la URL para autenticación en nueva pestaña
+  const token = localStorage.getItem("token");
+  const comprobanteUrl = `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante?token=${encodeURIComponent(token)}`;
   const comprobantePreview = isPdf
     ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" class="btn btn-primary">📄 Ver PDF</a>`
     : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
