@@ -1306,16 +1306,8 @@ function mostrarDetalle(e){
 
   body.innerHTML = `
     <div class="grid">
-      <div class="field span12" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div class="field span12" style="margin-bottom: 16px;">
         <div>${statusBadge}</div>
-        <div style="display: flex; gap: 8px;">
-          ${canEdit && status === 'activo' ? `
-            <button class="btn btn-small" id="btnHistorialModal" data-egreso-id="${e.id}">📜 Historial</button>
-          ` : ''}
-          ${canEdit && (status === 'activo' || status === 'editada') ? `
-            <button class="btn btn-small btn-primary" id="btnEditarModal">✏️ Editar</button>
-          ` : ''}
-        </div>
       </div>
 
       ${status === 'anulado' && e.motivo_anulacion ? `
@@ -1411,17 +1403,6 @@ function mostrarDetalle(e){
   console.log('🔍 Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
 
-  // Agregar event listeners a los botones del modal
-  setTimeout(() => {
-    const btnEditar = document.getElementById("btnEditarModal");
-    if(btnEditar) btnEditar.addEventListener("click", () => editarEgresoModal());
-
-    const btnHistorial = document.getElementById("btnHistorialModal");
-    if(btnHistorial) {
-      const egresoId = btnHistorial.getAttribute("data-egreso-id");
-      btnHistorial.addEventListener("click", () => verHistorial(parseInt(egresoId)));
-    }
-  }, 0);
   console.log('✅ Modal mostrado con display:', modal.style.display);
 }
 
