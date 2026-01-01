@@ -560,9 +560,9 @@ router.get("/:id/comprobante", auth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Buscar el egreso
+    // Buscar el egreso con URL y filename
     const r = await query(
-      `SELECT comprobante_filename, created_by
+      `SELECT comprobante_url, comprobante_filename, created_by
        FROM egresos
        WHERE id = $1`,
       [id]
@@ -587,7 +587,20 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       return res.status(403).json({ message: "No tenés permisos para ver este comprobante" });
     }
 
-    // Servir el archivo
+    // Si el comprobante está en R2 (tiene URL pública), redirigir
+    if (egreso.comprobante_url && egreso.comprobante_url.startsWith('http')) {
+      await auditLog(req, {
+        action: "COMPROBANTE_VIEW",
+        entity: "egresos",
+        entity_id: id,
+        success: true,
+        status_code: 302,
+        details: { url: egreso.comprobante_url }
+      });
+      return res.redirect(egreso.comprobante_url);
+    }
+
+    // Si está en disco local, servir el archivo
     const filePath = path.join(process.cwd(), UPLOAD_DIR, egreso.comprobante_filename);
 
     if (!fs.existsSync(filePath)) {
