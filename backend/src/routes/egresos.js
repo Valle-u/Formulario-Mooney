@@ -587,8 +587,15 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       return res.status(403).json({ message: "No tenés permisos para ver este comprobante" });
     }
 
+    console.log(`📄 Sirviendo comprobante para egreso ${id}:`);
+    console.log(`  - comprobante_url: ${egreso.comprobante_url}`);
+    console.log(`  - comprobante_filename: ${egreso.comprobante_filename}`);
+    console.log(`  - UPLOAD_DIR: ${UPLOAD_DIR}`);
+    console.log(`  - process.cwd(): ${process.cwd()}`);
+
     // Si el comprobante está en R2 (tiene URL pública), redirigir
     if (egreso.comprobante_url && egreso.comprobante_url.startsWith('http')) {
+      console.log(`  ✅ Redirigiendo a R2: ${egreso.comprobante_url}`);
       await auditLog(req, {
         action: "COMPROBANTE_VIEW",
         entity: "egresos",
@@ -602,8 +609,20 @@ router.get("/:id/comprobante", auth, async (req, res) => {
 
     // Si está en disco local, servir el archivo
     const filePath = path.join(process.cwd(), UPLOAD_DIR, egreso.comprobante_filename);
+    console.log(`  - Ruta completa del archivo: ${filePath}`);
+    console.log(`  - Archivo existe: ${fs.existsSync(filePath)}`);
 
     if (!fs.existsSync(filePath)) {
+      console.log(`  ❌ Archivo no encontrado en disco`);
+
+      // Listar archivos en el directorio de uploads para debugging
+      try {
+        const uploadFiles = fs.readdirSync(path.join(process.cwd(), UPLOAD_DIR));
+        console.log(`  📂 Archivos en ${UPLOAD_DIR}:`, uploadFiles.slice(0, 10));
+      } catch (err) {
+        console.log(`  ❌ Error listando directorio: ${err.message}`);
+      }
+
       return res.status(404).json({ message: "Archivo no encontrado" });
     }
 
