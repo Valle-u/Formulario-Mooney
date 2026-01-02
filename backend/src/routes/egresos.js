@@ -361,14 +361,21 @@ router.get("/", auth, async (req, res) => {
     }
 
     // Filtrar por rol del usuario:
-    // - Empleado/Encargado: solo ven egresos creados por empleados/encargados
     // - Admin/Dirección: ven todos los egresos
+    // - Encargado: ve egresos de empleados y encargados
+    // - Empleado: ve solo egresos de empleados
     const isAdminOrDireccion = req.user.role === "admin" || req.user.role === "direccion";
+    const isEncargado = req.user.role === "encargado";
+    const isEmpleado = req.user.role === "empleado";
 
-    if (!isAdminOrDireccion) {
-      // Empleados y encargados solo ven egresos creados por empleados/encargados
+    if (isEncargado) {
+      // Encargados ven egresos de empleados y encargados
       where.push(`u.role IN ('empleado', 'encargado')`);
+    } else if (isEmpleado) {
+      // Empleados solo ven egresos de empleados
+      where.push(`u.role = 'empleado'`);
     }
+    // Admin y Dirección ven todos (no se agrega filtro)
 
     const lim = Math.min(Number(limit || 50), 200);
     const off = Math.max(Number(offset || 0), 0);
@@ -591,11 +598,12 @@ router.get("/:id/comprobante", auth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Buscar el egreso con URL y filename
+    // Buscar el egreso con URL, filename y rol del creador
     const r = await query(
-      `SELECT comprobante_url, comprobante_filename, created_by
-       FROM egresos
-       WHERE id = $1`,
+      `SELECT e.comprobante_url, e.comprobante_filename, e.created_by, u.role as creator_role
+       FROM egresos e
+       JOIN users u ON u.id = e.created_by
+       WHERE e.id = $1`,
       [id]
     );
 
@@ -606,21 +614,37 @@ router.get("/:id/comprobante", auth, async (req, res) => {
     const egreso = r.rows[0];
 
     // Validar permisos según rol:
-    // - Admin y Dirección: pueden ver todos los comprobantes
-    // - Empleado y Encargado: solo pueden ver sus propios comprobantes
+    // - Admin/Dirección: pueden ver todos los comprobantes
+    // - Encargado: puede ver comprobantes de empleados y encargados
+    // - Empleado: puede ver comprobantes de empleados
     const isAdminOrDireccion = req.user.role === "admin" || req.user.role === "direccion";
-    const isCreator = req.user.id === egreso.created_by;
+    const isEncargado = req.user.role === "encargado";
+    const isEmpleado = req.user.role === "empleado";
+    const creatorRole = egreso.creator_role;
 
-    if (!isAdminOrDireccion && !isCreator) {
+    let hasPermission = false;
+
+    if (isAdminOrDireccion) {
+      // Admin y Dirección pueden ver todos
+      hasPermission = true;
+    } else if (isEncargado) {
+      // Encargados pueden ver comprobantes de empleados y encargados
+      hasPermission = creatorRole === "empleado" || creatorRole === "encargado";
+    } else if (isEmpleado) {
+      // Empleados solo pueden ver comprobantes de empleados
+      hasPermission = creatorRole === "empleado";
+    }
+
+    if (!hasPermission) {
       await auditLog(req, {
         action: "COMPROBANTE_ACCESS_DENIED",
         entity: "egresos",
         entity_id: id,
         success: false,
         status_code: 403,
-        details: { reason: "Solo puede ver comprobantes propios" }
+        details: { reason: "No tiene permisos para ver este comprobante", creator_role: creatorRole }
       });
-      return res.status(403).json({ message: "Solo podés ver tus propios comprobantes" });
+      return res.status(403).json({ message: "No tenés permisos para ver este comprobante" });
     }
 
     console.log(`📄 Sirviendo comprobante para egreso ${id}:`);
