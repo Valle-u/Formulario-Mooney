@@ -595,18 +595,8 @@ router.get("/:id/comprobante", auth, async (req, res) => {
 
     const egreso = r.rows[0];
 
-    // Validar permisos: solo admin o creador puede ver el comprobante
-    if (req.user.role !== "admin" && req.user.id !== egreso.created_by) {
-      await auditLog(req, {
-        action: "COMPROBANTE_ACCESS_DENIED",
-        entity: "egresos",
-        entity_id: id,
-        success: false,
-        status_code: 403,
-        details: { reason: "No es el creador ni admin" }
-      });
-      return res.status(403).json({ message: "No tenés permisos para ver este comprobante" });
-    }
+    // Todos los usuarios autenticados pueden ver comprobantes
+    // (la autenticación ya fue verificada por el middleware auth)
 
     console.log(`📄 Sirviendo comprobante para egreso ${id}:`);
     console.log(`  - comprobante_url: ${egreso.comprobante_url}`);
