@@ -63,8 +63,9 @@ body{
   background: var(--input);
   border-radius: 2px;
   border: 1px solid rgba(0,0,0,.15);
-  overflow:hidden;
+  overflow:visible;
   margin: 10px 0;
+  position: relative;
 }
 .input span{
   width:42px;
@@ -79,6 +80,37 @@ body{
   padding:12px 10px;
   outline:none;
   background:transparent;
+}
+
+/* Botón de mostrar/ocultar contraseña */
+.password-toggle {
+  position: absolute !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+  padding: 4px !important;
+  opacity: 0.6 !important;
+  transition: opacity 0.2s !important;
+  z-index: 10 !important;
+  line-height: 1 !important;
+}
+
+.password-toggle:hover {
+  opacity: 1 !important;
+}
+
+/* Para el login (dentro de .input) */
+.input .password-toggle {
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+/* Para campos normales (field) */
+.field .password-toggle {
+  right: 8px !important;
+  top: 34px !important;
 }
 .btn{
   border:0;
