@@ -1286,7 +1286,12 @@ function mostrarDetalle(e){
   });
 
   const isPdf = e.comprobante_mime === "application/pdf";
-  const comprobanteUrl = `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`;
+
+  // Usar directamente la URL de ImgBB si está disponible, sino usar el endpoint del backend
+  const comprobanteUrl = e.comprobante_url && e.comprobante_url.startsWith('http')
+    ? e.comprobante_url // URL directa de ImgBB o R2
+    : `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`; // Fallback al endpoint del backend
+
   const comprobantePreview = isPdf
     ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">📄 Ver PDF en nueva ventana</a>`
     : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
