@@ -614,23 +614,26 @@ router.get("/:id/comprobante", auth, async (req, res) => {
     console.log(`  - UPLOAD_DIR: ${UPLOAD_DIR}`);
     console.log(`  - process.cwd(): ${process.cwd()}`);
 
-    // Si el comprobante está en R2 (URL pública externa), redirigir
-    // Verificar que sea URL de R2 y no URL local de uploads
-    const isR2Url = egreso.comprobante_url &&
-                    egreso.comprobante_url.startsWith('http') &&
-                    (egreso.comprobante_url.includes('.r2.dev') ||
-                     egreso.comprobante_url.includes('.r2.cloudflarestorage.com') ||
-                     egreso.comprobante_url.includes('pub-'));
+    // Si el comprobante está en almacenamiento externo (R2 o ImgBB), redirigir
+    // Verificar que sea URL externa y no URL local de uploads
+    const isExternalUrl = egreso.comprobante_url &&
+                          egreso.comprobante_url.startsWith('http') &&
+                          (egreso.comprobante_url.includes('.r2.dev') ||
+                           egreso.comprobante_url.includes('.r2.cloudflarestorage.com') ||
+                           egreso.comprobante_url.includes('pub-') ||
+                           egreso.comprobante_url.includes('i.ibb.co') ||
+                           egreso.comprobante_url.includes('ibb.co'));
 
-    if (isR2Url) {
-      console.log(`  ✅ Redirigiendo a R2: ${egreso.comprobante_url}`);
+    if (isExternalUrl) {
+      const storageType = egreso.comprobante_url.includes('ibb.co') ? 'ImgBB' : 'R2';
+      console.log(`  ✅ Redirigiendo a ${storageType}: ${egreso.comprobante_url}`);
       await auditLog(req, {
         action: "COMPROBANTE_VIEW",
         entity: "egresos",
         entity_id: id,
         success: true,
         status_code: 302,
-        details: { url: egreso.comprobante_url }
+        details: { url: egreso.comprobante_url, storage: storageType }
       });
       return res.redirect(egreso.comprobante_url);
     }
