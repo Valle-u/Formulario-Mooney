@@ -16,7 +16,9 @@ import {
 } from "../utils/validators.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
-import { uploadToR2, isR2Configured } from "../config/r2.js";
+// SOLUCIÓN: Usar cliente R2 con fetch nativo (sin AWS SDK)
+// Esto evita problemas SSL/OpenSSL en SeeNode
+import { uploadToR2, isR2Configured } from "../config/r2-fetch.js";
 
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
