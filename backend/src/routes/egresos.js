@@ -360,6 +360,16 @@ router.get("/", auth, async (req, res) => {
       where.push(`e.created_by = $${params.length}`);
     }
 
+    // Filtrar por rol del usuario:
+    // - Empleado/Encargado: solo ven egresos creados por empleados/encargados
+    // - Admin/Dirección: ven todos los egresos
+    const isAdminOrDireccion = req.user.role === "admin" || req.user.role === "direccion";
+
+    if (!isAdminOrDireccion) {
+      // Empleados y encargados solo ven egresos creados por empleados/encargados
+      where.push(`u.role IN ('empleado', 'encargado')`);
+    }
+
     const lim = Math.min(Number(limit || 50), 200);
     const off = Math.max(Number(offset || 0), 0);
 
@@ -595,8 +605,23 @@ router.get("/:id/comprobante", auth, async (req, res) => {
 
     const egreso = r.rows[0];
 
-    // Todos los usuarios autenticados pueden ver comprobantes
-    // (la autenticación ya fue verificada por el middleware auth)
+    // Validar permisos según rol:
+    // - Admin y Dirección: pueden ver todos los comprobantes
+    // - Empleado y Encargado: solo pueden ver sus propios comprobantes
+    const isAdminOrDireccion = req.user.role === "admin" || req.user.role === "direccion";
+    const isCreator = req.user.id === egreso.created_by;
+
+    if (!isAdminOrDireccion && !isCreator) {
+      await auditLog(req, {
+        action: "COMPROBANTE_ACCESS_DENIED",
+        entity: "egresos",
+        entity_id: id,
+        success: false,
+        status_code: 403,
+        details: { reason: "Solo puede ver comprobantes propios" }
+      });
+      return res.status(403).json({ message: "Solo podés ver tus propios comprobantes" });
+    }
 
     console.log(`📄 Sirviendo comprobante para egreso ${id}:`);
     console.log(`  - comprobante_url: ${egreso.comprobante_url}`);
