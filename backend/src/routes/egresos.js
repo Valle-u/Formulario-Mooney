@@ -16,9 +16,10 @@ import {
 } from "../utils/validators.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
-// SOLUCIÓN: Usar cliente R2 con fetch nativo (sin AWS SDK)
-// Esto evita problemas SSL/OpenSSL en SeeNode
+
+// Soportar múltiples proveedores de almacenamiento
 import { uploadToR2, isR2Configured } from "../config/r2-fetch.js";
+import { uploadToImgBB, isImgBBConfigured } from "../config/imgbb.js";
 
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
@@ -140,16 +141,31 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const hqNorm = normalizeHoraOptional(hora_quema_fichas);
     if (String(hora_quema_fichas || "").trim() && !hqNorm) return res.status(400).json({ message: "Hora quema de fichas inválida. Usá HH:MM" });
 
-    // Subir archivo a R2 o guardar localmente
+    // Subir archivo a almacenamiento externo o guardar localmente
+    // Prioridad: ImgBB > R2 > Local
     let comprobanteUrl;
     const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
     const fileName = `${Date.now()}_${safe}`;
+    const fileNameWithoutExt = fileName.replace(/\.[^.]+$/, ''); // Sin extensión para ImgBB
 
     console.log(`📁 Archivo recibido: ${file.originalname}, Size: ${file.size} bytes, MIME: ${file.mimetype}`);
+    console.log(`🔧 ImgBB configurado: ${isImgBBConfigured()}`);
     console.log(`🔧 R2 configurado: ${isR2Configured()}`);
 
-    if (isR2Configured()) {
-      // Subir a Cloudflare R2
+    // Prioridad 1: ImgBB (más fácil y sin problemas SSL)
+    if (isImgBBConfigured()) {
+      try {
+        console.log(`☁️ Intentando subir a ImgBB: ${fileName}`);
+        comprobanteUrl = await uploadToImgBB(file.buffer, fileNameWithoutExt, file.mimetype);
+        console.log(`✅ Comprobante subido a ImgBB: ${fileName} -> ${comprobanteUrl}`);
+      } catch (error) {
+        console.error('❌ Error subiendo a ImgBB:', error);
+        console.error('Error details:', error.message, error.stack);
+        return res.status(500).json({ message: `Error al subir comprobante a ImgBB: ${error.message}` });
+      }
+    }
+    // Prioridad 2: Cloudflare R2 (si ImgBB no está configurado)
+    else if (isR2Configured()) {
       try {
         console.log(`☁️ Intentando subir a R2: ${fileName}`);
         comprobanteUrl = await uploadToR2(file.buffer, fileName, file.mimetype);
@@ -159,10 +175,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
         console.error('Error details:', error.message, error.stack);
         return res.status(500).json({ message: `Error al subir comprobante a R2: ${error.message}` });
       }
-    } else {
-      // Fallback: guardar en disco local
+    }
+    // Fallback: Guardar en disco local (solo para desarrollo)
+    else {
       try {
         console.log(`💾 Guardando localmente en: ${UPLOAD_DIR}/${fileName}`);
+        console.warn('⚠️  ADVERTENCIA: Guardando archivo localmente. Esto NO es recomendado en SeeNode.');
+        console.warn('⚠️  Configura IMGBB_API_KEY para usar almacenamiento externo.');
 
         // Asegurar que el directorio existe
         if (!fs.existsSync(UPLOAD_DIR)) {

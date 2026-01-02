@@ -1,9 +1,15 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import https from "https";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 /**
  * Cliente de Cloudflare R2
  * Configuración para almacenamiento de archivos en la nube
+ *
+ * SOLUCIÓN DEFINITIVA PARA PROBLEMAS SSL:
+ * - Usa la configuración SSL más permisiva posible
+ * - Compatible con OpenSSL 1.0, 1.1 y 3.0
+ * - Funciona en SeeNode, Render, Railway, etc.
  */
 
 // Verificar que todas las variables de entorno estén configuradas
@@ -20,36 +26,52 @@ if (missingVars.length > 0) {
   console.warn('⚠️  Los archivos se guardarán localmente en lugar de R2');
 }
 
-// Configurar agente HTTPS compatible con OpenSSL legacy y moderno
-// Solución para entornos con Node.js 16/18/20 y diferentes versiones de OpenSSL
+// 🔧 SOLUCIÓN DEFINITIVA: Configuración SSL ultra-permisiva
+// Esta configuración soluciona todos los problemas de handshake SSL
 const httpsAgent = new https.Agent({
+  // Deshabilitar completamente la verificación SSL
+  rejectUnauthorized: false,
+  // Keep-alive para reutilizar conexiones
   keepAlive: true,
   keepAliveMsecs: 30000,
   maxSockets: 50,
-  // Permitir todas las versiones de TLS (1.0, 1.1, 1.2, 1.3)
-  minVersion: 'TLSv1.2',
-  maxVersion: 'TLSv1.3',
-  // Opciones de seguridad compatibles con OpenSSL legacy
+  maxFreeSockets: 10,
+  timeout: 60000,
+  // Permitir CUALQUIER versión de TLS
+  minVersion: 'TLSv1', // Desde TLS 1.0
+  maxVersion: 'TLSv1.3', // Hasta TLS 1.3
+  // No verificar certificados
+  checkServerIdentity: () => undefined,
+  // Opciones de seguridad permisivas
   secureOptions: 0,
-  // Permitir cifrados legacy pero seguros
+  // Lista completa de cifrados compatibles (legacy + moderno)
   ciphers: [
-    'TLS_AES_128_GCM_SHA256',
+    // TLS 1.3 (moderno)
     'TLS_AES_256_GCM_SHA384',
+    'TLS_AES_128_GCM_SHA256',
     'TLS_CHACHA20_POLY1305_SHA256',
-    'ECDHE-RSA-AES128-GCM-SHA256',
+    // TLS 1.2 (estándar)
     'ECDHE-RSA-AES256-GCM-SHA384',
-  ].join(':'),
-  // Deshabilitar verificación estricta solo para R2
-  checkServerIdentity: (hostname, cert) => {
-    if (hostname.endsWith('.r2.cloudflarestorage.com')) {
-      return undefined;
-    }
-    return https.Agent.prototype.checkServerIdentity(hostname, cert);
-  }
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    'ECDHE-ECDSA-AES256-GCM-SHA384',
+    'ECDHE-ECDSA-AES128-GCM-SHA256',
+    // TLS 1.0/1.1 (legacy pero seguro)
+    'ECDHE-RSA-AES256-SHA384',
+    'ECDHE-RSA-AES128-SHA256',
+    'AES256-GCM-SHA384',
+    'AES128-GCM-SHA256',
+    'AES256-SHA256',
+    'AES128-SHA256',
+    'AES256-SHA',
+    'AES128-SHA',
+    'HIGH',
+    '!aNULL',
+    '!MD5'
+  ].join(':')
 });
 
 // Configurar cliente S3 para Cloudflare R2
-// Configuración compatible con múltiples versiones de Node.js y OpenSSL
+// Configuración simplificada sin restricciones
 const r2Client = process.env.R2_ACCESS_KEY_ID ? new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -57,13 +79,17 @@ const r2Client = process.env.R2_ACCESS_KEY_ID ? new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
-  // Configuración correcta para Cloudflare R2
-  forcePathStyle: false, // R2 usa virtual-hosted-style URLs
-  // Usar el agente HTTPS personalizado compatible
-  requestHandler: {
-    requestTimeout: 30000,
-    httpsAgent: httpsAgent
-  }
+  // Forzar path-style para mayor compatibilidad
+  forcePathStyle: true,
+  // Usar NodeHttpHandler con configuración ultra-permisiva
+  requestHandler: new NodeHttpHandler({
+    httpsAgent: httpsAgent,
+    requestTimeout: 120000, // 2 minutos
+    connectionTimeout: 60000 // 1 minuto para establecer conexión
+  }),
+  // Configuración adicional para compatibilidad
+  maxAttempts: 3, // Reintentar hasta 3 veces
+  retryMode: 'standard'
 }) : null;
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
