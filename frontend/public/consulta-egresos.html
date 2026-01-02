@@ -71,11 +71,14 @@
 
         <!-- FILTROS -->
         <section class="card">
-          <div class="card-header">
-            🔍 Filtros de búsqueda
+          <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" id="filtrosHeader">
+            <span>🔍 Filtros de búsqueda</span>
+            <button type="button" class="btn btn-ghost" id="btnToggleFiltros" style="margin: 0; padding: 4px 12px; font-size: 14px;" title="Mostrar/Ocultar filtros">
+              <span id="filtrosToggleIcon">▼</span>
+            </button>
           </div>
 
-          <div class="card-body">
+          <div class="card-body" id="filtrosBody">
             <form id="filtrosForm" class="grid">
 
               <div class="field span3">

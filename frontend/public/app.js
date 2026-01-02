@@ -1108,6 +1108,22 @@ let egresosOffset = 0;
 const EGRESOS_LIMIT = 50;
 let currentFilters = {};
 
+// Toggle de filtros (mostrar/ocultar)
+function toggleFiltros(){
+  const body = document.getElementById("filtrosBody");
+  const icon = document.getElementById("filtrosToggleIcon");
+
+  if(!body || !icon) return;
+
+  const isHidden = body.style.display === "none";
+
+  body.style.display = isHidden ? "" : "none";
+  icon.textContent = isHidden ? "▼" : "▲";
+
+  // Guardar preferencia en localStorage
+  localStorage.setItem("filtros_visible", isHidden ? "true" : "false");
+}
+
 function populateFiltrosSelects(){
   const selEmpresa = document.getElementById("empresa_salida");
   const selEtiqueta = document.getElementById("etiqueta");
@@ -1806,6 +1822,22 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.getElementById("btnNext")?.addEventListener("click", egresosNext);
     document.getElementById("btnCerrarModal")?.addEventListener("click", cerrarModal);
     document.getElementById("btnDescargarCsvFiltrado")?.addEventListener("click", downloadCSVFiltrado);
+
+    // Toggle de filtros
+    document.getElementById("btnToggleFiltros")?.addEventListener("click", (e) => {
+      e.stopPropagation(); // Evitar que se dispare el click del header
+      toggleFiltros();
+    });
+    document.getElementById("filtrosHeader")?.addEventListener("click", toggleFiltros);
+
+    // Restaurar estado de filtros desde localStorage
+    const filtrosVisible = localStorage.getItem("filtros_visible");
+    if(filtrosVisible === "false"){
+      const body = document.getElementById("filtrosBody");
+      const icon = document.getElementById("filtrosToggleIcon");
+      if(body) body.style.display = "none";
+      if(icon) icon.textContent = "▲";
+    }
 
     // Cerrar modal al hacer click en el backdrop
     document.querySelector(".modal-backdrop")?.addEventListener("click", cerrarModal);
