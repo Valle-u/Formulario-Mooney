@@ -92,6 +92,24 @@ function escapeHtml(unsafe) {
 }
 
 /* =========================
+   MOSTRAR/OCULTAR CONTRASEÑA
+   ========================= */
+function togglePasswordVisibility(inputId, button) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (input.type === "password") {
+    input.type = "text";
+    button.style.opacity = "1";
+    button.textContent = "🙈"; // Cambia a "ocultar"
+  } else {
+    input.type = "password";
+    button.style.opacity = "0.6";
+    button.textContent = "👁️"; // Cambia a "mostrar"
+  }
+}
+
+/* =========================
    STORAGE / AUTH
    ========================= */
 function setToken(t){ localStorage.setItem(STORAGE_KEY_TOKEN, t); }
@@ -937,19 +955,52 @@ function bindUserRowActions(){
     });
   });
 
-  document.querySelectorAll("[data-reset-pass]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const id = btn.dataset.resetPass;
-      const pass = prompt("Nueva contraseña (mín 4):");
-      if(!pass) return;
+  // Variable para guardar el ID del usuario a resetear
+  let resetUserId = null;
 
-      try{
-        await api(`/api/users/${id}/reset-password`, { method:"POST", body:{ password: pass } });
-        toast("✅ Guardado","Contraseña actualizada correctamente", "success");
-      }catch(err){
-        toast("❌ Error", err.message, "error");
+  document.querySelectorAll("[data-reset-pass]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.resetPass;
+      resetUserId = id;
+
+      // Mostrar modal
+      const modal = document.getElementById("resetPasswordModal");
+      const input = document.getElementById("reset_password");
+      if(modal && input) {
+        modal.style.display = "flex";
+        input.value = "";
+        input.focus();
       }
     });
+  });
+
+  // Cerrar modal
+  const closeResetModal = () => {
+    const modal = document.getElementById("resetPasswordModal");
+    if(modal) modal.style.display = "none";
+    resetUserId = null;
+  };
+
+  document.getElementById("btnCloseResetModal")?.addEventListener("click", closeResetModal);
+  document.getElementById("btnCancelReset")?.addEventListener("click", closeResetModal);
+
+  // Confirmar reset
+  document.getElementById("btnConfirmReset")?.addEventListener("click", async ()=>{
+    const pass = document.getElementById("reset_password")?.value || "";
+    if(!pass || !resetUserId) return;
+
+    try{
+      await api(`/api/users/${resetUserId}/reset-password`, { method:"POST", body:{ password: pass } });
+      toast("✅ Guardado","Contraseña actualizada correctamente", "success");
+      closeResetModal();
+    }catch(err){
+      toast("❌ Error", err.message, "error");
+    }
+  });
+
+  // Cerrar modal al hacer click fuera
+  document.getElementById("resetPasswordModal")?.addEventListener("click", (e)=>{
+    if(e.target.id === "resetPasswordModal") closeResetModal();
   });
 }
 

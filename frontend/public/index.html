@@ -19,9 +19,12 @@
             <input id="username" type="text" placeholder="usuario" autocomplete="username" required>
           </div>
 
-          <div class="input">
+          <div class="input" style="position: relative;">
             <span>🔒</span>
-            <input id="password" type="password" placeholder="contraseña" autocomplete="current-password" required>
+            <input id="password" type="password" placeholder="contraseña" autocomplete="current-password" required style="padding-right: 45px;">
+            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
+              👁️
+            </button>
           </div>
 
           <button class="btn btn-primary" type="submit">Iniciar sesión</button>
