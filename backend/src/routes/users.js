@@ -82,6 +82,28 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
 
     const { role, full_name, is_active } = req.body || {};
 
+    // Obtener información del usuario a modificar
+    const targetUser = await query("SELECT role FROM users WHERE id = $1", [id]);
+    if (targetUser.rowCount === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    const targetRole = targetUser.rows[0].role;
+
+    // Validar permisos según el rol del usuario que hace la modificación
+    const isAdmin = req.user.role === "admin";
+    const isDireccion = req.user.role === "direccion";
+
+    // Dirección NO puede modificar usuarios admin
+    if (isDireccion && !isAdmin && targetRole === "admin") {
+      return res.status(403).json({ message: "Dirección no puede modificar usuarios admin" });
+    }
+
+    // Dirección NO puede asignar rol admin
+    if (isDireccion && !isAdmin && role === "admin") {
+      return res.status(403).json({ message: "Dirección no puede asignar rol admin" });
+    }
+
+    // Nadie puede modificarse a sí mismo
     if (id === req.user.id) {
       if (typeof is_active === "boolean" && is_active === false) {
         return res.status(400).json({ message: "No podés desactivarte a vos mismo" });
@@ -91,7 +113,8 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
       }
     }
 
-    if (role && !["admin", "empleado"].includes(role)) {
+    // Validar roles permitidos
+    if (role && !["admin", "direccion", "encargado", "empleado"].includes(role)) {
       return res.status(400).json({ message: "role inválido" });
     }
 
@@ -141,6 +164,21 @@ router.post("/:id/reset-password", auth, requireAdminOrDireccion, async (req, re
     const { password } = req.body || {};
     if (!password) {
       return res.status(400).json({ message: "password es obligatoria" });
+    }
+
+    // Obtener información del usuario a modificar
+    const targetUser = await query("SELECT role FROM users WHERE id = $1", [id]);
+    if (targetUser.rowCount === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    const targetRole = targetUser.rows[0].role;
+
+    // Validar permisos: Dirección NO puede resetear password de admin
+    const isAdmin = req.user.role === "admin";
+    const isDireccion = req.user.role === "direccion";
+
+    if (isDireccion && !isAdmin && targetRole === "admin") {
+      return res.status(403).json({ message: "Dirección no puede modificar usuarios admin" });
     }
 
     // Validar contraseña fuerte
