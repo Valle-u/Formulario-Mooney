@@ -913,11 +913,20 @@ function renderUsers(users){
   const tbody = document.getElementById("usersTbody");
   if(!tbody) return;
 
+  // Verificar si el usuario actual es admin
+  const currentUser = getUser();
+  const isCurrentUserAdmin = currentUser && currentUser.role === "admin";
+
   tbody.innerHTML = users.map(u => `
     <tr>
       <td>${u.id}</td>
-      <td>${u.username}</td>
-      <td><input data-edit-name="${u.id}" value="${u.full_name||""}"></td>
+      <td>
+        ${isCurrentUserAdmin
+          ? `<input data-edit-username="${u.id}" value="${escapeHtml(u.username)}" placeholder="username">`
+          : escapeHtml(u.username)
+        }
+      </td>
+      <td><input data-edit-name="${u.id}" value="${escapeHtml(u.full_name||"")}" placeholder="Nombre completo"></td>
       <td>
         <select data-edit-role="${u.id}">
           <option value="empleado" ${u.role==="empleado"?"selected":""}>Empleado</option>
@@ -942,13 +951,29 @@ function bindUserRowActions(){
   document.querySelectorAll("[data-save-user]").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       const id = btn.dataset.saveUser;
+
+      // Obtener valores del formulario
+      const usernameInput = document.querySelector(`[data-edit-username="${id}"]`);
       const full_name = document.querySelector(`[data-edit-name="${id}"]`)?.value ?? "";
       const role = document.querySelector(`[data-edit-role="${id}"]`)?.value ?? "empleado";
       const is_active = !!document.querySelector(`[data-edit-active="${id}"]`)?.checked;
 
+      // Construir body - solo incluir username si el input existe (admin)
+      const body = { full_name, role, is_active };
+      if (usernameInput) {
+        const username = usernameInput.value.trim();
+        if (!username) {
+          toast("⚠️ Username vacío", "El username no puede estar vacío", "warning");
+          return;
+        }
+        body.username = username;
+      }
+
       try{
-        await api(`/api/users/${id}`, { method:"PUT", body:{ full_name, role, is_active } });
+        await api(`/api/users/${id}`, { method:"PUT", body });
         toast("✅ Guardado","Usuario actualizado correctamente", "success");
+        // Recargar la lista de usuarios para mostrar los cambios
+        loadUsers();
       }catch(err){
         toast("❌ Error", err.message, "error");
       }

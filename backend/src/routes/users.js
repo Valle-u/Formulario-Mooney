@@ -80,7 +80,7 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "id inválido" });
 
-    const { role, full_name, is_active } = req.body || {};
+    const { username, role, full_name, is_active } = req.body || {};
 
     // Obtener información del usuario a modificar
     const targetUser = await query("SELECT role FROM users WHERE id = $1", [id]);
@@ -92,6 +92,11 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
     // Validar permisos según el rol del usuario que hace la modificación
     const isAdmin = req.user.role === "admin";
     const isDireccion = req.user.role === "direccion";
+
+    // Solo admin puede cambiar username
+    if (username !== undefined && !isAdmin) {
+      return res.status(403).json({ message: "Solo admin puede modificar el username" });
+    }
 
     // Dirección NO puede modificar usuarios admin
     if (isDireccion && !isAdmin && targetRole === "admin") {
@@ -122,6 +127,7 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
     const params = [];
     let i = 1;
 
+    if (username !== undefined) { sets.push(`username = $${i++}`); params.push(username.trim()); }
     if (role !== undefined) { sets.push(`role = $${i++}`); params.push(role); }
     if (full_name !== undefined) { sets.push(`full_name = $${i++}`); params.push(full_name || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); params.push(!!is_active); }
