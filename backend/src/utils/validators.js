@@ -1,4 +1,4 @@
-export const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta"];
+export const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay"];
 
 export const ETIQUETAS_CON_USUARIO_CASINO = new Set([
   "Premio Pagado",

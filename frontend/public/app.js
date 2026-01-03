@@ -33,7 +33,7 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay"];
 
 const ETIQUETAS = [
   "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
