@@ -7,6 +7,10 @@ import { loginLimiter } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
+// Configuración de intentos de login
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_DURATION_MINUTES = 30;
+
 // Aplicar rate limiting al endpoint de login
 router.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
@@ -24,7 +28,9 @@ router.post("/login", loginLimiter, async (req, res) => {
     }
 
     const r = await query(
-      "SELECT id, username, password_hash, role, is_active FROM users WHERE username = $1",
+      `SELECT id, username, password_hash, role, is_active,
+              failed_login_attempts, locked_until, last_failed_login
+       FROM users WHERE username = $1`,
       [username]
     );
 
@@ -42,6 +48,41 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     const user = r.rows[0];
 
+    // Verificar si la cuenta está bloqueada
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      const remainingMinutes = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
+      await auditLog(req, {
+        action: "AUTH_LOGIN_FAIL",
+        entity: "auth",
+        success: false,
+        status_code: 423,
+        details: {
+          username,
+          user_id: user.id,
+          reason: "account_locked",
+          locked_until: user.locked_until,
+          remaining_minutes: remainingMinutes
+        },
+        actor: { id: user.id, username: user.username, role: user.role }
+      });
+      return res.status(423).json({
+        message: `Cuenta bloqueada temporalmente. Intente nuevamente en ${remainingMinutes} minuto(s).`,
+        locked_until: user.locked_until
+      });
+    }
+
+    // Si ya pasó el tiempo de bloqueo, resetear contador
+    if (user.locked_until && new Date(user.locked_until) <= new Date()) {
+      await query(
+        `UPDATE users
+         SET failed_login_attempts = 0, locked_until = NULL, last_failed_login = NULL
+         WHERE id = $1`,
+        [user.id]
+      );
+      user.failed_login_attempts = 0;
+      user.locked_until = null;
+    }
+
     if (!user.is_active) {
       await auditLog(req, {
         action: "AUTH_LOGIN_FAIL",
@@ -56,15 +97,78 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
-      await auditLog(req, {
-        action: "AUTH_LOGIN_FAIL",
-        entity: "auth",
-        success: false,
-        status_code: 401,
-        details: { username, user_id: user.id, reason: "invalid_credentials" },
-        actor: { id: user.id, username: user.username, role: user.role }
-      });
-      return res.status(401).json({ message: "Credenciales inválidas" });
+      // Incrementar contador de intentos fallidos
+      const newAttempts = (user.failed_login_attempts || 0) + 1;
+      const shouldLock = newAttempts >= MAX_LOGIN_ATTEMPTS;
+
+      if (shouldLock) {
+        const lockUntil = new Date(Date.now() + LOCK_DURATION_MINUTES * 60000);
+        await query(
+          `UPDATE users
+           SET failed_login_attempts = $1, locked_until = $2, last_failed_login = NOW()
+           WHERE id = $3`,
+          [newAttempts, lockUntil, user.id]
+        );
+
+        await auditLog(req, {
+          action: "AUTH_ACCOUNT_LOCKED",
+          entity: "auth",
+          success: false,
+          status_code: 423,
+          details: {
+            username,
+            user_id: user.id,
+            reason: "max_attempts_reached",
+            attempts: newAttempts,
+            locked_until: lockUntil
+          },
+          actor: { id: user.id, username: user.username, role: user.role }
+        });
+
+        return res.status(423).json({
+          message: `Cuenta bloqueada por ${LOCK_DURATION_MINUTES} minutos después de ${MAX_LOGIN_ATTEMPTS} intentos fallidos.`,
+          locked_until: lockUntil
+        });
+      } else {
+        await query(
+          `UPDATE users
+           SET failed_login_attempts = $1, last_failed_login = NOW()
+           WHERE id = $2`,
+          [newAttempts, user.id]
+        );
+
+        const remainingAttempts = MAX_LOGIN_ATTEMPTS - newAttempts;
+
+        await auditLog(req, {
+          action: "AUTH_LOGIN_FAIL",
+          entity: "auth",
+          success: false,
+          status_code: 401,
+          details: {
+            username,
+            user_id: user.id,
+            reason: "invalid_credentials",
+            failed_attempts: newAttempts,
+            remaining_attempts: remainingAttempts
+          },
+          actor: { id: user.id, username: user.username, role: user.role }
+        });
+
+        return res.status(401).json({
+          message: `Credenciales inválidas. ${remainingAttempts} intento(s) restante(s).`,
+          remaining_attempts: remainingAttempts
+        });
+      }
+    }
+
+    // Login exitoso: resetear contador de intentos fallidos
+    if (user.failed_login_attempts > 0 || user.locked_until) {
+      await query(
+        `UPDATE users
+         SET failed_login_attempts = 0, locked_until = NULL, last_failed_login = NULL
+         WHERE id = $1`,
+        [user.id]
+      );
     }
 
     const token = jwt.sign(

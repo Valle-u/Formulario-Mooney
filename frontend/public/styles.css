@@ -1023,6 +1023,25 @@ label{
   padding: 24px;
 }
 
+/* Validación de formularios */
+.validation-error {
+  color: #dc3545;
+  font-weight: 500;
+  padding: 4px 8px;
+  background: #fee2e2;
+  border-left: 3px solid #dc3545;
+  border-radius: 4px;
+}
+
+.validation-success {
+  color: #28a745;
+  font-weight: 500;
+  padding: 4px 8px;
+  background: #d1fae5;
+  border-left: 3px solid #28a745;
+  border-radius: 4px;
+}
+
 @media (max-width: 768px) {
   .modal-content {
     max-width: 100%;

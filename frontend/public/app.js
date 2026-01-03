@@ -352,6 +352,92 @@ function wireIdTransferenciaAlphanumeric(){
   });
 }
 
+// Validación en tiempo real de ID de transferencia duplicado
+let validationTimeout = null;
+async function checkIdTransferenciaDuplicado() {
+  const idInput = document.getElementById("id_transferencia");
+  const empresaInput = document.getElementById("empresa_salida");
+  const feedbackDiv = document.getElementById("id_transferencia_feedback");
+
+  if (!idInput || !empresaInput) return;
+
+  const idValue = idInput.value.trim();
+  const empresaValue = empresaInput.value;
+
+  // Limpiar feedback
+  if (feedbackDiv) {
+    feedbackDiv.textContent = "";
+    feedbackDiv.className = "";
+  }
+
+  // Si no hay valor o empresa, no validar
+  if (!idValue || !empresaValue) return;
+
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const url = `${API_BASE}/api/egresos/check-id-transferencia?empresa_salida=${encodeURIComponent(empresaValue)}&id_transferencia=${encodeURIComponent(idValue)}`;
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      console.error("Error validando ID:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.exists && feedbackDiv) {
+      feedbackDiv.className = "validation-error";
+      feedbackDiv.textContent = `⚠️ Este ID ya existe en ${empresaValue} (Egreso #${data.egreso.id} - ${data.egreso.etiqueta} - $${data.egreso.monto} ${data.egreso.moneda})`;
+      idInput.style.borderColor = "#dc3545";
+    } else if (feedbackDiv) {
+      feedbackDiv.className = "validation-success";
+      feedbackDiv.textContent = "✓ ID disponible";
+      idInput.style.borderColor = "#28a745";
+    }
+
+  } catch (error) {
+    console.error("Error al validar ID de transferencia:", error);
+  }
+}
+
+function wireIdTransferenciaValidation() {
+  const idInput = document.getElementById("id_transferencia");
+  const empresaInput = document.getElementById("empresa_salida");
+
+  if (!idInput || !empresaInput) return;
+
+  // Validar cuando cambia el ID (con debounce)
+  idInput.addEventListener("input", () => {
+    if (validationTimeout) clearTimeout(validationTimeout);
+
+    // Resetear estilos mientras escribe
+    idInput.style.borderColor = "";
+    const feedbackDiv = document.getElementById("id_transferencia_feedback");
+    if (feedbackDiv) {
+      feedbackDiv.textContent = "";
+      feedbackDiv.className = "";
+    }
+
+    // Esperar 800ms después de que deje de escribir
+    validationTimeout = setTimeout(() => {
+      checkIdTransferenciaDuplicado();
+    }, 800);
+  });
+
+  // Validar también cuando cambia la empresa
+  empresaInput.addEventListener("change", () => {
+    if (validationTimeout) clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+      checkIdTransferenciaDuplicado();
+    }, 300);
+  });
+}
+
 function parseMontoARSStrict(raw){
   const v = (raw || "").trim();
   const re = /^\d+(,\d{1,2})?$/;
@@ -1855,6 +1941,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     toggleOtroConcepto();
     fileLabel();
     wireIdTransferenciaAlphanumeric();
+    wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
     conectarValidacionTiempoReal(); // Validación en tiempo real
 
     document.getElementById("etiqueta")?.addEventListener("change", ()=>{

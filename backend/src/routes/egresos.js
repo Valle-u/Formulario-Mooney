@@ -949,4 +949,65 @@ router.get("/:id/history", auth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/egresos/check-id-transferencia
+ * Verifica si un ID de transferencia ya existe para una empresa específica
+ * Query params: empresa_salida, id_transferencia
+ * Retorna: { exists: boolean, egreso: {...} | null }
+ */
+router.get("/check-id-transferencia", auth, async (req, res) => {
+  try {
+    const { empresa_salida, id_transferencia } = req.query;
+
+    // Validar parámetros
+    if (!empresa_salida || !id_transferencia) {
+      return res.status(400).json({
+        message: "Parámetros requeridos: empresa_salida, id_transferencia"
+      });
+    }
+
+    // Validar empresa
+    if (!EMPRESAS_SALIDA.includes(empresa_salida)) {
+      return res.status(400).json({
+        message: `Empresa inválida. Debe ser una de: ${EMPRESAS_SALIDA.join(", ")}`
+      });
+    }
+
+    // Buscar si existe
+    const result = await query(
+      `SELECT id, fecha, monto, moneda, etiqueta, created_by, status
+       FROM egresos
+       WHERE empresa_salida = $1 AND id_transferencia = $2
+       LIMIT 1`,
+      [empresa_salida, id_transferencia]
+    );
+
+    if (result.rowCount === 0) {
+      return res.json({
+        exists: false,
+        egreso: null
+      });
+    }
+
+    const egreso = result.rows[0];
+
+    return res.json({
+      exists: true,
+      egreso: {
+        id: egreso.id,
+        fecha: egreso.fecha,
+        monto: egreso.monto,
+        moneda: egreso.moneda,
+        etiqueta: egreso.etiqueta,
+        status: egreso.status,
+        created_by: egreso.created_by
+      }
+    });
+
+  } catch (error) {
+    console.error("🔥 Error verificando ID de transferencia:", error);
+    return res.status(500).json({ message: "Error verificando ID de transferencia" });
+  }
+});
+
 export default router;
