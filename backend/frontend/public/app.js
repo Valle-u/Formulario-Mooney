@@ -55,27 +55,59 @@ const ETIQUETAS_CON_USUARIO_CASINO = new Set([
 const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
 
 /* =========================
-   TOAST
+   TOAST - Sistema Unificado
    ========================= */
 function toast(title, msg, type = "error", duration = null){
-  const el = document.getElementById("toast");
-  if(!el) return;
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
 
-  // Remover clases anteriores
-  el.classList.remove("toast-error", "toast-success", "toast-warning", "toast-info");
+  const icons = {
+    success: "✅",
+    warning: "⚠️",
+    error: "❌",
+    info: "ℹ️"
+  };
 
-  // Agregar clase según tipo
-  el.classList.add(`toast-${type}`);
+  const toastEl = document.createElement("div");
+  toastEl.className = `toast ${type}`;
 
-  el.querySelector("strong").textContent = title;
-  el.querySelector("span").textContent = msg || "";
-  el.classList.add("show");
+  const icon = document.createElement("span");
+  icon.className = "toast-icon";
+  icon.textContent = icons[type] || icons.info;
 
-  // Duración personalizable, o por defecto según tipo
-  // Success y error ahora duran mucho más para que se puedan apreciar bien
+  const content = document.createElement("div");
+  content.className = "toast-content";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "toast-title";
+  titleEl.textContent = title;
+
+  const messageEl = document.createElement("div");
+  messageEl.className = "toast-message";
+  messageEl.textContent = msg || "";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "toast-close";
+  closeBtn.textContent = "×";
+  closeBtn.setAttribute("aria-label", "Cerrar notificación");
+  closeBtn.addEventListener("click", () => toastEl.remove());
+
+  content.appendChild(titleEl);
+  content.appendChild(messageEl);
+
+  toastEl.appendChild(icon);
+  toastEl.appendChild(content);
+  toastEl.appendChild(closeBtn);
+
+  container.appendChild(toastEl);
+
+  // Duración personalizable
   const finalDuration = duration || (type === "error" ? 8000 : type === "success" ? 7000 : 5000);
 
-  setTimeout(()=> el.classList.remove("show"), finalDuration);
+  setTimeout(() => {
+    toastEl.style.animation = "slideOut 0.3s ease-out";
+    setTimeout(() => toastEl.remove(), 300);
+  }, finalDuration);
 }
 
 /* =========================
@@ -2112,7 +2144,7 @@ function handleNewNotification(data) {
   showToast(notification);
 }
 
-// Mostrar toast notification
+// Mostrar toast notification (para notificaciones en tiempo real)
 function showToast(notification) {
   const container = document.getElementById("toastContainer");
   if (!container) return;
@@ -2124,23 +2156,43 @@ function showToast(notification) {
     info: "ℹ️"
   };
 
-  const toast = document.createElement("div");
-  toast.className = `toast ${notification.category}`;
-  toast.innerHTML = `
-    <span class="toast-icon">${icons[notification.category] || icons.info}</span>
-    <div class="toast-content">
-      <div class="toast-title">${escapeHtml(notification.title)}</div>
-      <div class="toast-message">${escapeHtml(notification.message)}</div>
-    </div>
-    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-  `;
+  const toastEl = document.createElement("div");
+  toastEl.className = `toast ${notification.category}`;
 
-  container.appendChild(toast);
+  const icon = document.createElement("span");
+  icon.className = "toast-icon";
+  icon.textContent = icons[notification.category] || icons.info;
+
+  const content = document.createElement("div");
+  content.className = "toast-content";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "toast-title";
+  titleEl.textContent = notification.title;
+
+  const messageEl = document.createElement("div");
+  messageEl.className = "toast-message";
+  messageEl.textContent = notification.message;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "toast-close";
+  closeBtn.textContent = "×";
+  closeBtn.setAttribute("aria-label", "Cerrar notificación");
+  closeBtn.addEventListener("click", () => toastEl.remove());
+
+  content.appendChild(titleEl);
+  content.appendChild(messageEl);
+
+  toastEl.appendChild(icon);
+  toastEl.appendChild(content);
+  toastEl.appendChild(closeBtn);
+
+  container.appendChild(toastEl);
 
   // Auto-remover después de 5 segundos
   setTimeout(() => {
-    toast.style.animation = "slideOut 0.3s ease-out";
-    setTimeout(() => toast.remove(), 300);
+    toastEl.style.animation = "slideOut 0.3s ease-out";
+    setTimeout(() => toastEl.remove(), 300);
   }, 5000);
 }
 
