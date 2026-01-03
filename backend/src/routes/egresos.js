@@ -21,6 +21,9 @@ import { auditLog } from "../utils/audit.js";
 import { uploadToR2, isR2Configured } from "../config/r2-fetch.js";
 import { uploadToImgBB, isImgBBConfigured } from "../config/imgbb.js";
 
+// Notificaciones en tiempo real
+import { sendNotification } from "./notifications.js";
+
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 10);
@@ -256,6 +259,42 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
         etiqueta
       }
     });
+
+    // Enviar notificación en tiempo real a otros usuarios
+    try {
+      const creatorName = req.user.username || 'Usuario';
+      const creatorRole = req.user.role || 'empleado';
+
+      // Determinar quién debe recibir la notificación según el rol del creador
+      let targetRoles = null;
+      if (creatorRole === 'empleado') {
+        // Si un empleado crea un egreso, notificar a encargados, dirección y admin
+        targetRoles = ['encargado', 'direccion', 'admin'];
+      } else if (creatorRole === 'encargado') {
+        // Si un encargado crea un egreso, notificar a dirección y admin
+        targetRoles = ['direccion', 'admin'];
+      }
+      // Si es admin o dirección, no notificar a nadie (ellos pueden ver todo)
+
+      if (targetRoles) {
+        sendNotification({
+          type: 'egreso_created',
+          title: 'Nuevo egreso registrado',
+          message: `${creatorName} registró un egreso de $${montoToCommaString(montoNum)} ${monedaNorm} (${etiqueta})`,
+          category: 'success',
+          data: {
+            egreso_id: egresoId,
+            monto: montoNum,
+            moneda: monedaNorm,
+            etiqueta,
+            created_by: creatorName
+          }
+        }, null, targetRoles);
+      }
+    } catch (notifError) {
+      console.error('Error enviando notificación:', notifError);
+      // No fallar la creación del egreso si falla la notificación
+    }
 
     return res.status(201).json({ id: egresoId, message: "ok" });
   } catch (e) {

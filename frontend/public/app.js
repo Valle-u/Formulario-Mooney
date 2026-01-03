@@ -2011,3 +2011,245 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 
 });
+
+// ===================================================================
+// SISTEMA DE NOTIFICACIONES EN TIEMPO REAL
+// ===================================================================
+
+// Variables globales
+let notificationEventSource = null;
+let notifications = [];
+let unreadCount = 0;
+
+// Conectar a SSE (Server-Sent Events)
+function connectToNotifications() {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  // Cerrar conexión anterior si existe
+  if (notificationEventSource) {
+    notificationEventSource.close();
+  }
+
+  const url = `${API_BASE}/api/notifications/stream`;
+  notificationEventSource = new EventSource(url + `?token=${encodeURIComponent(token)}`);
+
+  notificationEventSource.onopen = () => {
+    console.log("📡 Conectado a notificaciones en tiempo real");
+  };
+
+  notificationEventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log("📨 Notificación recibida:", data);
+
+      if (data.type === "connected") {
+        console.log("✅ Conexión SSE establecida");
+        return;
+      }
+
+      // Agregar notificación
+      handleNewNotification(data);
+
+    } catch (error) {
+      console.error("Error procesando notificación:", error);
+    }
+  };
+
+  notificationEventSource.onerror = (error) => {
+    console.error("Error en SSE:", error);
+    notificationEventSource.close();
+
+    // Reconectar después de 5 segundos
+    setTimeout(() => {
+      console.log("🔄 Reintentando conexión a notificaciones...");
+      connectToNotifications();
+    }, 5000);
+  };
+}
+
+// Manejar nueva notificación
+function handleNewNotification(data) {
+  const notification = {
+    id: Date.now(),
+    type: data.type,
+    title: data.title,
+    message: data.message,
+    category: data.category || "info",
+    timestamp: new Date(data.timestamp || Date.now()),
+    read: false,
+    data: data.data || {}
+  };
+
+  // Agregar a la lista
+  notifications.unshift(notification);
+  unreadCount++;
+
+  // Actualizar UI
+  updateNotificationBadge();
+  updateNotificationPanel();
+
+  // Mostrar toast
+  showToast(notification);
+}
+
+// Mostrar toast notification
+function showToast(notification) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+
+  const icons = {
+    success: "✅",
+    warning: "⚠️",
+    error: "❌",
+    info: "ℹ️"
+  };
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${notification.category}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[notification.category] || icons.info}</span>
+    <div class="toast-content">
+      <div class="toast-title">${escapeHtml(notification.title)}</div>
+      <div class="toast-message">${escapeHtml(notification.message)}</div>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+  `;
+
+  container.appendChild(toast);
+
+  // Auto-remover después de 5 segundos
+  setTimeout(() => {
+    toast.style.animation = "slideOut 0.3s ease-out";
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// Actualizar badge de notificaciones
+function updateNotificationBadge() {
+  const badge = document.getElementById("notificationBadge");
+  if (!badge) return;
+
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount > 99 ? "99+" : unreadCount;
+    badge.style.display = "block";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+// Actualizar panel de notificaciones
+function updateNotificationPanel() {
+  const list = document.getElementById("notificationList");
+  if (!list) return;
+
+  if (notifications.length === 0) {
+    list.innerHTML = '<div class="notification-empty">No hay notificaciones</div>';
+    return;
+  }
+
+  list.innerHTML = notifications.map(n => {
+    const timeAgo = getTimeAgo(n.timestamp);
+    return `
+      <div class="notification-item ${n.read ? "" : "unread"} ${n.category}" data-id="${n.id}">
+        <div class="notification-title">${escapeHtml(n.title)}</div>
+        <div class="notification-message">${escapeHtml(n.message)}</div>
+        <div class="notification-time">${timeAgo}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Agregar event listeners
+  list.querySelectorAll(".notification-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const id = parseInt(item.dataset.id);
+      markNotificationAsRead(id);
+    });
+  });
+}
+
+// Marcar notificación como leída
+function markNotificationAsRead(id) {
+  const notification = notifications.find(n => n.id === id);
+  if (notification && !notification.read) {
+    notification.read = true;
+    unreadCount = Math.max(0, unreadCount - 1);
+    updateNotificationBadge();
+    updateNotificationPanel();
+  }
+}
+
+// Marcar todas como leídas
+function markAllAsRead() {
+  notifications.forEach(n => n.read = true);
+  unreadCount = 0;
+  updateNotificationBadge();
+  updateNotificationPanel();
+}
+
+// Limpiar todas las notificaciones
+function clearAllNotifications() {
+  notifications = [];
+  unreadCount = 0;
+  updateNotificationBadge();
+  updateNotificationPanel();
+}
+
+// Obtener tiempo relativo (hace X tiempo)
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+
+  if (seconds < 60) return "Hace un momento";
+  if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)} h`;
+  if (seconds < 604800) return `Hace ${Math.floor(seconds / 86400)} días`;
+
+  return date.toLocaleDateString();
+}
+
+// Event listeners para el panel de notificaciones
+document.addEventListener("DOMContentLoaded", () => {
+  const notificationBtn = document.getElementById("notificationBtn");
+  const notificationPanel = document.getElementById("notificationPanel");
+  const closePanel = document.getElementById("closeNotificationPanel");
+  const clearAllBtn = document.getElementById("clearAllNotifications");
+
+  if (notificationBtn) {
+    notificationBtn.addEventListener("click", () => {
+      const isVisible = notificationPanel.style.display === "flex";
+      notificationPanel.style.display = isVisible ? "none" : "flex";
+
+      if (!isVisible) {
+        // Marcar todas como leídas al abrir el panel
+        markAllAsRead();
+      }
+    });
+  }
+
+  if (closePanel) {
+    closePanel.addEventListener("click", () => {
+      notificationPanel.style.display = "none";
+    });
+  }
+
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener("click", () => {
+      clearAllNotifications();
+    });
+  }
+
+  // Cerrar panel al hacer click fuera
+  document.addEventListener("click", (e) => {
+    if (notificationPanel && notificationPanel.style.display === "flex") {
+      if (!notificationPanel.contains(e.target) && !notificationBtn.contains(e.target)) {
+        notificationPanel.style.display = "none";
+      }
+    }
+  });
+
+  // Conectar a notificaciones si hay un token
+  const token = localStorage.getItem("token");
+  if (token) {
+    connectToNotifications();
+  }
+});
