@@ -9,7 +9,7 @@ const router = express.Router();
 
 // Configuración de intentos de login
 const MAX_LOGIN_ATTEMPTS = 5;
-const LOCK_DURATION_MINUTES = 30;
+const LOCK_DURATION_MINUTES = 5;
 
 // Aplicar rate limiting al endpoint de login
 router.post("/login", loginLimiter, async (req, res) => {
