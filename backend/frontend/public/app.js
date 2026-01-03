@@ -33,14 +33,14 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay"];
 
 const ETIQUETAS = [
   "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
   "Gasto de publicidad","Gasto de CRM","Pago de Utilidades",
   "Cambio a USD","Cambio a USDT","Cambio a Peso Fisico",
   "Gasto de cuenta","Transferencia Rechazada",
-  "Gasto Personal L","Gasto Personl A",
+  "Gasto Personal L","Gasto Personal F","Gasto Personl A",
   "Inversion Publicidad","Pago Programacion","Pago Costo de estructura",
   "Gasto limpieza","Gasto de Cocina","Fondeo de cuenta","Gasto Personal",
   "Adelanto de sueldo","Redireccion de capital","Pago de premios duplicado",
@@ -89,6 +89,24 @@ function escapeHtml(unsafe) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/* =========================
+   MOSTRAR/OCULTAR CONTRASEÑA
+   ========================= */
+function togglePasswordVisibility(inputId, button) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (input.type === "password") {
+    input.type = "text";
+    button.style.opacity = "1";
+    button.textContent = "🙈"; // Cambia a "ocultar"
+  } else {
+    input.type = "password";
+    button.style.opacity = "0.6";
+    button.textContent = "👁️"; // Cambia a "mostrar"
+  }
 }
 
 /* =========================
@@ -331,6 +349,92 @@ function wireIdTransferenciaAlphanumeric(){
   // Permitir solo letras, números, guiones y guiones bajos
   el.addEventListener("input", ()=> {
     el.value = el.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+  });
+}
+
+// Validación en tiempo real de ID de transferencia duplicado
+let validationTimeout = null;
+async function checkIdTransferenciaDuplicado() {
+  const idInput = document.getElementById("id_transferencia");
+  const empresaInput = document.getElementById("empresa_salida");
+  const feedbackDiv = document.getElementById("id_transferencia_feedback");
+
+  if (!idInput || !empresaInput) return;
+
+  const idValue = idInput.value.trim();
+  const empresaValue = empresaInput.value;
+
+  // Limpiar feedback
+  if (feedbackDiv) {
+    feedbackDiv.textContent = "";
+    feedbackDiv.className = "";
+  }
+
+  // Si no hay valor o empresa, no validar
+  if (!idValue || !empresaValue) return;
+
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const url = `${API_BASE}/api/egresos/check-id-transferencia?empresa_salida=${encodeURIComponent(empresaValue)}&id_transferencia=${encodeURIComponent(idValue)}`;
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      console.error("Error validando ID:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.exists && feedbackDiv) {
+      feedbackDiv.className = "validation-error";
+      feedbackDiv.textContent = `⚠️ Este ID ya existe en ${empresaValue} (Egreso #${data.egreso.id} - ${data.egreso.etiqueta} - $${data.egreso.monto} ${data.egreso.moneda})`;
+      idInput.style.borderColor = "#dc3545";
+    } else if (feedbackDiv) {
+      feedbackDiv.className = "validation-success";
+      feedbackDiv.textContent = "✓ ID disponible";
+      idInput.style.borderColor = "#28a745";
+    }
+
+  } catch (error) {
+    console.error("Error al validar ID de transferencia:", error);
+  }
+}
+
+function wireIdTransferenciaValidation() {
+  const idInput = document.getElementById("id_transferencia");
+  const empresaInput = document.getElementById("empresa_salida");
+
+  if (!idInput || !empresaInput) return;
+
+  // Validar cuando cambia el ID (con debounce)
+  idInput.addEventListener("input", () => {
+    if (validationTimeout) clearTimeout(validationTimeout);
+
+    // Resetear estilos mientras escribe
+    idInput.style.borderColor = "";
+    const feedbackDiv = document.getElementById("id_transferencia_feedback");
+    if (feedbackDiv) {
+      feedbackDiv.textContent = "";
+      feedbackDiv.className = "";
+    }
+
+    // Esperar 800ms después de que deje de escribir
+    validationTimeout = setTimeout(() => {
+      checkIdTransferenciaDuplicado();
+    }, 800);
+  });
+
+  // Validar también cuando cambia la empresa
+  empresaInput.addEventListener("change", () => {
+    if (validationTimeout) clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+      checkIdTransferenciaDuplicado();
+    }, 300);
   });
 }
 
@@ -629,36 +733,6 @@ function mostrarModalConfirmacion(payload, montoNum, file){
 
   const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
-  // Generar vista previa del comprobante
-  // Liberar URL anterior si existe
-  if(currentFileURL){
-    URL.revokeObjectURL(currentFileURL);
-  }
-  currentFileURL = URL.createObjectURL(file);
-  const fileURL = currentFileURL;
-  const isPDF = file.type === 'application/pdf';
-  const isImage = file.type.startsWith('image/');
-
-  let previewHTML = '';
-  if (isImage) {
-    previewHTML = `
-      <div style="margin-top:8px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; max-height:300px; display:flex; align-items:center; justify-content:center; background:var(--bg-alt);">
-        <img src="${fileURL}" alt="Vista previa" style="max-width:100%; max-height:300px; object-fit:contain;">
-      </div>
-    `;
-  } else if (isPDF) {
-    previewHTML = `
-      <div style="margin-top:12px; padding:16px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-alt); text-align:center;">
-        <div style="margin-bottom:12px; color:var(--muted); font-size:14px;">
-          📄 Archivo PDF adjunto
-        </div>
-        <a href="${fileURL}" target="_blank" class="btn btn-primary" style="display:inline-block; text-decoration:none;">
-          Ver PDF en nueva pestaña
-        </a>
-      </div>
-    `;
-  }
-
   body.innerHTML = `
     <p style="margin-bottom:16px; color:var(--muted);">
       Revisá que todos los datos sean correctos antes de confirmar:
@@ -727,7 +801,6 @@ function mostrarModalConfirmacion(payload, montoNum, file){
       <div class="field span12">
         <label>COMPROBANTE</label>
         <div class="note">📎 ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</div>
-        ${previewHTML}
       </div>
       ${payload.notas ? `
       <div class="field span12">
@@ -747,19 +820,10 @@ function mostrarModalConfirmacion(payload, montoNum, file){
   }, 100);
 }
 
-// Variable global para almacenar la URL del comprobante
-let currentFileURL = null;
-
 // Cerrar modal
 function cerrarModalConfirmacion(){
   const modal = document.getElementById("modalConfirmacion");
   if(modal) modal.style.display = "none";
-
-  // Liberar la URL del objeto para evitar memory leaks
-  if(currentFileURL){
-    URL.revokeObjectURL(currentFileURL);
-    currentFileURL = null;
-  }
 
   // Restaurar focus al botón submit del formulario
   const submitBtn = document.querySelector("#egresoForm button[type='submit']");
@@ -935,11 +999,20 @@ function renderUsers(users){
   const tbody = document.getElementById("usersTbody");
   if(!tbody) return;
 
+  // Verificar si el usuario actual es admin
+  const currentUser = getUser();
+  const isCurrentUserAdmin = currentUser && currentUser.role === "admin";
+
   tbody.innerHTML = users.map(u => `
     <tr>
       <td>${u.id}</td>
-      <td>${u.username}</td>
-      <td><input data-edit-name="${u.id}" value="${u.full_name||""}"></td>
+      <td>
+        ${isCurrentUserAdmin
+          ? `<input data-edit-username="${u.id}" value="${escapeHtml(u.username)}" placeholder="username">`
+          : escapeHtml(u.username)
+        }
+      </td>
+      <td><input data-edit-name="${u.id}" value="${escapeHtml(u.full_name||"")}" placeholder="Nombre completo"></td>
       <td>
         <select data-edit-role="${u.id}">
           <option value="empleado" ${u.role==="empleado"?"selected":""}>Empleado</option>
@@ -964,32 +1037,81 @@ function bindUserRowActions(){
   document.querySelectorAll("[data-save-user]").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       const id = btn.dataset.saveUser;
+
+      // Obtener valores del formulario
+      const usernameInput = document.querySelector(`[data-edit-username="${id}"]`);
       const full_name = document.querySelector(`[data-edit-name="${id}"]`)?.value ?? "";
       const role = document.querySelector(`[data-edit-role="${id}"]`)?.value ?? "empleado";
       const is_active = !!document.querySelector(`[data-edit-active="${id}"]`)?.checked;
 
+      // Construir body - solo incluir username si el input existe (admin)
+      const body = { full_name, role, is_active };
+      if (usernameInput) {
+        const username = usernameInput.value.trim();
+        if (!username) {
+          toast("⚠️ Username vacío", "El username no puede estar vacío", "warning");
+          return;
+        }
+        body.username = username;
+      }
+
       try{
-        await api(`/api/users/${id}`, { method:"PUT", body:{ full_name, role, is_active } });
+        await api(`/api/users/${id}`, { method:"PUT", body });
         toast("✅ Guardado","Usuario actualizado correctamente", "success");
+        // Recargar la lista de usuarios para mostrar los cambios
+        loadUsers();
       }catch(err){
         toast("❌ Error", err.message, "error");
       }
     });
   });
 
-  document.querySelectorAll("[data-reset-pass]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const id = btn.dataset.resetPass;
-      const pass = prompt("Nueva contraseña (mín 4):");
-      if(!pass) return;
+  // Variable para guardar el ID del usuario a resetear
+  let resetUserId = null;
 
-      try{
-        await api(`/api/users/${id}/reset-password`, { method:"POST", body:{ password: pass } });
-        toast("✅ Guardado","Contraseña actualizada correctamente", "success");
-      }catch(err){
-        toast("❌ Error", err.message, "error");
+  document.querySelectorAll("[data-reset-pass]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.resetPass;
+      resetUserId = id;
+
+      // Mostrar modal
+      const modal = document.getElementById("resetPasswordModal");
+      const input = document.getElementById("reset_password");
+      if(modal && input) {
+        modal.style.display = "flex";
+        input.value = "";
+        input.focus();
       }
     });
+  });
+
+  // Cerrar modal
+  const closeResetModal = () => {
+    const modal = document.getElementById("resetPasswordModal");
+    if(modal) modal.style.display = "none";
+    resetUserId = null;
+  };
+
+  document.getElementById("btnCloseResetModal")?.addEventListener("click", closeResetModal);
+  document.getElementById("btnCancelReset")?.addEventListener("click", closeResetModal);
+
+  // Confirmar reset
+  document.getElementById("btnConfirmReset")?.addEventListener("click", async ()=>{
+    const pass = document.getElementById("reset_password")?.value || "";
+    if(!pass || !resetUserId) return;
+
+    try{
+      await api(`/api/users/${resetUserId}/reset-password`, { method:"POST", body:{ password: pass } });
+      toast("✅ Guardado","Contraseña actualizada correctamente", "success");
+      closeResetModal();
+    }catch(err){
+      toast("❌ Error", err.message, "error");
+    }
+  });
+
+  // Cerrar modal al hacer click fuera
+  document.getElementById("resetPasswordModal")?.addEventListener("click", (e)=>{
+    if(e.target.id === "resetPasswordModal") closeResetModal();
   });
 }
 
@@ -1148,6 +1270,22 @@ let egresosOffset = 0;
 const EGRESOS_LIMIT = 50;
 let currentFilters = {};
 
+// Toggle de filtros (mostrar/ocultar)
+function toggleFiltros(){
+  const body = document.getElementById("filtrosBody");
+  const icon = document.getElementById("filtrosToggleIcon");
+
+  if(!body || !icon) return;
+
+  const isHidden = body.style.display === "none";
+
+  body.style.display = isHidden ? "" : "none";
+  icon.textContent = isHidden ? "▼" : "▲";
+
+  // Guardar preferencia en localStorage
+  localStorage.setItem("filtros_visible", isHidden ? "true" : "false");
+}
+
 function populateFiltrosSelects(){
   const selEmpresa = document.getElementById("empresa_salida");
   const selEtiqueta = document.getElementById("etiqueta");
@@ -1240,6 +1378,8 @@ function renderEgresos(egresos, pagination){
       ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✓ ACTIVO</span>'
       : status === 'anulado'
       ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✗ ANULADO</span>'
+      : status === 'editada'
+      ? '<span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✏️ EDITADA</span>'
       : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">⏳ PENDIENTE</span>';
 
     return `
@@ -1302,7 +1442,11 @@ function bindVerDetalleButtons(egresos){
   });
 }
 
+// Variable global para almacenar el egreso actual
+let currentEgreso = null;
+
 function mostrarDetalle(e){
+  currentEgreso = e; // Guardar egreso en variable global
   console.log('📋 mostrarDetalle llamada con egreso:', e);
   const modal = document.getElementById("detalleModal");
   const body = document.getElementById("detalleBody");
@@ -1320,12 +1464,15 @@ function mostrarDetalle(e){
   });
 
   const isPdf = e.comprobante_mime === "application/pdf";
-  // Agregar token JWT a la URL para autenticación en nueva pestaña
-  const token = getToken(); // Usar la función correcta que obtiene mm_token
-  const comprobanteUrl = `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante?token=${encodeURIComponent(token)}`;
+
+  // Usar directamente la URL de ImgBB si está disponible, sino usar el endpoint del backend
+  const comprobanteUrl = e.comprobante_url && e.comprobante_url.startsWith('http')
+    ? e.comprobante_url // URL directa de ImgBB o R2
+    : `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`; // Fallback al endpoint del backend
+
   const comprobantePreview = isPdf
-    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" class="btn btn-primary">📄 Ver PDF</a>`
-    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
+    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">📄 Ver PDF en nueva ventana</a>`
+    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
 
   // Estado visual
   const status = e.status || 'activo';
@@ -1333,6 +1480,8 @@ function mostrarDetalle(e){
     ? '<span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✓ ACTIVO</span>'
     : status === 'anulado'
     ? '<span style="background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✗ ANULADO</span>'
+    : status === 'editada'
+    ? '<span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✏️ EDITADA</span>'
     : '<span style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⏳ PENDIENTE</span>';
 
   const user = getUser();
@@ -1340,7 +1489,7 @@ function mostrarDetalle(e){
 
   body.innerHTML = `
     <div class="grid">
-      <div class="field span12" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div class="field span12" style="margin-bottom: 16px;">
         <div>${statusBadge}</div>
       </div>
 
@@ -1414,10 +1563,6 @@ function mostrarDetalle(e){
         <div class="note">${escapeHtml(e.notas)}</div>
       </div>` : ""}
       <div class="field span12">
-        <label>COMPROBANTE</label>
-        ${comprobantePreview}
-      </div>
-      <div class="field span12">
         <label>CREADO POR</label>
         <div class="note">${escapeHtml(e.created_by_username)} - ${escapeHtml(new Date(e.created_at).toLocaleString())}</div>
       </div>
@@ -1427,12 +1572,20 @@ function mostrarDetalle(e){
         <label>ÚLTIMA MODIFICACIÓN</label>
         <div class="note">${new Date(e.updated_at).toLocaleString()}</div>
       </div>` : ''}
+
+      <div class="field span12" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <label>COMPROBANTE</label>
+        <div style="margin-top: 8px;">
+          ${comprobantePreview}
+        </div>
+      </div>
     </div>
   `;
 
   console.log('✅ HTML generado, mostrando modal...');
   console.log('🔍 Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
+
   console.log('✅ Modal mostrado con display:', modal.style.display);
 }
 
@@ -1487,33 +1640,128 @@ async function handleFiltrosSubmit(e){
 /* =========================
    EDICIÓN Y ANULACIÓN DE EGRESOS
    ========================= */
-function editarEgreso(egreso){
-  // TODO: Implementar modal de edición completo
-  const motivo = prompt(`Vas a editar el egreso #${egreso.id}\n\n¿Motivo del cambio?`);
-  if(!motivo) return;
+function editarEgresoModal(){
+  const egreso = currentEgreso;
+  if(!egreso) return;
+  const modal = document.getElementById("detalleModal");
+  const body = document.getElementById("detalleBody");
+  if(!modal || !body) return;
 
-  const nuevoMonto = prompt(`Monto actual: $${egreso.monto}\n\nNuevo monto (dejar vacío para no cambiar):`, egreso.monto);
-  const nuevaCuenta = prompt(`Cuenta receptora actual: ${egreso.cuenta_receptora}\n\nNueva cuenta (dejar vacío para no cambiar):`, egreso.cuenta_receptora);
+  // Formulario de edición
+  body.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0 0 8px 0;">✏️ Editar Transferencia</h3>
+      <div class="note">Egreso #${egreso.id} - Solo modificá los campos necesarios</div>
+    </div>
 
-  const updates = {};
-  if(nuevoMonto && parseFloat(nuevoMonto) !== parseFloat(egreso.monto)){
-    updates.monto = parseFloat(nuevoMonto);
-    updates.monto_raw = nuevoMonto;
-  }
-  if(nuevaCuenta && nuevaCuenta !== egreso.cuenta_receptora){
-    updates.cuenta_receptora = nuevaCuenta;
-  }
+    <form id="formEditarEgreso" class="grid">
+      <div class="field span6">
+        <label>FECHA</label>
+        <input type="date" id="edit_fecha" value="${escapeHtml(egreso.fecha)}">
+      </div>
 
-  if(Object.keys(updates).length === 0){
-    toast("Sin cambios", "No se realizaron modificaciones", "info");
-    return;
-  }
+      <div class="field span6">
+        <label>HORA</label>
+        <input type="time" id="edit_hora" value="${escapeHtml(egreso.hora || '')}">
+      </div>
 
-  updates.change_reason = motivo;
+      <div class="field span6">
+        <label>TURNO</label>
+        <select id="edit_turno">
+          <option value="Turno mañana" ${egreso.turno === 'Turno mañana' ? 'selected' : ''}>Turno mañana</option>
+          <option value="Turno tarde" ${egreso.turno === 'Turno tarde' ? 'selected' : ''}>Turno tarde</option>
+          <option value="Turno noche" ${egreso.turno === 'Turno noche' ? 'selected' : ''}>Turno noche</option>
+        </select>
+      </div>
 
-  actualizarEgreso(egreso.id, updates);
+      <div class="field span6">
+        <label>MONTO</label>
+        <input type="text" id="edit_monto" value="${escapeHtml(egreso.monto)}" placeholder="Ej: 12000 o 12000,50">
+      </div>
+
+      <div class="field span6">
+        <label>EMPRESA SALIDA</label>
+        <select id="edit_empresa_salida">
+          ${EMPRESAS_SALIDA.map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field span6">
+        <label>CUENTA SALIDA</label>
+        <input type="text" id="edit_cuenta_salida" value="${escapeHtml(egreso.cuenta_salida)}">
+      </div>
+
+      <div class="field span12">
+        <label>CUENTA RECEPTORA</label>
+        <input type="text" id="edit_cuenta_receptora" value="${escapeHtml(egreso.cuenta_receptora)}">
+      </div>
+
+      <div class="field span12">
+        <label>NOTAS</label>
+        <textarea id="edit_notas">${escapeHtml(egreso.notas || '')}</textarea>
+      </div>
+
+      <div class="field span12" style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
+        <label style="color: #92400e; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
+        <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required style="margin-top: 8px;">
+        <div class="note" style="color: #78350f; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
+      </div>
+
+      <div class="actions span12" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-ghost" id="btnCancelarEdicion">Cancelar</button>
+        <button type="submit" class="btn btn-primary">✓ Guardar Cambios</button>
+      </div>
+    </form>
+  `;
+
+  // Manejar submit del formulario
+  document.getElementById('formEditarEgreso').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const motivo = document.getElementById('edit_motivo').value.trim();
+    if(!motivo){
+      toast("⚠️ Falta motivo", "Debés especificar el motivo del cambio", "warning");
+      return;
+    }
+
+    const updates = {
+      fecha: document.getElementById('edit_fecha').value,
+      hora: document.getElementById('edit_hora').value,
+      turno: document.getElementById('edit_turno').value,
+      monto_raw: document.getElementById('edit_monto').value,
+      monto: parseMontoARSStrict(document.getElementById('edit_monto').value),
+      empresa_salida: document.getElementById('edit_empresa_salida').value,
+      cuenta_salida: document.getElementById('edit_cuenta_salida').value,
+      cuenta_receptora: document.getElementById('edit_cuenta_receptora').value,
+      notas: document.getElementById('edit_notas').value,
+      change_reason: motivo
+    };
+
+    // Validar monto
+    if(!updates.monto || updates.monto <= 0){
+      toast("⚠️ Monto inválido", "Ingresá un monto válido (ej: 12000 o 12000,50)", "warning");
+      return;
+    }
+
+    try {
+      await api(`/api/egresos/${egreso.id}`, { method: 'PUT', body: updates });
+      toast("✅ Actualizado", "Egreso modificado correctamente. Estado cambiado a EDITADA.", "success");
+      cerrarModal();
+      buscarEgresos(); // Recargar listado
+    } catch(err) {
+      toast("❌ Error", err.message, "error");
+    }
+  });
+
+  modal.style.display = "flex";
 }
 
+
+  // Agregar event listener al botón Cancelar
+  setTimeout(() => {
+    const btnCancelar = document.getElementById("btnCancelarEdicion");
+    if(btnCancelar) btnCancelar.addEventListener("click", () => mostrarDetalle(currentEgreso));
+  }, 0);
 async function actualizarEgreso(id, updates){
   try{
     await api(`/api/egresos/${id}`, { method: 'PUT', body: updates });
@@ -1632,11 +1880,17 @@ function mostrarHistorialModal(egresoId, changes){
       ${rows}
     </div>
     <div style="margin-top: 16px; text-align: right;">
-      <button class="btn btn-ghost" onclick="cerrarModal()">Cerrar</button>
+      <button class="btn btn-ghost" id="btnCerrarHistorial">Cerrar</button>
     </div>
   `;
 
   modal.style.display = "block";
+
+  // Agregar event listener al botón Cerrar
+  setTimeout(() => {
+    const btnCerrar = document.getElementById("btnCerrarHistorial");
+    if(btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+  }, 0);
 }
 
 /* =========================
@@ -1687,6 +1941,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     toggleOtroConcepto();
     fileLabel();
     wireIdTransferenciaAlphanumeric();
+    wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
     conectarValidacionTiempoReal(); // Validación en tiempo real
 
     document.getElementById("etiqueta")?.addEventListener("change", ()=>{
@@ -1731,6 +1986,22 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.getElementById("btnCerrarModal")?.addEventListener("click", cerrarModal);
     document.getElementById("btnDescargarCsvFiltrado")?.addEventListener("click", downloadCSVFiltrado);
 
+    // Toggle de filtros
+    document.getElementById("btnToggleFiltros")?.addEventListener("click", (e) => {
+      e.stopPropagation(); // Evitar que se dispare el click del header
+      toggleFiltros();
+    });
+    document.getElementById("filtrosHeader")?.addEventListener("click", toggleFiltros);
+
+    // Restaurar estado de filtros desde localStorage
+    const filtrosVisible = localStorage.getItem("filtros_visible");
+    if(filtrosVisible === "false"){
+      const body = document.getElementById("filtrosBody");
+      const icon = document.getElementById("filtrosToggleIcon");
+      if(body) body.style.display = "none";
+      if(icon) icon.textContent = "▲";
+    }
+
     // Cerrar modal al hacer click en el backdrop
     document.querySelector(".modal-backdrop")?.addEventListener("click", cerrarModal);
 
@@ -1739,4 +2010,246 @@ document.addEventListener("DOMContentLoaded", ()=>{
   }
 
 
+});
+
+// ===================================================================
+// SISTEMA DE NOTIFICACIONES EN TIEMPO REAL
+// ===================================================================
+
+// Variables globales
+let notificationEventSource = null;
+let notifications = [];
+let unreadCount = 0;
+
+// Conectar a SSE (Server-Sent Events)
+function connectToNotifications() {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  // Cerrar conexión anterior si existe
+  if (notificationEventSource) {
+    notificationEventSource.close();
+  }
+
+  const url = `${API_BASE}/api/notifications/stream`;
+  notificationEventSource = new EventSource(url + `?token=${encodeURIComponent(token)}`);
+
+  notificationEventSource.onopen = () => {
+    console.log("📡 Conectado a notificaciones en tiempo real");
+  };
+
+  notificationEventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log("📨 Notificación recibida:", data);
+
+      if (data.type === "connected") {
+        console.log("✅ Conexión SSE establecida");
+        return;
+      }
+
+      // Agregar notificación
+      handleNewNotification(data);
+
+    } catch (error) {
+      console.error("Error procesando notificación:", error);
+    }
+  };
+
+  notificationEventSource.onerror = (error) => {
+    console.error("Error en SSE:", error);
+    notificationEventSource.close();
+
+    // Reconectar después de 5 segundos
+    setTimeout(() => {
+      console.log("🔄 Reintentando conexión a notificaciones...");
+      connectToNotifications();
+    }, 5000);
+  };
+}
+
+// Manejar nueva notificación
+function handleNewNotification(data) {
+  const notification = {
+    id: Date.now(),
+    type: data.type,
+    title: data.title,
+    message: data.message,
+    category: data.category || "info",
+    timestamp: new Date(data.timestamp || Date.now()),
+    read: false,
+    data: data.data || {}
+  };
+
+  // Agregar a la lista
+  notifications.unshift(notification);
+  unreadCount++;
+
+  // Actualizar UI
+  updateNotificationBadge();
+  updateNotificationPanel();
+
+  // Mostrar toast
+  showToast(notification);
+}
+
+// Mostrar toast notification
+function showToast(notification) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+
+  const icons = {
+    success: "✅",
+    warning: "⚠️",
+    error: "❌",
+    info: "ℹ️"
+  };
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${notification.category}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[notification.category] || icons.info}</span>
+    <div class="toast-content">
+      <div class="toast-title">${escapeHtml(notification.title)}</div>
+      <div class="toast-message">${escapeHtml(notification.message)}</div>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+  `;
+
+  container.appendChild(toast);
+
+  // Auto-remover después de 5 segundos
+  setTimeout(() => {
+    toast.style.animation = "slideOut 0.3s ease-out";
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// Actualizar badge de notificaciones
+function updateNotificationBadge() {
+  const badge = document.getElementById("notificationBadge");
+  if (!badge) return;
+
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount > 99 ? "99+" : unreadCount;
+    badge.style.display = "block";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+// Actualizar panel de notificaciones
+function updateNotificationPanel() {
+  const list = document.getElementById("notificationList");
+  if (!list) return;
+
+  if (notifications.length === 0) {
+    list.innerHTML = '<div class="notification-empty">No hay notificaciones</div>';
+    return;
+  }
+
+  list.innerHTML = notifications.map(n => {
+    const timeAgo = getTimeAgo(n.timestamp);
+    return `
+      <div class="notification-item ${n.read ? "" : "unread"} ${n.category}" data-id="${n.id}">
+        <div class="notification-title">${escapeHtml(n.title)}</div>
+        <div class="notification-message">${escapeHtml(n.message)}</div>
+        <div class="notification-time">${timeAgo}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Agregar event listeners
+  list.querySelectorAll(".notification-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const id = parseInt(item.dataset.id);
+      markNotificationAsRead(id);
+    });
+  });
+}
+
+// Marcar notificación como leída
+function markNotificationAsRead(id) {
+  const notification = notifications.find(n => n.id === id);
+  if (notification && !notification.read) {
+    notification.read = true;
+    unreadCount = Math.max(0, unreadCount - 1);
+    updateNotificationBadge();
+    updateNotificationPanel();
+  }
+}
+
+// Marcar todas como leídas
+function markAllAsRead() {
+  notifications.forEach(n => n.read = true);
+  unreadCount = 0;
+  updateNotificationBadge();
+  updateNotificationPanel();
+}
+
+// Limpiar todas las notificaciones
+function clearAllNotifications() {
+  notifications = [];
+  unreadCount = 0;
+  updateNotificationBadge();
+  updateNotificationPanel();
+}
+
+// Obtener tiempo relativo (hace X tiempo)
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+
+  if (seconds < 60) return "Hace un momento";
+  if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)} h`;
+  if (seconds < 604800) return `Hace ${Math.floor(seconds / 86400)} días`;
+
+  return date.toLocaleDateString();
+}
+
+// Event listeners para el panel de notificaciones
+document.addEventListener("DOMContentLoaded", () => {
+  const notificationBtn = document.getElementById("notificationBtn");
+  const notificationPanel = document.getElementById("notificationPanel");
+  const closePanel = document.getElementById("closeNotificationPanel");
+  const clearAllBtn = document.getElementById("clearAllNotifications");
+
+  if (notificationBtn) {
+    notificationBtn.addEventListener("click", () => {
+      const isVisible = notificationPanel.style.display === "flex";
+      notificationPanel.style.display = isVisible ? "none" : "flex";
+
+      if (!isVisible) {
+        // Marcar todas como leídas al abrir el panel
+        markAllAsRead();
+      }
+    });
+  }
+
+  if (closePanel) {
+    closePanel.addEventListener("click", () => {
+      notificationPanel.style.display = "none";
+    });
+  }
+
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener("click", () => {
+      clearAllNotifications();
+    });
+  }
+
+  // Cerrar panel al hacer click fuera
+  document.addEventListener("click", (e) => {
+    if (notificationPanel && notificationPanel.style.display === "flex") {
+      if (!notificationPanel.contains(e.target) && !notificationBtn.contains(e.target)) {
+        notificationPanel.style.display = "none";
+      }
+    }
+  });
+
+  // Conectar a notificaciones si hay un token
+  const token = localStorage.getItem("token");
+  if (token) {
+    connectToNotifications();
+  }
 });

@@ -4,7 +4,8 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Usuarios</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <!-- Build: 2026-01-02-23-03-19 -->
+  <link rel="stylesheet" href="styles.css?v=2026010223"/>
 </head>
 
 <body>
@@ -21,6 +22,8 @@
 
     <!-- Botón hamburguesa (solo mobile) -->
     <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+      <span></span>
+      <span></span>
       <span></span>
     </button>
 
@@ -83,17 +86,23 @@
                   <input id="u_username" placeholder="ej: juan123">
                 </div>
 
-                <div class="field span3">
+                <div class="field span3" style="position: relative;">
                   <label>PASSWORD *</label>
-                  <input id="u_password" type="password" placeholder="Contraseña segura">
+                  <input id="u_password" type="password" placeholder="Contraseña segura" style="padding-right: 40px;">
+                  <button type="button" class="password-toggle" onclick="togglePasswordVisibility('u_password', this)" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
+                    👁️
+                  </button>
                   <small class="note" style="display:block; margin-top:4px; font-size:11px;">
                     Mín 8 caracteres, mayúscula, minúscula, número y carácter especial
                   </small>
                 </div>
 
-                <div class="field span3">
+                <div class="field span3" style="position: relative;">
                   <label>CONFIRMAR PASSWORD *</label>
-                  <input id="u_password_confirm" type="password" placeholder="Repetir contraseña">
+                  <input id="u_password_confirm" type="password" placeholder="Repetir contraseña" style="padding-right: 40px;">
+                  <button type="button" class="password-toggle" onclick="togglePasswordVisibility('u_password_confirm', this)" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
+                    👁️
+                  </button>
                   <small id="password_match_indicator" class="note" style="display:block; margin-top:4px; font-size:11px; color:var(--muted);">
                     Las contraseñas deben coincidir
                   </small>
@@ -167,8 +176,34 @@
     <div id="toast" class="toast">
       <strong>—</strong><span>—</span>
     </div>
+
+    <!-- Modal Reset Password -->
+    <div id="resetPasswordModal" class="modal-backdrop" style="display: none;">
+      <div class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+          <h3>🔑 Resetear Contraseña</h3>
+          <button id="btnCloseResetModal" class="modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="field" style="position: relative;">
+            <label>Nueva Contraseña *</label>
+            <input id="reset_password" type="password" placeholder="Mínimo 8 caracteres" style="padding-right: 40px;">
+            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('reset_password', this)" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
+              👁️
+            </button>
+            <small class="note" style="display:block; margin-top:4px; font-size:11px;">
+              Mín 8 caracteres, mayúscula, minúscula, número y carácter especial
+            </small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnConfirmReset" class="btn btn-primary">Cambiar Contraseña</button>
+          <button id="btnCancelReset" class="btn btn-ghost">Cancelar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app-2026010223.js"></script>
 </body>
 </html>

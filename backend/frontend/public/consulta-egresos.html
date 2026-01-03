@@ -4,7 +4,8 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Consulta de Retiros</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <!-- Build: 2026-01-02-23-03-19 -->
+  <link rel="stylesheet" href="styles.css?v=2026010223"/>
 </head>
 
 <body>
@@ -21,6 +22,8 @@
 
     <!-- Botón hamburguesa (solo mobile) -->
     <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+      <span></span>
+      <span></span>
       <span></span>
     </button>
 
@@ -69,11 +72,14 @@
 
         <!-- FILTROS -->
         <section class="card">
-          <div class="card-header">
-            🔍 Filtros de búsqueda
+          <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" id="filtrosHeader">
+            <span>🔍 Filtros de búsqueda</span>
+            <button type="button" class="btn btn-ghost" id="btnToggleFiltros" style="margin: 0; padding: 4px 12px; font-size: 14px;" title="Mostrar/Ocultar filtros">
+              <span id="filtrosToggleIcon">▼</span>
+            </button>
           </div>
 
-          <div class="card-body">
+          <div class="card-body" id="filtrosBody">
             <form id="filtrosForm" class="grid">
 
               <div class="field span3">
@@ -105,6 +111,7 @@
                 <select id="status">
                   <option value="">Todos</option>
                   <option value="activo">✓ Activo</option>
+                  <option value="editada">✏️ Editada</option>
                   <option value="pendiente">⏳ Pendiente</option>
                   <option value="anulado">✗ Anulado</option>
                 </select>
@@ -217,6 +224,6 @@
 
   </div>
 
-  <script src="app.js"></script>
+  <script src="app-2026010223.js"></script>
 </body>
 </html>
