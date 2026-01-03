@@ -31,3 +31,9 @@ Thumbs.db
 # Build (si usas bundler en el futuro)
 dist/
 build/
+
+# Backups
+backend/backups/
+
+# IMPORTANTE: Solo trabajar en backend/frontend/public
+# NO crear carpeta frontend/ en la raíz
