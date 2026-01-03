@@ -109,6 +109,9 @@ function togglePasswordVisibility(inputId, button) {
   }
 }
 
+// Exponer la función globalmente para que funcione con onclick en HTML
+window.togglePasswordVisibility = togglePasswordVisibility;
+
 /* =========================
    STORAGE / AUTH
    ========================= */
