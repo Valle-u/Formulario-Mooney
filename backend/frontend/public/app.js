@@ -109,8 +109,24 @@ function togglePasswordVisibility(inputId, button) {
   }
 }
 
-// Exponer la función globalmente para que funcione con onclick en HTML
-window.togglePasswordVisibility = togglePasswordVisibility;
+// Inicializar event listeners para todos los botones de toggle de contraseña
+function initPasswordToggles() {
+  document.querySelectorAll('.password-toggle').forEach(button => {
+    const targetId = button.getAttribute('data-target');
+    if (targetId) {
+      button.addEventListener('click', function() {
+        togglePasswordVisibility(targetId, this);
+      });
+    }
+  });
+}
+
+// Ejecutar inmediatamente para que esté disponible en todas las páginas
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPasswordToggles);
+} else {
+  initPasswordToggles();
+}
 
 /* =========================
    STORAGE / AUTH
