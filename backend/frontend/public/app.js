@@ -1662,8 +1662,8 @@ function mostrarDetalle(e){
               ✏️ Editar
             </button>
             ${user.role === 'admin' ? `
-              <button class="btn" onclick="mostrarModalAnular(${e.id})" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
-                ✗ Anular
+              <button class="btn" onclick="mostrarModalEliminar(${e.id})" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+                🗑️ Eliminar
               </button>
             ` : ''}
           ` : ''}
@@ -1866,24 +1866,18 @@ async function actualizarEgreso(id, updates){
   }
 }
 
-function mostrarModalAnular(id){
-  const motivo = prompt(`⚠️ Vas a ANULAR el egreso #${id}\n\nEsta acción no se puede deshacer.\n\nMotivo de anulación (obligatorio):`);
+function mostrarModalEliminar(id){
+  const confirmacion = confirm(`⚠️ ¿Estás seguro que querés ELIMINAR el egreso #${id}?\n\nEsta acción NO se puede deshacer.\nEl egreso será eliminado permanentemente de la base de datos.`);
 
-  if(!motivo || motivo.trim() === ""){
-    toast("⚠️ Cancelado", "El motivo es obligatorio", "warning");
-    return;
-  }
-
-  const confirmacion = confirm(`¿Confirmas que deseas anular este egreso?\n\nMotivo: ${motivo}`);
   if(!confirmacion) return;
 
-  anularEgreso(id, motivo);
+  eliminarEgreso(id);
 }
 
-async function anularEgreso(id, motivo){
+async function eliminarEgreso(id){
   try{
-    await api(`/api/egresos/${id}/anular`, { method: 'POST', body: { motivo } });
-    toast("✅ Anulado", "Egreso anulado correctamente", "success");
+    await api(`/api/egresos/${id}`, { method: 'DELETE' });
+    toast("✅ Eliminado", "Egreso eliminado correctamente", "success", 5000);
     cerrarModal();
     buscarEgresos(); // Recargar listado
   }catch(err){

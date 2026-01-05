@@ -1050,4 +1050,55 @@ router.get("/:id/history", auth, async (req, res) => {
   }
 });
 
+// DELETE /api/egresos/:id - Eliminar egreso completamente (solo admin)
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    // Solo admin puede eliminar
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Solo administradores pueden eliminar egresos" });
+    }
+
+    const { id } = req.params;
+
+    // Verificar que el egreso existe
+    const checkEgreso = await query(
+      `SELECT * FROM egresos WHERE id = $1`,
+      [id]
+    );
+
+    if (checkEgreso.rows.length === 0) {
+      return res.status(404).json({ message: "Egreso no encontrado" });
+    }
+
+    const egreso = checkEgreso.rows[0];
+
+    // Eliminar el egreso de la base de datos
+    await query(
+      `DELETE FROM egresos WHERE id = $1`,
+      [id]
+    );
+
+    // Registrar en audit logs
+    await auditLog(req, {
+      action: "EGRESO_DELETE",
+      entity: "egresos",
+      entity_id: id,
+      success: true,
+      status_code: 200,
+      details: {
+        monto: Number(egreso.monto),
+        empresa_salida: egreso.empresa_salida,
+        id_transferencia: egreso.id_transferencia,
+        fecha: egreso.fecha
+      }
+    });
+
+    return res.json({ message: "Egreso eliminado correctamente" });
+
+  } catch (error) {
+    console.error("🔥 Error eliminando egreso:", error);
+    return res.status(500).json({ message: "Error eliminando egreso" });
+  }
+});
+
 export default router;
