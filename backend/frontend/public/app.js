@@ -33,7 +33,7 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX"];
 
 const ETIQUETAS = [
   "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
@@ -1653,6 +1653,25 @@ function mostrarDetalle(e){
           ${comprobantePreview}
         </div>
       </div>
+
+      ${canEdit ? `
+      <div class="field span12" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start;">
+          ${status !== 'anulado' ? `
+            <button class="btn btn-primary" onclick="editarEgreso(${e.id})" style="flex: 1; min-width: 140px;">
+              ✏️ Editar
+            </button>
+            ${user.role === 'admin' ? `
+              <button class="btn" onclick="mostrarModalAnular(${e.id})" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+                ✗ Anular
+              </button>
+            ` : ''}
+          ` : ''}
+          <button class="btn btn-ghost" onclick="verHistorial(${e.id})" style="flex: 1; min-width: 140px;">
+            📜 Ver Historial
+          </button>
+        </div>
+      </div>` : ''}
     </div>
   `;
 
