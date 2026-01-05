@@ -12,7 +12,7 @@ import dotenv from 'dotenv';
 // IMPORTANTE: Cargar .env ANTES de importar r2-fetch
 dotenv.config();
 
-import { uploadToR2, deleteFromR2, isR2Configured } from './src/config/r2-fetch.js';
+import { uploadToR2, deleteFromR2, isR2Configured } from '../../src/config/r2-fetch.js';
 
 console.log('🧪 Probando cliente R2 con FETCH API\n');
 console.log('📋 Configuración cargada:');

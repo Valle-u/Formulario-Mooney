@@ -10,7 +10,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { uploadToImgBB, isImgBBConfigured } from './src/config/imgbb.js';
+import { uploadToImgBB, isImgBBConfigured } from '../../src/config/imgbb.js';
 
 console.log('🧪 Probando ImgBB\n');
 
