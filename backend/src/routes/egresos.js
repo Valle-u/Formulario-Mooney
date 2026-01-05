@@ -58,6 +58,68 @@ function fileFilter(req, file, cb) {
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 } });
 
+/**
+ * GET /api/egresos/check-id-transferencia
+ * Verifica si un ID de transferencia ya existe para una empresa específica
+ * Query params: empresa_salida, id_transferencia
+ * Retorna: { exists: boolean, egreso: {...} | null }
+ * IMPORTANTE: Debe estar ANTES del POST / para que Express lo matchee correctamente
+ */
+router.get("/check-id-transferencia", auth, async (req, res) => {
+  try {
+    const { empresa_salida, id_transferencia } = req.query;
+
+    // Validar parámetros
+    if (!empresa_salida || !id_transferencia) {
+      return res.status(400).json({
+        message: "Parámetros requeridos: empresa_salida, id_transferencia"
+      });
+    }
+
+    // Validar empresa
+    if (!EMPRESAS_SALIDA.includes(empresa_salida)) {
+      return res.status(400).json({
+        message: `Empresa inválida. Debe ser una de: ${EMPRESAS_SALIDA.join(", ")}`
+      });
+    }
+
+    // Buscar si existe
+    const result = await query(
+      `SELECT id, fecha, monto, moneda, etiqueta, created_by, status
+       FROM egresos
+       WHERE empresa_salida = $1 AND id_transferencia = $2
+       LIMIT 1`,
+      [empresa_salida, id_transferencia]
+    );
+
+    if (result.rowCount === 0) {
+      return res.json({
+        exists: false,
+        egreso: null
+      });
+    }
+
+    const egreso = result.rows[0];
+
+    return res.json({
+      exists: true,
+      egreso: {
+        id: egreso.id,
+        fecha: egreso.fecha,
+        monto: egreso.monto,
+        moneda: egreso.moneda,
+        etiqueta: egreso.etiqueta,
+        status: egreso.status,
+        created_by: egreso.created_by
+      }
+    });
+
+  } catch (error) {
+    console.error("🔥 Error verificando ID de transferencia:", error);
+    return res.status(500).json({ message: "Error verificando ID de transferencia" });
+  }
+});
+
 router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async (req, res) => {
   try {
     const dataStr = req.body?.data;
@@ -437,7 +499,7 @@ router.get("/", auth, async (req, res) => {
       FROM egresos e
       JOIN users u ON u.id = e.created_by
       ${whereClause}
-      ORDER BY e.fecha DESC, e.hora DESC, e.id DESC
+      ORDER BY e.created_at DESC, e.id DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}
     `;
 
@@ -574,7 +636,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
        FROM egresos e
        JOIN users u ON u.id = e.created_by
        ${whereClause}
-       ORDER BY e.fecha DESC, e.hora DESC, e.id DESC`,
+       ORDER BY e.created_at DESC, e.id DESC`,
       params
     );
 
@@ -988,64 +1050,54 @@ router.get("/:id/history", auth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/egresos/check-id-transferencia
- * Verifica si un ID de transferencia ya existe para una empresa específica
- * Query params: empresa_salida, id_transferencia
- * Retorna: { exists: boolean, egreso: {...} | null }
- */
-router.get("/check-id-transferencia", auth, async (req, res) => {
+// DELETE /api/egresos/:id - Eliminar egreso completamente (solo admin)
+router.delete("/:id", auth, async (req, res) => {
   try {
-    const { empresa_salida, id_transferencia } = req.query;
-
-    // Validar parámetros
-    if (!empresa_salida || !id_transferencia) {
-      return res.status(400).json({
-        message: "Parámetros requeridos: empresa_salida, id_transferencia"
-      });
+    // Solo admin puede eliminar
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Solo administradores pueden eliminar egresos" });
     }
 
-    // Validar empresa
-    if (!EMPRESAS_SALIDA.includes(empresa_salida)) {
-      return res.status(400).json({
-        message: `Empresa inválida. Debe ser una de: ${EMPRESAS_SALIDA.join(", ")}`
-      });
-    }
+    const { id } = req.params;
 
-    // Buscar si existe
-    const result = await query(
-      `SELECT id, fecha, monto, moneda, etiqueta, created_by, status
-       FROM egresos
-       WHERE empresa_salida = $1 AND id_transferencia = $2
-       LIMIT 1`,
-      [empresa_salida, id_transferencia]
+    // Verificar que el egreso existe
+    const checkEgreso = await query(
+      `SELECT * FROM egresos WHERE id = $1`,
+      [id]
     );
 
-    if (result.rowCount === 0) {
-      return res.json({
-        exists: false,
-        egreso: null
-      });
+    if (checkEgreso.rows.length === 0) {
+      return res.status(404).json({ message: "Egreso no encontrado" });
     }
 
-    const egreso = result.rows[0];
+    const egreso = checkEgreso.rows[0];
 
-    return res.json({
-      exists: true,
-      egreso: {
-        id: egreso.id,
-        fecha: egreso.fecha,
-        monto: egreso.monto,
-        moneda: egreso.moneda,
-        etiqueta: egreso.etiqueta,
-        status: egreso.status,
-        created_by: egreso.created_by
+    // Eliminar el egreso de la base de datos
+    await query(
+      `DELETE FROM egresos WHERE id = $1`,
+      [id]
+    );
+
+    // Registrar en audit logs
+    await auditLog(req, {
+      action: "EGRESO_DELETE",
+      entity: "egresos",
+      entity_id: id,
+      success: true,
+      status_code: 200,
+      details: {
+        monto: Number(egreso.monto),
+        empresa_salida: egreso.empresa_salida,
+        id_transferencia: egreso.id_transferencia,
+        fecha: egreso.fecha
       }
     });
 
+    return res.json({ message: "Egreso eliminado correctamente" });
+
   } catch (error) {
-    console.error("🔥 Error verificando ID de transferencia:", error);
-    return res.status(500).json({ message: "Error verificando ID de transferencia" });
+    console.error("🔥 Error eliminando egreso:", error);
+    return res.status(500).json({ message: "Error eliminando egreso" });
   }
 });
 

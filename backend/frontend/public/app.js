@@ -33,7 +33,7 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet"];
 
 const ETIQUETAS = [
   "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
@@ -236,7 +236,7 @@ function setupInactivityMonitor(){
 /* =========================
    API
    ========================= */
-async function api(path, {method="GET", body=null, auth=true} = {}){
+async function api(path, {method="GET", body=null, auth=true, timeout=60000} = {}){
   const headers = {};
   if(!(body instanceof FormData)) headers["Content-Type"] = "application/json";
   if(auth){
@@ -244,27 +244,42 @@ async function api(path, {method="GET", body=null, auth=true} = {}){
     if(t) headers["Authorization"] = `Bearer ${t}`;
   }
 
-  const res = await fetch(API_BASE + path, {
-    method,
-    headers,
-    body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : null
-  });
+  // Crear AbortController para timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  if(res.status === 401 && auth){
-    clearToken(); clearUser();
-    window.location.href = "index.html";
-    throw new Error("Sesión expirada. Volvé a iniciar sesión.");
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : null,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if(res.status === 401 && auth){
+      clearToken(); clearUser();
+      window.location.href = "index.html";
+      throw new Error("Sesión expirada. Volvé a iniciar sesión.");
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+    const data = isJson ? await res.json().catch(()=>null) : await res.text().catch(()=>null);
+
+    if(!res.ok){
+      const msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
+      throw new Error(msg);
+    }
+    return data;
+  } catch(err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error("La solicitud tardó demasiado. Verificá tu conexión e intentá nuevamente.");
+    }
+    throw err;
   }
-
-  const contentType = res.headers.get("content-type") || "";
-  const isJson = contentType.includes("application/json");
-  const data = isJson ? await res.json().catch(()=>null) : await res.text().catch(()=>null);
-
-  if(!res.ok){
-    const msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
-    throw new Error(msg);
-  }
-  return data;
 }
 
 /* =========================
@@ -901,6 +916,20 @@ async function confirmarYEnviarEgreso(){
   const { payload, file } = datosEgresoValidados;
   const modal = document.getElementById("modalConfirmacion");
 
+  // Función helper para rehabilitar botones
+  const rehabilitarBotones = () => {
+    const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
+    const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
+
+    if(btnConfirmar){
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = "✓ Confirmar y Guardar";
+    }
+    if(btnCancelar){
+      btnCancelar.disabled = false;
+    }
+  };
+
   try{
     const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
     const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
@@ -935,6 +964,9 @@ async function confirmarYEnviarEgreso(){
 
     await api("/api/egresos", { method:"POST", body: fd, auth:true });
 
+    // Rehabilitar botones inmediatamente después del éxito
+    rehabilitarBotones();
+
     // Mostrar mensaje de éxito con duración extendida (8 segundos)
     toast("✅ Guardado", "Egreso registrado correctamente.", "success", 8000);
 
@@ -951,19 +983,10 @@ async function confirmarYEnviarEgreso(){
     }, 2500); // Esperar 2.5 segundos antes de cerrar modal y resetear
 
   }catch(err){
+    // Rehabilitar botones inmediatamente en caso de error
+    rehabilitarBotones();
+
     toast("❌ Error", err.message, "error", 10000);
-
-    // Re-habilitar botones inmediatamente en caso de error
-    const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
-    const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
-
-    if(btnConfirmar){
-      btnConfirmar.disabled = false;
-      btnConfirmar.textContent = "✓ Confirmar y Guardar";
-    }
-    if(btnCancelar){
-      btnCancelar.disabled = false;
-    }
   }
 }
 
@@ -1024,7 +1047,7 @@ async function downloadCSVFiltrado(){
     a.remove();
     window.URL.revokeObjectURL(downloadUrl);
 
-    toast("CSV descargado", "Archivo exportado exitosamente");
+    toast("✅ CSV descargado", "Archivo exportado exitosamente", "success", 5000);
   }catch(err){
     toast("Error CSV", err.message);
   }
@@ -1630,6 +1653,25 @@ function mostrarDetalle(e){
           ${comprobantePreview}
         </div>
       </div>
+
+      ${canEdit ? `
+      <div class="field span12" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start;">
+          ${status !== 'anulado' ? `
+            <button class="btn btn-primary btn-editar-egreso" style="flex: 1; min-width: 140px;">
+              ✏️ Editar
+            </button>
+            ${user.role === 'admin' ? `
+              <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+                🗑️ Eliminar
+              </button>
+            ` : ''}
+          ` : ''}
+          <button class="btn btn-ghost btn-ver-historial" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px;">
+            📜 Ver Historial
+          </button>
+        </div>
+      </div>` : ''}
     </div>
   `;
 
@@ -1638,6 +1680,36 @@ function mostrarDetalle(e){
   modal.style.display = "flex";
 
   console.log('✅ Modal mostrado con display:', modal.style.display);
+
+  // Agregar event listeners a los botones de acción
+  setTimeout(() => {
+    const btnEditar = document.querySelector('.btn-editar-egreso');
+    const btnEliminar = document.querySelector('.btn-eliminar-egreso');
+    const btnHistorial = document.querySelector('.btn-ver-historial');
+
+    if (btnEditar) {
+      btnEditar.addEventListener('click', () => {
+        console.log('🖊️ Botón Editar clickeado');
+        editarEgresoModal();
+      });
+    }
+
+    if (btnEliminar) {
+      btnEliminar.addEventListener('click', () => {
+        const egresoId = btnEliminar.dataset.egresoId;
+        console.log('🗑️ Botón Eliminar clickeado, ID:', egresoId);
+        mostrarModalEliminar(egresoId);
+      });
+    }
+
+    if (btnHistorial) {
+      btnHistorial.addEventListener('click', () => {
+        const egresoId = btnHistorial.dataset.egresoId;
+        console.log('📜 Botón Historial clickeado, ID:', egresoId);
+        verHistorial(egresoId);
+      });
+    }
+  }, 100);
 }
 
 function cerrarModal(){
@@ -1824,24 +1896,18 @@ async function actualizarEgreso(id, updates){
   }
 }
 
-function mostrarModalAnular(id){
-  const motivo = prompt(`⚠️ Vas a ANULAR el egreso #${id}\n\nEsta acción no se puede deshacer.\n\nMotivo de anulación (obligatorio):`);
+function mostrarModalEliminar(id){
+  const confirmacion = confirm(`⚠️ ¿Estás seguro que querés ELIMINAR el egreso #${id}?\n\nEsta acción NO se puede deshacer.\nEl egreso será eliminado permanentemente de la base de datos.`);
 
-  if(!motivo || motivo.trim() === ""){
-    toast("⚠️ Cancelado", "El motivo es obligatorio", "warning");
-    return;
-  }
-
-  const confirmacion = confirm(`¿Confirmas que deseas anular este egreso?\n\nMotivo: ${motivo}`);
   if(!confirmacion) return;
 
-  anularEgreso(id, motivo);
+  eliminarEgreso(id);
 }
 
-async function anularEgreso(id, motivo){
+async function eliminarEgreso(id){
   try{
-    await api(`/api/egresos/${id}/anular`, { method: 'POST', body: { motivo } });
-    toast("✅ Anulado", "Egreso anulado correctamente", "success");
+    await api(`/api/egresos/${id}`, { method: 'DELETE' });
+    toast("✅ Eliminado", "Egreso eliminado correctamente", "success", 5000);
     cerrarModal();
     buscarEgresos(); // Recargar listado
   }catch(err){

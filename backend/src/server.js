@@ -144,7 +144,36 @@ app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationsRoutes); // Notificaciones en tiempo real (SSE)
 app.use("/api", initRoutes); // Endpoint temporal para inicializar admin
 
-app.get("/health", (req, res) => res.json({ ok: true }));
+// Health check endpoint mejorado
+import { query } from "./config/db.js";
+
+app.get("/health", async (req, res) => {
+  try {
+    // Verificar conexión a la base de datos
+    const dbCheck = await query("SELECT NOW() as time");
+
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      database: 'connected',
+      dbTime: dbCheck.rows[0].time,
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Health check failed:', error.message);
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      database: 'disconnected',
+      error: error.message
+    });
+  }
+});
 
 app.use((err, req, res, next) => {
   console.error("🔥 ERROR GLOBAL:", err);
@@ -152,16 +181,58 @@ app.use((err, req, res, next) => {
 });
 
 // 🚀 Arranque con migraciones
+let server;
+
 async function start() {
   try {
     await runMigrations();
-    app.listen(PORT, () => {
-      console.log(`API running on ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
+    server = app.listen(PORT, () => {
+      console.log(`✅ API running on ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
+      console.log(`🏥 Health check: ${process.env.BASE_URL || `http://localhost:${PORT}`}/health`);
     });
   } catch (e) {
     console.error("❌ Server NOT started due to migration error");
     process.exit(1);
   }
 }
+
+// Graceful shutdown: cerrar conexiones limpiamente cuando el proceso termina
+async function gracefulShutdown(signal) {
+  console.log(`\n🛑 ${signal} recibido, cerrando servidor...`);
+
+  // Dejar de aceptar nuevas conexiones
+  if (server) {
+    server.close(() => {
+      console.log('✅ Servidor HTTP cerrado');
+    });
+  }
+
+  try {
+    // Cerrar pool de PostgreSQL
+    const { pool } = await import('./config/db.js');
+    await pool.end();
+    console.log('✅ Pool de PostgreSQL cerrado');
+
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Error durante graceful shutdown:', err);
+    process.exit(1);
+  }
+}
+
+// Manejar señales del sistema operativo
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Manejar errores no capturados
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught Exception:', err);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  // No terminar el proceso por promesas rechazadas, solo logear
+});
 
 start();

@@ -225,82 +225,6 @@ label{
   color: var(--muted);
 }
 
-/* Toast */
-.toast{
-  position:fixed;
-  bottom:24px;
-  right:24px;
-  background: rgba(25,30,40,.96);
-  border:1px solid var(--border);
-  padding:16px 20px;
-  border-radius:10px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
-  opacity:0;
-  transform: translateY(30px) scale(0.9);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  pointer-events:none;
-  max-width:450px;
-  min-width:320px;
-  z-index: 10000;
-}
-.toast.show{
-  opacity:1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-  animation: toast-bounce 0.5s ease;
-}
-@keyframes toast-bounce {
-  0% { transform: translateY(30px) scale(0.9); }
-  50% { transform: translateY(-5px) scale(1.02); }
-  100% { transform: translateY(0) scale(1); }
-}
-.toast strong{
-  display:block;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-.toast span{
-  display:block;
-  margin-top:4px;
-  color: var(--muted);
-  font-size:13px;
-  line-height: 1.4;
-}
-
-/* Toast tipos */
-.toast-error{
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.98), rgba(185, 28, 28, 0.98));
-  border: 2px solid rgb(248, 113, 113);
-  box-shadow: 0 10px 40px rgba(220, 38, 38, 0.4), 0 2px 8px rgba(0,0,0,0.3);
-}
-.toast-error strong{ color: #fff; font-size: 16px; }
-.toast-error span{ color: rgba(255,255,255,0.95); }
-
-.toast-success{
-  background: linear-gradient(135deg, rgba(22, 163, 74, 0.98), rgba(21, 128, 61, 0.98));
-  border: 2px solid rgb(74, 222, 128);
-  box-shadow: 0 10px 40px rgba(22, 163, 74, 0.4), 0 2px 8px rgba(0,0,0,0.3);
-}
-.toast-success strong{ color: #fff; font-size: 16px; }
-.toast-success span{ color: rgba(255,255,255,0.95); }
-
-.toast-warning{
-  background: linear-gradient(135deg, rgba(234, 179, 8, 0.98), rgba(202, 138, 4, 0.98));
-  border: 2px solid rgb(253, 224, 71);
-  box-shadow: 0 10px 40px rgba(234, 179, 8, 0.4), 0 2px 8px rgba(0,0,0,0.3);
-}
-.toast-warning strong{ color: #000; font-size: 16px; }
-.toast-warning span{ color: rgba(0,0,0,0.85); }
-
-.toast-info{
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.98), rgba(37, 99, 235, 0.98));
-  border: 2px solid rgb(147, 197, 253);
-  box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4), 0 2px 8px rgba(0,0,0,0.3);
-}
-.toast-info strong{ color: #fff; font-size: 16px; }
-.toast-info span{ color: rgba(255,255,255,0.95); }
-
 /* ===============================
    LAYOUT SIN SIDEBAR (EGRESOS)
    =============================== */
@@ -446,22 +370,6 @@ label{
   .page { padding: 0; }
   .actions-sticky{
     bottom: 8px;
-  }
-
-  /* Toast más compacto en mobile */
-  .toast {
-    bottom: 12px;
-    right: 12px;
-    left: 12px;
-    min-width: auto;
-    max-width: none;
-    padding: 14px 16px;
-  }
-  .toast strong {
-    font-size: 14px;
-  }
-  .toast span {
-    font-size: 12px;
   }
 }
 

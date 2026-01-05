@@ -1,4 +1,4 @@
-import { pool } from './src/config/db.js';
+import { pool } from '../../src/config/db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,26 +8,25 @@ const __dirname = path.dirname(__filename);
 
 async function runMigration() {
   try {
-    console.log('🔄 Ejecutando migración 010_add_currency_support.sql...\n');
+    console.log('🔄 Ejecutando migración 011_update_user_roles.sql...\n');
 
-    const migrationPath = path.join(__dirname, 'src/migrations/010_add_currency_support.sql');
+    const migrationPath = path.join(__dirname, '../../src/migrations/011_update_user_roles.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
     await pool.query(sql);
 
     console.log('✅ Migración ejecutada correctamente!\n');
 
-    // Verificar que se agregó la columna
+    // Verificar los roles actualizados
     const check = await pool.query(`
-      SELECT column_name, data_type, column_default
-      FROM information_schema.columns
-      WHERE table_name = 'egresos' AND column_name = 'moneda'
+      SELECT role, COUNT(*) as count
+      FROM users
+      GROUP BY role
+      ORDER BY role
     `);
 
-    if (check.rows.length > 0) {
-      console.log('✅ Columna "moneda" agregada correctamente:');
-      console.table(check.rows);
-    }
+    console.log('✅ Roles actualizados en la tabla users:');
+    console.table(check.rows);
 
     await pool.end();
   } catch (error) {
