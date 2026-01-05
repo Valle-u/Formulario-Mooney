@@ -1658,7 +1658,7 @@ function mostrarDetalle(e){
       <div class="field span12" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
         <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start;">
           ${status !== 'anulado' ? `
-            <button class="btn btn-primary" onclick="editarEgreso(${e.id})" style="flex: 1; min-width: 140px;">
+            <button class="btn btn-primary" onclick="editarEgresoModal()" style="flex: 1; min-width: 140px;">
               ✏️ Editar
             </button>
             ${user.role === 'admin' ? `
