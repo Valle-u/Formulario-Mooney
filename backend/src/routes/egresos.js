@@ -499,7 +499,7 @@ router.get("/", auth, async (req, res) => {
       FROM egresos e
       JOIN users u ON u.id = e.created_by
       ${whereClause}
-      ORDER BY e.fecha DESC, e.hora DESC, e.id DESC
+      ORDER BY e.created_at DESC, e.id DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}
     `;
 
@@ -636,7 +636,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
        FROM egresos e
        JOIN users u ON u.id = e.created_by
        ${whereClause}
-       ORDER BY e.fecha DESC, e.hora DESC, e.id DESC`,
+       ORDER BY e.created_at DESC, e.id DESC`,
       params
     );
 
