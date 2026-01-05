@@ -1658,16 +1658,16 @@ function mostrarDetalle(e){
       <div class="field span12" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
         <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start;">
           ${status !== 'anulado' ? `
-            <button class="btn btn-primary" onclick="editarEgresoModal()" style="flex: 1; min-width: 140px;">
+            <button class="btn btn-primary btn-editar-egreso" style="flex: 1; min-width: 140px;">
               ✏️ Editar
             </button>
             ${user.role === 'admin' ? `
-              <button class="btn" onclick="mostrarModalEliminar(${e.id})" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+              <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
                 🗑️ Eliminar
               </button>
             ` : ''}
           ` : ''}
-          <button class="btn btn-ghost" onclick="verHistorial(${e.id})" style="flex: 1; min-width: 140px;">
+          <button class="btn btn-ghost btn-ver-historial" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px;">
             📜 Ver Historial
           </button>
         </div>
@@ -1680,6 +1680,36 @@ function mostrarDetalle(e){
   modal.style.display = "flex";
 
   console.log('✅ Modal mostrado con display:', modal.style.display);
+
+  // Agregar event listeners a los botones de acción
+  setTimeout(() => {
+    const btnEditar = document.querySelector('.btn-editar-egreso');
+    const btnEliminar = document.querySelector('.btn-eliminar-egreso');
+    const btnHistorial = document.querySelector('.btn-ver-historial');
+
+    if (btnEditar) {
+      btnEditar.addEventListener('click', () => {
+        console.log('🖊️ Botón Editar clickeado');
+        editarEgresoModal();
+      });
+    }
+
+    if (btnEliminar) {
+      btnEliminar.addEventListener('click', () => {
+        const egresoId = btnEliminar.dataset.egresoId;
+        console.log('🗑️ Botón Eliminar clickeado, ID:', egresoId);
+        mostrarModalEliminar(egresoId);
+      });
+    }
+
+    if (btnHistorial) {
+      btnHistorial.addEventListener('click', () => {
+        const egresoId = btnHistorial.dataset.egresoId;
+        console.log('📜 Botón Historial clickeado, ID:', egresoId);
+        verHistorial(egresoId);
+      });
+    }
+  }, 100);
 }
 
 function cerrarModal(){
