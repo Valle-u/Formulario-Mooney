@@ -236,7 +236,7 @@ function setupInactivityMonitor(){
 /* =========================
    API
    ========================= */
-async function api(path, {method="GET", body=null, auth=true} = {}){
+async function api(path, {method="GET", body=null, auth=true, timeout=60000} = {}){
   const headers = {};
   if(!(body instanceof FormData)) headers["Content-Type"] = "application/json";
   if(auth){
@@ -244,27 +244,42 @@ async function api(path, {method="GET", body=null, auth=true} = {}){
     if(t) headers["Authorization"] = `Bearer ${t}`;
   }
 
-  const res = await fetch(API_BASE + path, {
-    method,
-    headers,
-    body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : null
-  });
+  // Crear AbortController para timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  if(res.status === 401 && auth){
-    clearToken(); clearUser();
-    window.location.href = "index.html";
-    throw new Error("Sesión expirada. Volvé a iniciar sesión.");
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : null,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if(res.status === 401 && auth){
+      clearToken(); clearUser();
+      window.location.href = "index.html";
+      throw new Error("Sesión expirada. Volvé a iniciar sesión.");
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+    const data = isJson ? await res.json().catch(()=>null) : await res.text().catch(()=>null);
+
+    if(!res.ok){
+      const msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
+      throw new Error(msg);
+    }
+    return data;
+  } catch(err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error("La solicitud tardó demasiado. Verificá tu conexión e intentá nuevamente.");
+    }
+    throw err;
   }
-
-  const contentType = res.headers.get("content-type") || "";
-  const isJson = contentType.includes("application/json");
-  const data = isJson ? await res.json().catch(()=>null) : await res.text().catch(()=>null);
-
-  if(!res.ok){
-    const msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
-    throw new Error(msg);
-  }
-  return data;
 }
 
 /* =========================
@@ -901,6 +916,20 @@ async function confirmarYEnviarEgreso(){
   const { payload, file } = datosEgresoValidados;
   const modal = document.getElementById("modalConfirmacion");
 
+  // Función helper para rehabilitar botones
+  const rehabilitarBotones = () => {
+    const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
+    const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
+
+    if(btnConfirmar){
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = "✓ Confirmar y Guardar";
+    }
+    if(btnCancelar){
+      btnCancelar.disabled = false;
+    }
+  };
+
   try{
     const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
     const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
@@ -935,6 +964,9 @@ async function confirmarYEnviarEgreso(){
 
     await api("/api/egresos", { method:"POST", body: fd, auth:true });
 
+    // Rehabilitar botones inmediatamente después del éxito
+    rehabilitarBotones();
+
     // Mostrar mensaje de éxito con duración extendida (8 segundos)
     toast("✅ Guardado", "Egreso registrado correctamente.", "success", 8000);
 
@@ -951,19 +983,10 @@ async function confirmarYEnviarEgreso(){
     }, 2500); // Esperar 2.5 segundos antes de cerrar modal y resetear
 
   }catch(err){
+    // Rehabilitar botones inmediatamente en caso de error
+    rehabilitarBotones();
+
     toast("❌ Error", err.message, "error", 10000);
-
-    // Re-habilitar botones inmediatamente en caso de error
-    const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
-    const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
-
-    if(btnConfirmar){
-      btnConfirmar.disabled = false;
-      btnConfirmar.textContent = "✓ Confirmar y Guardar";
-    }
-    if(btnCancelar){
-      btnCancelar.disabled = false;
-    }
   }
 }
 
