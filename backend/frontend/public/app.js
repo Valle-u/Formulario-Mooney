@@ -33,7 +33,7 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet"];
 
 const ETIQUETAS = [
   "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
@@ -1047,7 +1047,7 @@ async function downloadCSVFiltrado(){
     a.remove();
     window.URL.revokeObjectURL(downloadUrl);
 
-    toast("CSV descargado", "Archivo exportado exitosamente");
+    toast("✅ CSV descargado", "Archivo exportado exitosamente", "success", 5000);
   }catch(err){
     toast("Error CSV", err.message);
   }
