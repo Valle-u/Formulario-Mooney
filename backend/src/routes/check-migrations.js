@@ -26,6 +26,8 @@ router.get('/check-migrations', async (req, res) => {
                           testLemoncash.rows[0].definition.includes('NaranjaX');
       const hasTrustWallet = testLemoncash.rows.length > 0 &&
                              testLemoncash.rows[0].definition.includes('TrustWallet');
+      const hasMercadoPago = testLemoncash.rows.length > 0 &&
+                             testLemoncash.rows[0].definition.includes('Mercado Pago');
 
       results.checks.push({
         migration: '014_add_lemoncash_naranjax',
@@ -42,6 +44,15 @@ router.get('/check-migrations', async (req, res) => {
         status: hasTrustWallet ? '✅ EJECUTADA' : '❌ FALTANTE',
         details: {
           hasTrustWallet,
+          currentDefinition: testLemoncash.rows[0]?.definition || 'No encontrado'
+        }
+      });
+
+      results.checks.push({
+        migration: '017_add_mercado_pago',
+        status: hasMercadoPago ? '✅ EJECUTADA' : '❌ FALTANTE',
+        details: {
+          hasMercadoPago,
           currentDefinition: testLemoncash.rows[0]?.definition || 'No encontrado'
         }
       });

@@ -82,6 +82,29 @@ router.get('/run-migrations', async (req, res) => {
       });
     }
 
+    // Migración 017: Add Mercado Pago
+    try {
+      const sql017 = `
+        ALTER TABLE egresos DROP CONSTRAINT IF EXISTS egresos_empresa_salida_check;
+        ALTER TABLE egresos ADD CONSTRAINT egresos_empresa_salida_check
+          CHECK (empresa_salida IN ('Telepagos', 'Copter', 'Palta', 'Personal Pay', 'Lemoncash', 'NaranjaX', 'TrustWallet', 'Mercado Pago'));
+      `;
+
+      await query(sql017);
+
+      results.migrations.push({
+        name: '017_add_mercado_pago',
+        status: '✅ EJECUTADA',
+        message: 'Mercado Pago agregado al constraint de empresa_salida'
+      });
+    } catch (err) {
+      results.migrations.push({
+        name: '017_add_mercado_pago',
+        status: '❌ ERROR',
+        error: err.message
+      });
+    }
+
     // Verificar estado final
     const statusCheck = await query(
       `SELECT pg_get_constraintdef(oid) as definition
