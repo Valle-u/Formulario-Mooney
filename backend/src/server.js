@@ -12,7 +12,8 @@ import egresosRoutes from "./routes/egresos.js";
 import logsRoutes from "./routes/logs.js";
 import initRoutes from "./routes/init.js";
 import notificationsRoutes from "./routes/notifications.js";
-import runMigrationsWebRoutes from "./routes/run-migrations-web.js";
+import checkMigrationsRoutes from "./routes/check-migrations.js";
+import runMigrationsRoutes from "./routes/run-migrations.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 
@@ -144,7 +145,8 @@ app.use("/api/egresos", egresosRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationsRoutes); // Notificaciones en tiempo real (SSE)
 app.use("/api", initRoutes); // Endpoint temporal para inicializar admin
-app.use("/api", runMigrationsWebRoutes); // ⚠️ TEMPORAL: Endpoint para ejecutar migraciones (ELIMINAR DESPUÉS)
+app.use("/api", checkMigrationsRoutes); // Endpoint temporal para verificar migraciones
+app.use("/api", runMigrationsRoutes); // Endpoint temporal para ejecutar migraciones
 
 // Health check endpoint mejorado
 import { query } from "./config/db.js";

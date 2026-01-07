@@ -33,7 +33,7 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago"];
 
 const ETIQUETAS = [
   "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
@@ -866,7 +866,12 @@ function mostrarModalConfirmacion(payload, montoNum, file){
       ` : ''}
       <div class="field span12">
         <label>COMPROBANTE</label>
-        <div class="note">📎 ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</div>
+        <div class="note" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <span>📎 ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</span>
+          <button type="button" class="btn-ver-comprobante-preview" style="padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+            👁️ Ver Comprobante
+          </button>
+        </div>
       </div>
       ${payload.notas ? `
       <div class="field span12">
@@ -879,10 +884,17 @@ function mostrarModalConfirmacion(payload, montoNum, file){
 
   modal.style.display = "flex";
 
-  // Focus en el primer botón
+  // Focus en el primer botón y agregar event listener al botón de ver comprobante
   setTimeout(() => {
     const btnConfirmar = document.getElementById("btnConfirmarEgreso");
     if(btnConfirmar) btnConfirmar.focus();
+
+    // Agregar event listener al botón de ver comprobante
+    const btnVerComprobante = document.querySelector('.btn-ver-comprobante-preview');
+    if(btnVerComprobante){
+      btnVerComprobante.addEventListener('click', verComprobantePreview);
+      console.log('✅ Event listener agregado al botón Ver Comprobante');
+    }
   }, 100);
 }
 
@@ -894,6 +906,32 @@ function cerrarModalConfirmacion(){
   // Restaurar focus al botón submit del formulario
   const submitBtn = document.querySelector("#egresoForm button[type='submit']");
   if(submitBtn) submitBtn.focus();
+}
+
+// Ver comprobante en preview antes de confirmar
+function verComprobantePreview(){
+  if(!datosEgresoValidados || !datosEgresoValidados.file){
+    toast("⚠️ Error", "No hay comprobante para visualizar", "error", 3000);
+    return;
+  }
+
+  const file = datosEgresoValidados.file;
+
+  // Crear URL temporal del archivo
+  const fileURL = URL.createObjectURL(file);
+
+  // Abrir en nueva ventana/pestaña
+  const newWindow = window.open(fileURL, '_blank');
+
+  if(!newWindow){
+    toast("⚠️ Popups Bloqueados", "Por favor permite popups para ver el comprobante", "warning", 4000);
+  } else {
+    // Liberar el objeto URL después de un tiempo para evitar memory leaks
+    // La nueva ventana ya tiene acceso al blob, así que es seguro liberarlo
+    setTimeout(() => {
+      URL.revokeObjectURL(fileURL);
+    }, 1000);
+  }
 }
 
 // Manejar tecla ESC para cerrar modal
