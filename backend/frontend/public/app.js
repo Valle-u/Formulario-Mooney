@@ -868,7 +868,7 @@ function mostrarModalConfirmacion(payload, montoNum, file){
         <label>COMPROBANTE</label>
         <div class="note" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <span>📎 ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</span>
-          <button type="button" class="btn-ver-comprobante" onclick="verComprobantePreview()" style="padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+          <button type="button" class="btn-ver-comprobante-preview" style="padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
             👁️ Ver Comprobante
           </button>
         </div>
@@ -884,10 +884,17 @@ function mostrarModalConfirmacion(payload, montoNum, file){
 
   modal.style.display = "flex";
 
-  // Focus en el primer botón
+  // Focus en el primer botón y agregar event listener al botón de ver comprobante
   setTimeout(() => {
     const btnConfirmar = document.getElementById("btnConfirmarEgreso");
     if(btnConfirmar) btnConfirmar.focus();
+
+    // Agregar event listener al botón de ver comprobante
+    const btnVerComprobante = document.querySelector('.btn-ver-comprobante-preview');
+    if(btnVerComprobante){
+      btnVerComprobante.addEventListener('click', verComprobantePreview);
+      console.log('✅ Event listener agregado al botón Ver Comprobante');
+    }
   }, 100);
 }
 
