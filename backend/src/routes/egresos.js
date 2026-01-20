@@ -217,7 +217,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     console.log(`🔧 ImgBB configurado: ${isImgBBConfigured()}`);
     console.log(`🔧 R2 configurado: ${isR2Configured()}`);
 
-    // Prioridad 1: ImgBB (más fácil y sin problemas SSL)
+    // Prioridad 1: ImgBB (servicio principal)
     if (isImgBBConfigured()) {
       try {
         console.log(`☁️ Intentando subir a ImgBB: ${fileName}`);
@@ -226,11 +226,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       } catch (error) {
         console.error('❌ Error subiendo a ImgBB:', error);
         console.error('Error details:', error.message, error.stack);
-        return res.status(500).json({ message: `Error al subir comprobante a ImgBB: ${error.message}` });
+        console.warn('⚠️ ImgBB falló, intentando fallback a R2 o almacenamiento local...');
+        // NO hacer return, intentar fallbacks
       }
     }
-    // Prioridad 2: Cloudflare R2 (si ImgBB no está configurado)
-    else if (isR2Configured()) {
+
+    // Prioridad 2: Cloudflare R2 (si ImgBB no está configurado o falló)
+    if (!comprobanteUrl && isR2Configured()) {
       try {
         console.log(`☁️ Intentando subir a R2: ${fileName}`);
         comprobanteUrl = await uploadToR2(file.buffer, fileName, file.mimetype);
@@ -238,11 +240,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       } catch (error) {
         console.error('❌ Error subiendo a R2:', error);
         console.error('Error details:', error.message, error.stack);
-        return res.status(500).json({ message: `Error al subir comprobante a R2: ${error.message}` });
+        console.warn('⚠️ R2 falló, usando almacenamiento local como último fallback...');
+        // NO hacer return, usar fallback local
       }
     }
-    // Fallback: Guardar en disco local (solo para desarrollo)
-    else {
+
+    // Fallback final: Guardar en disco local (si todo lo demás falló)
+    if (!comprobanteUrl) {
       try {
         console.log(`💾 Guardando localmente en: ${UPLOAD_DIR}/${fileName}`);
         console.warn('⚠️  ADVERTENCIA: Guardando archivo localmente. Esto NO es recomendado en SeeNode.');
