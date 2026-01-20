@@ -9,10 +9,18 @@ DROP CONSTRAINT IF EXISTS egresos_id_transferencia_digits_chk;
 ALTER TABLE egresos
 ALTER COLUMN id_transferencia TYPE TEXT;
 
--- Agregar nuevo constraint para alfanuméricos
-ALTER TABLE egresos
-ADD CONSTRAINT egresos_id_transferencia_alphanumeric_chk
-CHECK (id_transferencia ~ '^[a-zA-Z0-9\-_]+$') NOT VALID;
+-- Agregar nuevo constraint para alfanuméricos (si no existe)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'egresos_id_transferencia_alphanumeric_chk'
+  ) THEN
+    ALTER TABLE egresos
+    ADD CONSTRAINT egresos_id_transferencia_alphanumeric_chk
+    CHECK (id_transferencia ~ '^[a-zA-Z0-9\-_]+$') NOT VALID;
+  END IF;
+END $$;
 
 -- Actualizar el comentario de la columna
 COMMENT ON COLUMN egresos.id_transferencia IS 'ID alfanumérico de la transferencia (puede contener letras, números, guiones y guiones bajos)';
