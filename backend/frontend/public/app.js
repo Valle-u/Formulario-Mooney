@@ -405,8 +405,11 @@ function toggleCamposPremio(){
 function fileLabel(){
   const f = document.getElementById("comprobante");
   const out = document.getElementById("comprobante_nombre");
+  console.log('📎 fileLabel ejecutado, input encontrado:', !!f, 'output encontrado:', !!out);
   if(!f || !out) return;
-  out.textContent = f.files?.[0]?.name ? f.files[0].name : "Ningún archivo seleccionado";
+  const fileName = f.files?.[0]?.name;
+  console.log('📎 Archivo seleccionado:', fileName || 'ninguno');
+  out.textContent = fileName ? fileName : "Ningún archivo seleccionado";
 }
 
 function wireIdTransferenciaAlphanumeric(){
@@ -2097,7 +2100,16 @@ document.addEventListener("DOMContentLoaded", ()=>{
       toggleOtroConcepto();
       toggleCamposPremio();
     });
-    document.getElementById("comprobante")?.addEventListener("change", fileLabel);
+    const inputComprobante = document.getElementById("comprobante");
+    if (inputComprobante) {
+      console.log('✅ Input comprobante encontrado y configurando listeners');
+      inputComprobante.addEventListener("change", fileLabel);
+      inputComprobante.addEventListener("click", () => {
+        console.log('🖱️ Click detectado en input comprobante');
+      });
+    } else {
+      console.error('❌ Input comprobante NO encontrado');
+    }
     document.getElementById("egresoForm")?.addEventListener("submit", handleEgresoSubmit);
 
     // Event listeners para el modal de confirmación
