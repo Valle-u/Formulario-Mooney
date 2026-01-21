@@ -200,11 +200,34 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "Para Premio Pagado en ARS el monto debe ser >= $3000" });
     }
 
+    // Validar horas de premio - OBLIGATORIAS para etiquetas con usuario_casino
     const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
-    if (String(hora_solicitud_cliente || "").trim() && !hsNorm) return res.status(400).json({ message: "Hora solicitud cliente inválida. Usá HH:MM" });
-
     const hqNorm = normalizeHoraOptional(hora_quema_fichas);
-    if (String(hora_quema_fichas || "").trim() && !hqNorm) return res.status(400).json({ message: "Hora quema de fichas inválida. Usá HH:MM" });
+
+    if (ETIQUETAS_CON_USUARIO_CASINO.has(etiqueta)) {
+      // Para premios, ambas horas son OBLIGATORIAS
+      if (!String(hora_solicitud_cliente || "").trim()) {
+        return res.status(400).json({ message: "Hora solicitud cliente es obligatoria para este concepto" });
+      }
+      if (!hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente inválida. Usá HH:MM" });
+      }
+
+      if (!String(hora_quema_fichas || "").trim()) {
+        return res.status(400).json({ message: "Hora quema de fichas es obligatoria para este concepto" });
+      }
+      if (!hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas inválida. Usá HH:MM" });
+      }
+    } else {
+      // Para otros conceptos, si se proveen deben ser válidas
+      if (String(hora_solicitud_cliente || "").trim() && !hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente inválida. Usá HH:MM" });
+      }
+      if (String(hora_quema_fichas || "").trim() && !hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas inválida. Usá HH:MM" });
+      }
+    }
 
     // Subir archivo a almacenamiento externo o guardar localmente
     // Prioridad: ImgBB > R2 > Local

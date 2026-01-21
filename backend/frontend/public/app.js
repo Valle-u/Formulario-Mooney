@@ -40,7 +40,7 @@ const ETIQUETAS = [
   "Gasto de publicidad","Gasto de CRM","Pago de Utilidades",
   "Cambio a USD","Cambio a USDT","Cambio a Peso Fisico",
   "Gasto de cuenta","Transferencia Rechazada",
-  "Gasto Personal L","Gasto Personal F","Gasto Personl A",
+  "Gasto Personal L","Gasto Personal A","Inversion Reca",
   "Inversion Publicidad","Pago Programacion","Pago Costo de estructura",
   "Gasto limpieza","Gasto de Cocina","Fondeo de cuenta","Gasto Personal",
   "Adelanto de sueldo","Redireccion de capital","Pago de premios duplicado",
@@ -393,12 +393,22 @@ function toggleCamposPremio(){
 
   if(wrapSolicitud && inputSolicitud){
     wrapSolicitud.classList.toggle("hidden", !esPremio);
-    if(!esPremio) inputSolicitud.value = "";
+    if(esPremio){
+      inputSolicitud.setAttribute("required", "required");
+    } else {
+      inputSolicitud.removeAttribute("required");
+      inputSolicitud.value = "";
+    }
   }
 
   if(wrapQuema && inputQuema){
     wrapQuema.classList.toggle("hidden", !esPremio);
-    if(!esPremio) inputQuema.value = "";
+    if(esPremio){
+      inputQuema.setAttribute("required", "required");
+    } else {
+      inputQuema.removeAttribute("required");
+      inputQuema.value = "";
+    }
   }
 }
 
