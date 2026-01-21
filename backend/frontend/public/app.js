@@ -431,6 +431,96 @@ function wireIdTransferenciaAlphanumeric(){
   });
 }
 
+function wireFechaValidation(){
+  const el = document.getElementById("fecha");
+  if(!el) return;
+
+  // Auto-formatear mientras escribe: solo números y /
+  el.addEventListener("input", (e) => {
+    let value = el.value.replace(/[^\d/]/g, ""); // Solo números y /
+
+    // Auto-agregar / después del día y mes
+    if (value.length === 2 && !value.includes("/")) {
+      value = value + "/";
+    } else if (value.length === 5 && value.split("/").length === 2) {
+      value = value + "/";
+    }
+
+    // Limitar a 10 caracteres (dd/mm/aaaa)
+    if (value.length > 10) {
+      value = value.substring(0, 10);
+    }
+
+    el.value = value;
+  });
+
+  // Validar fecha completa al perder el foco
+  el.addEventListener("blur", () => {
+    const value = el.value.trim();
+    if (!value) return; // Si está vacío, el required lo manejará
+
+    // Validar formato dd/mm/aaaa
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = value.match(regex);
+
+    if (!match) {
+      el.setCustomValidity("Formato inválido. Usá dd/mm/aaaa");
+      return;
+    }
+
+    const [_, dia, mes, anio] = match;
+    const diaNum = parseInt(dia, 10);
+    const mesNum = parseInt(mes, 10);
+    const anioNum = parseInt(anio, 10);
+
+    // Validar que sea año 2026
+    const anioActual = new Date().getFullYear();
+    if (anioNum !== anioActual) {
+      el.setCustomValidity(`La fecha debe ser del año ${anioActual}`);
+      return;
+    }
+
+    // Validar rango de mes
+    if (mesNum < 1 || mesNum > 12) {
+      el.setCustomValidity("Mes inválido (debe ser 01-12)");
+      return;
+    }
+
+    // Validar rango de día según el mes
+    const diasPorMes = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // 2026 no es bisiesto pero dejamos 29 por seguridad
+    const maxDias = diasPorMes[mesNum - 1];
+    if (diaNum < 1 || diaNum > maxDias) {
+      el.setCustomValidity(`Día inválido para ese mes (debe ser 01-${maxDias})`);
+      return;
+    }
+
+    // Validar que la fecha sea válida (existe realmente)
+    const fecha = new Date(anioNum, mesNum - 1, diaNum);
+    if (fecha.getDate() !== diaNum || fecha.getMonth() !== mesNum - 1) {
+      el.setCustomValidity("Fecha inválida");
+      return;
+    }
+
+    // Validar que no sea fecha futura
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fecha.setHours(0, 0, 0, 0);
+
+    if (fecha > hoy) {
+      el.setCustomValidity("No se permiten fechas futuras");
+      return;
+    }
+
+    // Todo válido
+    el.setCustomValidity("");
+  });
+
+  // Limpiar validación personalizada al empezar a escribir
+  el.addEventListener("input", () => {
+    el.setCustomValidity("");
+  });
+}
+
 // Validación en tiempo real de ID de transferencia duplicado
 let validationTimeout = null;
 async function checkIdTransferenciaDuplicado() {
@@ -2109,6 +2199,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     toggleOtroConcepto();
     fileLabel();
     wireIdTransferenciaAlphanumeric();
+    wireFechaValidation(); // Validación de formato dd/mm/aaaa
     wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
     conectarValidacionTiempoReal(); // Validación en tiempo real
 

@@ -32,6 +32,36 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 function isDigitsOnly(v){ return /^[0-9]+$/.test(String(v || "").trim()); }
 
+/**
+ * Convierte fecha ISO (aaaa-mm-dd) o Date a formato dd/mm/aaaa
+ */
+function formatFechaDDMMAAAA(fecha) {
+  if (!fecha) return null;
+
+  let dateObj;
+  if (fecha instanceof Date) {
+    dateObj = fecha;
+  } else if (typeof fecha === 'string') {
+    // Formato ISO aaaa-mm-dd
+    const match = fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [_, anio, mes, dia] = match;
+      return `${dia}/${mes}/${anio}`;
+    }
+    dateObj = new Date(fecha);
+  } else {
+    return null;
+  }
+
+  if (isNaN(dateObj.getTime())) return null;
+
+  const dia = String(dateObj.getDate()).padStart(2, '0');
+  const mes = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const anio = dateObj.getFullYear();
+
+  return `${dia}/${mes}/${anio}`;
+}
+
 function normalizeHoraToTime(hora) {
   const h = String(hora || "").trim();
   if (!/^\d{2}:\d{2}(:\d{2})?$/.test(h)) return null;
@@ -45,6 +75,90 @@ function normalizeHoraOptional(hora){
   const v = String(hora || "").trim();
   if(!v) return null;
   return normalizeHoraToTime(v);
+}
+
+/**
+ * Normaliza fecha de formato dd/mm/aaaa a ISO aaaa-mm-dd
+ * Valida año actual, fecha no futura, y que sea una fecha válida
+ * @returns {object} { valid: boolean, fecha: string|null, error: string|null }
+ */
+function normalizeFecha(fechaStr) {
+  const v = String(fechaStr || "").trim();
+
+  // Intentar formato dd/mm/aaaa primero
+  const regexSlash = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  const matchSlash = v.match(regexSlash);
+
+  if (matchSlash) {
+    const [_, dia, mes, anio] = matchSlash;
+    const diaNum = parseInt(dia, 10);
+    const mesNum = parseInt(mes, 10);
+    const anioNum = parseInt(anio, 10);
+
+    // Validar año actual
+    const anioActual = new Date().getFullYear();
+    if (anioNum !== anioActual) {
+      return { valid: false, fecha: null, error: `La fecha debe ser del año ${anioActual}` };
+    }
+
+    // Validar mes
+    if (mesNum < 1 || mesNum > 12) {
+      return { valid: false, fecha: null, error: "Mes inválido" };
+    }
+
+    // Validar día
+    const fecha = new Date(anioNum, mesNum - 1, diaNum);
+    if (fecha.getDate() !== diaNum || fecha.getMonth() !== mesNum - 1 || fecha.getFullYear() !== anioNum) {
+      return { valid: false, fecha: null, error: "Fecha inválida" };
+    }
+
+    // Validar no futura
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fecha.setHours(0, 0, 0, 0);
+    if (fecha > hoy) {
+      return { valid: false, fecha: null, error: "No se permiten fechas futuras" };
+    }
+
+    // Convertir a ISO aaaa-mm-dd
+    const fechaISO = `${anio}-${mes}-${dia}`;
+    return { valid: true, fecha: fechaISO, error: null };
+  }
+
+  // Intentar formato ISO aaaa-mm-dd (por retrocompatibilidad)
+  const regexISO = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const matchISO = v.match(regexISO);
+
+  if (matchISO) {
+    const [_, anio, mes, dia] = matchISO;
+    const anioNum = parseInt(anio, 10);
+    const mesNum = parseInt(mes, 10);
+    const diaNum = parseInt(dia, 10);
+
+    // Validar año actual
+    const anioActual = new Date().getFullYear();
+    if (anioNum !== anioActual) {
+      return { valid: false, fecha: null, error: `La fecha debe ser del año ${anioActual}` };
+    }
+
+    // Validar fecha válida
+    const fecha = new Date(anioNum, mesNum - 1, diaNum);
+    if (fecha.getDate() !== diaNum || fecha.getMonth() !== mesNum - 1) {
+      return { valid: false, fecha: null, error: "Fecha inválida" };
+    }
+
+    // Validar no futura
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fecha.setHours(0, 0, 0, 0);
+    if (fecha > hoy) {
+      return { valid: false, fecha: null, error: "No se permiten fechas futuras" };
+    }
+
+    return { valid: true, fecha: v, error: null };
+  }
+
+  return { valid: false, fecha: null, error: "Formato de fecha inválido. Usá dd/mm/aaaa" };
 }
 
 // Siempre usar memoryStorage para flexibilidad (R2 o disco)
@@ -149,7 +263,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 
     const errFecha = requireNonEmpty(fecha, "fecha");
     if (errFecha) return res.status(400).json({ message: errFecha });
-    if (isFutureDateISO(fecha)) return res.status(400).json({ message: "No se permite fecha futura" });
+
+    // Normalizar y validar fecha (acepta dd/mm/aaaa o aaaa-mm-dd)
+    const fechaResult = normalizeFecha(fecha);
+    if (!fechaResult.valid) {
+      return res.status(400).json({ message: fechaResult.error });
+    }
+    const fechaNorm = fechaResult.fecha; // Fecha en formato ISO aaaa-mm-dd
 
     const errHora = requireNonEmpty(hora, "hora");
     if (errHora) return res.status(400).json({ message: errHora });
@@ -309,7 +429,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
          $19,$20,$21)
        RETURNING id`,
       [
-        fecha,
+        fechaNorm, // Fecha normalizada en formato ISO
         horaNorm,
         turnoNorm,
         etiqueta,
@@ -535,7 +655,7 @@ router.get("/", auth, async (req, res) => {
 
     const egresos = r.rows.map(e => ({
       id: e.id,
-      fecha: e.fecha?.toISOString?.().slice(0, 10) || e.fecha,
+      fecha: formatFechaDDMMAAAA(e.fecha) || e.fecha,
       hora: e.hora_formatted,
       turno: e.turno,
       hora_solicitud_cliente: e.hora_solicitud_cliente_formatted || null,
@@ -681,7 +801,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
     ];
 
     const rows = r.rows.map(x => ([
-      x.fecha?.toISOString?.().slice(0,10) || x.fecha,
+      formatFechaDDMMAAAA(x.fecha) || x.fecha,
       x.hora || "",
       x.turno || "",
       x.hora_solicitud_cliente || "",

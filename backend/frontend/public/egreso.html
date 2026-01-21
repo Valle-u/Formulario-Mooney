@@ -140,8 +140,8 @@
                 <div class="section-body grid">
                   <div class="field span3">
                     <label>FECHA *</label>
-                    <input id="fecha" type="date" required>
-                    <div class="note">Fecha que marca el comprobante</div>
+                    <input id="fecha" type="text" placeholder="dd/mm/aaaa" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" required>
+                    <div class="note">Formato: dd/mm/aaaa (solo año 2026, no futuras)</div>
                   </div>
 
                   <div class="field span3">
