@@ -152,13 +152,13 @@
 
                   <div class="field span3">
                     <label>TURNO *</label>
-                    <select id="turno" required>
-                      <option value="">Seleccionar turno</option>
+                    <select id="turno" required disabled style="background-color: #f5f5f5; cursor: not-allowed;">
+                      <option value="">Automático según hora</option>
                       <option value="Turno mañana">Turno mañana</option>
                       <option value="Turno tarde">Turno tarde</option>
                       <option value="Turno noche">Turno noche</option>
                     </select>
-                    <div class="note" id="turno_sugerido"></div>
+                    <div class="note" id="turno_sugerido">Se calcula automáticamente según la hora</div>
                   </div>
 
                   <!-- Campos condicionales para PREMIOS -->

@@ -521,6 +521,59 @@ function wireFechaValidation(){
   });
 }
 
+/**
+ * Calcula el turno según la hora del comprobante
+ * - Turno noche: 00:00 - 07:59 (12am a 8am)
+ * - Turno mañana: 08:00 - 15:59 (8am a 4pm)
+ * - Turno tarde: 16:00 - 23:59 (4pm a 12am)
+ */
+function calcularTurnoSegunHora(horaStr) {
+  if (!horaStr) return null;
+
+  const match = horaStr.match(/^(\d{2}):(\d{2})/);
+  if (!match) return null;
+
+  const hora = parseInt(match[1], 10);
+
+  if (hora >= 0 && hora < 8) {
+    return "Turno noche";
+  } else if (hora >= 8 && hora < 16) {
+    return "Turno mañana";
+  } else if (hora >= 16 && hora < 24) {
+    return "Turno tarde";
+  }
+
+  return null;
+}
+
+/**
+ * Actualiza el turno automáticamente cuando cambia la hora
+ */
+function autoCalcularTurno() {
+  const horaInput = document.getElementById("hora");
+  const turnoSelect = document.getElementById("turno");
+  const turnoSugerido = document.getElementById("turno_sugerido");
+
+  if (!horaInput || !turnoSelect) return;
+
+  const hora = horaInput.value;
+  const turno = calcularTurnoSegunHora(hora);
+
+  if (turno) {
+    turnoSelect.value = turno;
+    if (turnoSugerido) {
+      turnoSugerido.textContent = `✓ ${turno} (${hora})`;
+      turnoSugerido.style.color = "#28a745";
+    }
+  } else {
+    turnoSelect.value = "";
+    if (turnoSugerido) {
+      turnoSugerido.textContent = "Se calcula automáticamente según la hora";
+      turnoSugerido.style.color = "";
+    }
+  }
+}
+
 // Validación en tiempo real de ID de transferencia duplicado
 let validationTimeout = null;
 async function checkIdTransferenciaDuplicado() {
@@ -814,6 +867,13 @@ async function handleEgresoSubmit(e){
     const montoRaw = document.getElementById("monto").value;
     const montoNum = parseMontoARSStrict(montoRaw);
 
+    // Habilitar temporalmente el select de turno para poder leer su valor
+    const turnoSelect = document.getElementById("turno");
+    const turnoDisabled = turnoSelect?.disabled;
+    if (turnoSelect && turnoDisabled) {
+      turnoSelect.disabled = false;
+    }
+
     const payload = {
       fecha: document.getElementById("fecha").value,
       hora: document.getElementById("hora").value,
@@ -885,6 +945,10 @@ async function handleEgresoSubmit(e){
     toast("❌ Error", err.message, "error");
   }finally{
     if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = prevText || "Guardar"; }
+    // Restaurar estado disabled del select de turno
+    if (turnoSelect && turnoDisabled) {
+      turnoSelect.disabled = true;
+    }
   }
 }
 
@@ -2202,6 +2266,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
     wireFechaValidation(); // Validación de formato dd/mm/aaaa
     wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
     conectarValidacionTiempoReal(); // Validación en tiempo real
+
+    // Auto-calcular turno según la hora
+    const horaInput = document.getElementById("hora");
+    if (horaInput) {
+      horaInput.addEventListener("change", autoCalcularTurno);
+      horaInput.addEventListener("input", autoCalcularTurno);
+    }
 
     document.getElementById("etiqueta")?.addEventListener("change", ()=>{
       toggleCasinoUserField();
