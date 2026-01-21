@@ -139,7 +139,13 @@
 
                 <div class="section-body grid">
                   <div class="field span3">
-                    <label>FECHA *</label>
+                    <label>
+                      FECHA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_fecha" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="fecha" type="text" placeholder="dd/mm/aaaa" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" required>
                     <div class="note">Formato: dd/mm/aaaa (solo año 2026, no futuras)</div>
                   </div>
@@ -228,13 +234,25 @@
 
                 <div class="section-body grid">
                   <div class="field span6">
-                    <label>EMPRESA DE LA CUENTA DE SALIDA *</label>
+                    <label>
+                      EMPRESA DE LA CUENTA DE SALIDA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_empresa" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <select id="empresa_salida" required></select>
                     <div class="note">Empresa de la cuenta de banco que estas usando</div>
                   </div>
 
                   <div class="field span6">
-                    <label>NOMBRE DE CUENTA DE SALIDA *</label>
+                    <label>
+                      NOMBRE DE CUENTA DE SALIDA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_cuenta_salida" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="cuenta_salida" required>
                     <div class="note">Titular de la cuenta de banco que estas usando</div>
                   </div>

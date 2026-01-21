@@ -574,6 +574,198 @@ function autoCalcularTurno() {
   }
 }
 
+// =============================================================================
+// Sistema de "Recordar valores" con localStorage
+// =============================================================================
+
+const STORAGE_KEYS = {
+  FECHA: 'egreso_recordar_fecha',
+  FECHA_CHECK: 'egreso_recordar_fecha_check',
+  EMPRESA: 'egreso_recordar_empresa',
+  EMPRESA_CHECK: 'egreso_recordar_empresa_check',
+  CUENTA_SALIDA: 'egreso_recordar_cuenta_salida',
+  CUENTA_SALIDA_CHECK: 'egreso_recordar_cuenta_salida_check'
+};
+
+/**
+ * Guarda un valor en localStorage si el checkbox está marcado
+ */
+function guardarValorSiRecordado(inputId, checkboxId, storageKey, storageCheckKey) {
+  const checkbox = document.getElementById(checkboxId);
+  const input = document.getElementById(inputId);
+
+  if (!checkbox || !input) return;
+
+  // Guardar estado del checkbox
+  localStorage.setItem(storageCheckKey, checkbox.checked ? 'true' : 'false');
+
+  // Guardar valor solo si está marcado
+  if (checkbox.checked) {
+    localStorage.setItem(storageKey, input.value);
+  } else {
+    localStorage.removeItem(storageKey);
+  }
+}
+
+/**
+ * Restaura valores guardados al cargar la página
+ */
+function restaurarValoresRecordados() {
+  // Restaurar FECHA
+  const recordarFecha = localStorage.getItem(STORAGE_KEYS.FECHA_CHECK) === 'true';
+  const checkboxFecha = document.getElementById('recordar_fecha');
+  const inputFecha = document.getElementById('fecha');
+
+  if (checkboxFecha) {
+    checkboxFecha.checked = recordarFecha;
+  }
+
+  if (recordarFecha && inputFecha) {
+    const valorGuardado = localStorage.getItem(STORAGE_KEYS.FECHA);
+    if (valorGuardado) {
+      inputFecha.value = valorGuardado;
+    }
+  }
+
+  // Restaurar EMPRESA
+  const recordarEmpresa = localStorage.getItem(STORAGE_KEYS.EMPRESA_CHECK) === 'true';
+  const checkboxEmpresa = document.getElementById('recordar_empresa');
+  const inputEmpresa = document.getElementById('empresa_salida');
+
+  if (checkboxEmpresa) {
+    checkboxEmpresa.checked = recordarEmpresa;
+  }
+
+  if (recordarEmpresa && inputEmpresa) {
+    const valorGuardado = localStorage.getItem(STORAGE_KEYS.EMPRESA);
+    if (valorGuardado) {
+      inputEmpresa.value = valorGuardado;
+    }
+  }
+
+  // Restaurar CUENTA SALIDA
+  const recordarCuentaSalida = localStorage.getItem(STORAGE_KEYS.CUENTA_SALIDA_CHECK) === 'true';
+  const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
+  const inputCuentaSalida = document.getElementById('cuenta_salida');
+
+  if (checkboxCuentaSalida) {
+    checkboxCuentaSalida.checked = recordarCuentaSalida;
+  }
+
+  if (recordarCuentaSalida && inputCuentaSalida) {
+    const valorGuardado = localStorage.getItem(STORAGE_KEYS.CUENTA_SALIDA);
+    if (valorGuardado) {
+      inputCuentaSalida.value = valorGuardado;
+    }
+  }
+}
+
+/**
+ * Conecta los event listeners para guardar valores cuando cambian
+ */
+function conectarRecordarValores() {
+  // Event listeners para FECHA
+  const inputFecha = document.getElementById('fecha');
+  const checkboxFecha = document.getElementById('recordar_fecha');
+
+  if (inputFecha && checkboxFecha) {
+    inputFecha.addEventListener('change', () => {
+      guardarValorSiRecordado('fecha', 'recordar_fecha', STORAGE_KEYS.FECHA, STORAGE_KEYS.FECHA_CHECK);
+    });
+
+    checkboxFecha.addEventListener('change', () => {
+      guardarValorSiRecordado('fecha', 'recordar_fecha', STORAGE_KEYS.FECHA, STORAGE_KEYS.FECHA_CHECK);
+    });
+  }
+
+  // Event listeners para EMPRESA
+  const inputEmpresa = document.getElementById('empresa_salida');
+  const checkboxEmpresa = document.getElementById('recordar_empresa');
+
+  if (inputEmpresa && checkboxEmpresa) {
+    inputEmpresa.addEventListener('change', () => {
+      guardarValorSiRecordado('empresa_salida', 'recordar_empresa', STORAGE_KEYS.EMPRESA, STORAGE_KEYS.EMPRESA_CHECK);
+    });
+
+    checkboxEmpresa.addEventListener('change', () => {
+      guardarValorSiRecordado('empresa_salida', 'recordar_empresa', STORAGE_KEYS.EMPRESA, STORAGE_KEYS.EMPRESA_CHECK);
+    });
+  }
+
+  // Event listeners para CUENTA SALIDA
+  const inputCuentaSalida = document.getElementById('cuenta_salida');
+  const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
+
+  if (inputCuentaSalida && checkboxCuentaSalida) {
+    inputCuentaSalida.addEventListener('change', () => {
+      guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
+    });
+
+    inputCuentaSalida.addEventListener('blur', () => {
+      guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
+    });
+
+    checkboxCuentaSalida.addEventListener('change', () => {
+      guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
+    });
+  }
+}
+
+/**
+ * Limpia el formulario pero mantiene valores "recordados"
+ */
+function limpiarFormularioConRecordar() {
+  const form = document.getElementById('egresoForm');
+  if (!form) return;
+
+  // Guardar valores que deben recordarse ANTES de limpiar
+  const valoresRecordados = {
+    fecha: {
+      recordar: document.getElementById('recordar_fecha')?.checked,
+      valor: document.getElementById('fecha')?.value
+    },
+    empresa: {
+      recordar: document.getElementById('recordar_empresa')?.checked,
+      valor: document.getElementById('empresa_salida')?.value
+    },
+    cuentaSalida: {
+      recordar: document.getElementById('recordar_cuenta_salida')?.checked,
+      valor: document.getElementById('cuenta_salida')?.value
+    }
+  };
+
+  // Resetear formulario
+  form.reset();
+
+  // Restaurar valores recordados
+  if (valoresRecordados.fecha.recordar) {
+    const inputFecha = document.getElementById('fecha');
+    const checkboxFecha = document.getElementById('recordar_fecha');
+    if (inputFecha) inputFecha.value = valoresRecordados.fecha.valor;
+    if (checkboxFecha) checkboxFecha.checked = true;
+  }
+
+  if (valoresRecordados.empresa.recordar) {
+    const inputEmpresa = document.getElementById('empresa_salida');
+    const checkboxEmpresa = document.getElementById('recordar_empresa');
+    if (inputEmpresa) inputEmpresa.value = valoresRecordados.empresa.valor;
+    if (checkboxEmpresa) checkboxEmpresa.checked = true;
+  }
+
+  if (valoresRecordados.cuentaSalida.recordar) {
+    const inputCuentaSalida = document.getElementById('cuenta_salida');
+    const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
+    if (inputCuentaSalida) inputCuentaSalida.value = valoresRecordados.cuentaSalida.valor;
+    if (checkboxCuentaSalida) checkboxCuentaSalida.checked = true;
+  }
+
+  // Restablecer estados visuales
+  fileLabel();
+  toggleCasinoUserField();
+  toggleOtroConcepto();
+  toggleCamposPremio();
+}
+
 // Validación en tiempo real de ID de transferencia duplicado
 let validationTimeout = null;
 async function checkIdTransferenciaDuplicado() {
@@ -1178,10 +1370,7 @@ async function confirmarYEnviarEgreso(){
     // Cerrar modal después de un delay para que se vea el mensaje
     setTimeout(() => {
       cerrarModalConfirmacion();
-      document.getElementById("egresoForm").reset();
-      fileLabel();
-      toggleCasinoUserField();
-      toggleOtroConcepto();
+      limpiarFormularioConRecordar(); // Limpia pero mantiene valores recordados
 
       // Limpiar datos validados
       datosEgresoValidados = null;
@@ -2266,6 +2455,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
     wireFechaValidation(); // Validación de formato dd/mm/aaaa
     wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
     conectarValidacionTiempoReal(); // Validación en tiempo real
+
+    // Sistema de recordar valores (con pequeño delay para asegurar que los selects estén poblados)
+    setTimeout(() => {
+      restaurarValoresRecordados();
+    }, 100);
+    conectarRecordarValores();
 
     // Auto-calcular turno según la hora
     const horaInput = document.getElementById("hora");
