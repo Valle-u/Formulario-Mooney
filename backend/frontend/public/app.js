@@ -2333,6 +2333,25 @@ function editarEgresoModal(){
         return;
       }
 
+      // Validar fecha
+      const fechaValue = document.getElementById('edit_fecha').value.trim();
+      const fechaRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+      const fechaMatch = fechaValue.match(fechaRegex);
+
+      if(!fechaMatch){
+        toast("⚠️ Fecha inválida", "Formato debe ser dd/mm/aaaa", "warning");
+        return;
+      }
+
+      const [_, dia, mes, anio] = fechaMatch;
+      const anioNum = parseInt(anio, 10);
+      const anioActual = new Date().getFullYear();
+
+      if(anioNum !== anioActual){
+        toast("⚠️ Año inválido", `La fecha debe ser del año ${anioActual}`, "warning");
+        return;
+      }
+
       const montoValue = document.getElementById('edit_monto').value;
       const montoParsed = parseMontoARSStrict(montoValue);
 
@@ -2343,7 +2362,7 @@ function editarEgresoModal(){
       }
 
       const updates = {
-        fecha: document.getElementById('edit_fecha').value,
+        fecha: fechaValue,
         hora: document.getElementById('edit_hora').value,
         turno: document.getElementById('edit_turno').value,
         etiqueta: document.getElementById('edit_etiqueta').value,
