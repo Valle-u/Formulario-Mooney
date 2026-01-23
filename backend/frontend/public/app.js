@@ -2164,121 +2164,228 @@ function editarEgresoModal(){
   const body = document.getElementById("detalleBody");
   if(!modal || !body) return;
 
-  // Formulario de edición
+  // Determinar si es un premio (para mostrar campos condicionales)
+  const esPremio = ETIQUETAS_CON_USUARIO_CASINO.has(egreso.etiqueta);
+
+  // Formulario de edición con TODOS los campos
   body.innerHTML = `
     <div style="margin-bottom: 16px;">
       <h3 style="margin: 0 0 8px 0;">✏️ Editar Transferencia</h3>
-      <div class="note">Egreso #${egreso.id} - Solo modificá los campos necesarios</div>
+      <div class="note">Egreso #${egreso.id} - Modificá todos los campos necesarios</div>
     </div>
 
     <form id="formEditarEgreso" class="grid">
-      <div class="field span6">
-        <label>FECHA</label>
-        <input type="date" id="edit_fecha" value="${escapeHtml(egreso.fecha)}">
+      <!-- FECHA Y HORA -->
+      <div class="field span4">
+        <label>FECHA *</label>
+        <input type="text" id="edit_fecha" value="${escapeHtml(egreso.fecha)}" placeholder="dd/mm/aaaa" pattern="\\d{2}/\\d{2}/\\d{4}" maxlength="10" required>
       </div>
 
-      <div class="field span6">
-        <label>HORA</label>
-        <input type="time" id="edit_hora" value="${escapeHtml(egreso.hora || '')}">
+      <div class="field span4">
+        <label>HORA *</label>
+        <input type="time" id="edit_hora" value="${escapeHtml(egreso.hora || '')}" required>
       </div>
 
-      <div class="field span6">
-        <label>TURNO</label>
-        <select id="edit_turno">
+      <div class="field span4">
+        <label>TURNO *</label>
+        <select id="edit_turno" required>
           <option value="Turno mañana" ${egreso.turno === 'Turno mañana' ? 'selected' : ''}>Turno mañana</option>
           <option value="Turno tarde" ${egreso.turno === 'Turno tarde' ? 'selected' : ''}>Turno tarde</option>
           <option value="Turno noche" ${egreso.turno === 'Turno noche' ? 'selected' : ''}>Turno noche</option>
         </select>
       </div>
 
+      <!-- ETIQUETA Y MONEDA -->
       <div class="field span6">
-        <label>MONTO</label>
-        <input type="text" id="edit_monto" value="${escapeHtml(egreso.monto)}" placeholder="Ej: 12000 o 12000,50">
+        <label>CONCEPTO/ETIQUETA *</label>
+        <select id="edit_etiqueta" required>
+          ${ETIQUETAS.map(et => `<option value="${et}" ${egreso.etiqueta === et ? 'selected' : ''}>${et}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field span6 ${egreso.etiqueta === 'Otro' ? '' : 'hidden'}" id="edit_wrap_otro">
+        <label>OTRO CONCEPTO</label>
+        <input type="text" id="edit_etiqueta_otro" value="${escapeHtml(egreso.etiqueta_otro || '')}">
       </div>
 
       <div class="field span6">
-        <label>EMPRESA SALIDA</label>
-        <select id="edit_empresa_salida">
+        <label>MONEDA *</label>
+        <select id="edit_moneda" required>
+          <option value="ARS" ${egreso.moneda === 'ARS' ? 'selected' : ''}>ARS (Pesos)</option>
+          <option value="USD" ${egreso.moneda === 'USD' ? 'selected' : ''}>USD (Dólares)</option>
+        </select>
+      </div>
+
+      <div class="field span6">
+        <label>MONTO *</label>
+        <input type="text" id="edit_monto" value="${escapeHtml(egreso.monto_raw)}" placeholder="Ej: 12000 o 12000,50" required>
+      </div>
+
+      <!-- CAMPOS DE PREMIOS (condicionales) -->
+      <div class="field span6 ${esPremio ? '' : 'hidden'}" id="edit_wrap_usuario_casino">
+        <label>USUARIO CASINO ${esPremio ? '*' : ''}</label>
+        <input type="text" id="edit_usuario_casino" value="${escapeHtml(egreso.usuario_casino || '')}" ${esPremio ? 'required' : ''}>
+      </div>
+
+      <div class="field span6 ${esPremio ? '' : 'hidden'}" id="edit_wrap_hora_solicitud">
+        <label>HORA SOLICITUD CLIENTE ${esPremio ? '*' : ''}</label>
+        <input type="text" id="edit_hora_solicitud_cliente" value="${escapeHtml(egreso.hora_solicitud_cliente || '')}" placeholder="HH:MM" ${esPremio ? 'required' : ''}>
+      </div>
+
+      <div class="field span6 ${esPremio ? '' : 'hidden'}" id="edit_wrap_hora_quema">
+        <label>HORA QUEMA DE FICHAS ${esPremio ? '*' : ''}</label>
+        <input type="time" id="edit_hora_quema_fichas" value="${escapeHtml(egreso.hora_quema_fichas || '')}" ${esPremio ? 'required' : ''}>
+      </div>
+
+      <!-- EMPRESA Y CUENTAS -->
+      <div class="field span6">
+        <label>EMPRESA SALIDA *</label>
+        <select id="edit_empresa_salida" required>
           ${EMPRESAS_SALIDA.map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
         </select>
       </div>
 
       <div class="field span6">
-        <label>CUENTA SALIDA</label>
-        <input type="text" id="edit_cuenta_salida" value="${escapeHtml(egreso.cuenta_salida)}">
+        <label>CUENTA SALIDA *</label>
+        <input type="text" id="edit_cuenta_salida" value="${escapeHtml(egreso.cuenta_salida)}" required>
       </div>
 
-      <div class="field span12">
-        <label>CUENTA RECEPTORA</label>
-        <input type="text" id="edit_cuenta_receptora" value="${escapeHtml(egreso.cuenta_receptora)}">
+      <div class="field span6">
+        <label>ID TRANSFERENCIA *</label>
+        <input type="text" id="edit_id_transferencia" value="${escapeHtml(egreso.id_transferencia)}" required>
       </div>
 
+      <div class="field span6">
+        <label>CUENTA RECEPTORA *</label>
+        <input type="text" id="edit_cuenta_receptora" value="${escapeHtml(egreso.cuenta_receptora)}" required>
+      </div>
+
+      <!-- NOTAS -->
       <div class="field span12">
         <label>NOTAS</label>
-        <textarea id="edit_notas">${escapeHtml(egreso.notas || '')}</textarea>
+        <textarea id="edit_notas" rows="3">${escapeHtml(egreso.notas || '')}</textarea>
       </div>
 
+      <!-- MOTIVO DEL CAMBIO -->
       <div class="field span12" style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
         <label style="color: #92400e; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
         <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required style="margin-top: 8px;">
         <div class="note" style="color: #78350f; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
       </div>
 
+      <!-- BOTONES -->
       <div class="actions span12" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
         <button type="button" class="btn btn-ghost" id="btnCancelarEdicion">Cancelar</button>
-        <button type="submit" class="btn btn-primary">✓ Guardar Cambios</button>
+        <button type="submit" class="btn btn-primary" id="btnGuardarEdicion">✓ Guardar Cambios</button>
       </div>
     </form>
   `;
+
+  // Toggle campos condicionales cuando cambia etiqueta
+  const editEtiquetaSelect = document.getElementById('edit_etiqueta');
+  if(editEtiquetaSelect){
+    editEtiquetaSelect.addEventListener('change', () => {
+      const etiquetaValue = editEtiquetaSelect.value;
+      const wrapOtro = document.getElementById('edit_wrap_otro');
+      const wrapUsuario = document.getElementById('edit_wrap_usuario_casino');
+      const wrapHoraSolicitud = document.getElementById('edit_wrap_hora_solicitud');
+      const wrapHoraQuema = document.getElementById('edit_wrap_hora_quema');
+
+      // Mostrar/ocultar campo "Otro concepto"
+      if(wrapOtro){
+        wrapOtro.classList.toggle('hidden', etiquetaValue !== 'Otro');
+      }
+
+      // Mostrar/ocultar campos de premios
+      const esPremioNuevo = ETIQUETAS_CON_USUARIO_CASINO.has(etiquetaValue);
+      if(wrapUsuario) wrapUsuario.classList.toggle('hidden', !esPremioNuevo);
+      if(wrapHoraSolicitud) wrapHoraSolicitud.classList.toggle('hidden', !esPremioNuevo);
+      if(wrapHoraQuema) wrapHoraQuema.classList.toggle('hidden', !esPremioNuevo);
+
+      // Actualizar required
+      const inputUsuario = document.getElementById('edit_usuario_casino');
+      const inputHoraSolicitud = document.getElementById('edit_hora_solicitud_cliente');
+      const inputHoraQuema = document.getElementById('edit_hora_quema_fichas');
+
+      if(inputUsuario) inputUsuario.required = esPremioNuevo;
+      if(inputHoraSolicitud) inputHoraSolicitud.required = esPremioNuevo;
+      if(inputHoraQuema) inputHoraQuema.required = esPremioNuevo;
+    });
+  }
 
   // Manejar submit del formulario
   document.getElementById('formEditarEgreso').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const motivo = document.getElementById('edit_motivo').value.trim();
-    if(!motivo){
-      toast("⚠️ Falta motivo", "Debés especificar el motivo del cambio", "warning");
-      return;
-    }
+    const submitBtn = document.getElementById('btnGuardarEdicion');
+    const originalText = submitBtn?.textContent || '✓ Guardar Cambios';
 
-    const updates = {
-      fecha: document.getElementById('edit_fecha').value,
-      hora: document.getElementById('edit_hora').value,
-      turno: document.getElementById('edit_turno').value,
-      monto_raw: document.getElementById('edit_monto').value,
-      monto: parseMontoARSStrict(document.getElementById('edit_monto').value),
-      empresa_salida: document.getElementById('edit_empresa_salida').value,
-      cuenta_salida: document.getElementById('edit_cuenta_salida').value,
-      cuenta_receptora: document.getElementById('edit_cuenta_receptora').value,
-      notas: document.getElementById('edit_notas').value,
-      change_reason: motivo
-    };
-
-    // Validar monto
-    if(!updates.monto || updates.monto <= 0){
-      toast("⚠️ Monto inválido", "Ingresá un monto válido (ej: 12000 o 12000,50)", "warning");
-      return;
+    // Deshabilitar botón y mostrar loading
+    if(submitBtn){
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Guardando...';
     }
 
     try {
+      const motivo = document.getElementById('edit_motivo').value.trim();
+      if(!motivo){
+        toast("⚠️ Falta motivo", "Debés especificar el motivo del cambio", "warning");
+        return;
+      }
+
+      const montoValue = document.getElementById('edit_monto').value;
+      const montoParsed = parseMontoARSStrict(montoValue);
+
+      // Validar monto
+      if(!montoParsed || montoParsed <= 0){
+        toast("⚠️ Monto inválido", "Ingresá un monto válido (ej: 12000 o 12000,50)", "warning");
+        return;
+      }
+
+      const updates = {
+        fecha: document.getElementById('edit_fecha').value,
+        hora: document.getElementById('edit_hora').value,
+        turno: document.getElementById('edit_turno').value,
+        etiqueta: document.getElementById('edit_etiqueta').value,
+        etiqueta_otro: document.getElementById('edit_etiqueta_otro')?.value || null,
+        moneda: document.getElementById('edit_moneda').value,
+        monto_raw: montoValue,
+        monto: montoParsed,
+        usuario_casino: document.getElementById('edit_usuario_casino')?.value || null,
+        hora_solicitud_cliente: document.getElementById('edit_hora_solicitud_cliente')?.value || null,
+        hora_quema_fichas: document.getElementById('edit_hora_quema_fichas')?.value || null,
+        empresa_salida: document.getElementById('edit_empresa_salida').value,
+        cuenta_salida: document.getElementById('edit_cuenta_salida').value,
+        id_transferencia: document.getElementById('edit_id_transferencia').value,
+        cuenta_receptora: document.getElementById('edit_cuenta_receptora').value,
+        notas: document.getElementById('edit_notas').value,
+        change_reason: motivo
+      };
+
       await api(`/api/egresos/${egreso.id}`, { method: 'PUT', body: updates });
       toast("✅ Actualizado", "Egreso modificado correctamente. Estado cambiado a EDITADA.", "success");
       cerrarModal();
       buscarEgresos(); // Recargar listado
     } catch(err) {
       toast("❌ Error", err.message, "error");
+      console.error('Error editando egreso:', err);
+    } finally {
+      // Rehabilitar botón
+      if(submitBtn){
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     }
   });
 
-  modal.style.display = "flex";
-}
-
-
-  // Agregar event listener al botón Cancelar
+  // Event listener para botón Cancelar
   setTimeout(() => {
     const btnCancelar = document.getElementById("btnCancelarEdicion");
     if(btnCancelar) btnCancelar.addEventListener("click", () => mostrarDetalle(currentEgreso));
   }, 0);
+
+  modal.style.display = "flex";
+}
 async function actualizarEgreso(id, updates){
   try{
     await api(`/api/egresos/${id}`, { method: 'PUT', body: updates });
