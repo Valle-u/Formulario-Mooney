@@ -1047,6 +1047,39 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
       return res.status(400).json({ message: "No se puede editar un egreso anulado" });
     }
 
+    // Normalizar y validar fecha si viene en el body
+    let fechaNormalizada = fecha;
+    if (fecha) {
+      const fechaResult = normalizeFecha(fecha);
+      if (!fechaResult.valid) {
+        return res.status(400).json({ message: `Error en fecha: ${fechaResult.error}` });
+      }
+      fechaNormalizada = fechaResult.fecha; // Convertir a ISO aaaa-mm-dd
+    }
+
+    // Validar hora si viene en el body
+    if (hora) {
+      const horaNorm = normalizeHoraToTime(hora);
+      if (!horaNorm) {
+        return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
+      }
+    }
+
+    // Validar horas de premios si se envían
+    if (hora_solicitud_cliente) {
+      const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
+      if (!hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
+      }
+    }
+
+    if (hora_quema_fichas) {
+      const hqNorm = normalizeHoraToTime(hora_quema_fichas);
+      if (!hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
+      }
+    }
+
     // Actualizar egreso y cambiar status a 'editada'
     await query(
       `UPDATE egresos
@@ -1071,7 +1104,7 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $18`,
       [
-        fecha, hora, turno, etiqueta, etiqueta_otro,
+        fechaNormalizada, hora, turno, etiqueta, etiqueta_otro,
         moneda, monto_raw, monto, cuenta_receptora, usuario_casino,
         hora_solicitud_cliente, hora_quema_fichas, id_transferencia,
         cuenta_salida, empresa_salida, notas,
