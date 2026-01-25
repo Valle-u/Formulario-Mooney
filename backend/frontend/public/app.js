@@ -1880,7 +1880,17 @@ async function populateFiltrosSelects(){
         users.map(u => `<option value="${u.id}">${u.full_name || u.username} (${u.role})</option>`).join("");
     }catch(err){
       console.error("Error cargando usuarios:", err);
+      // Fall back: rellenar con el usuario actual si es posible
       selCreatedBy.innerHTML = `<option value="">Todos</option>`;
+      try{
+        const current = getUser ? getUser() : null;
+        if (current && current.id){
+          const displayName = current.full_name || current.username || current.id;
+          selCreatedBy.innerHTML += `<option value="${current.id}">${escapeHtml(displayName)} (${escapeHtml(current.role) || ""})</option>`;
+        }
+      }catch(_){
+        // ignorar fallback si falla
+      }
     }
   }
 }
