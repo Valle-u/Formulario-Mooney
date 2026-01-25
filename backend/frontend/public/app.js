@@ -1401,6 +1401,9 @@ async function downloadCSVFiltrado(){
     const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
     const monto_min = document.getElementById("monto_min")?.value || "";
     const monto_max = document.getElementById("monto_max")?.value || "";
+    const turno = document.getElementById("turno")?.value || "";
+    const cuenta_receptora = document.getElementById("cuenta_receptora")?.value?.trim() || "";
+    const created_by = document.getElementById("created_by")?.value || "";
 
     const qs = new URLSearchParams();
 
@@ -1412,6 +1415,9 @@ async function downloadCSVFiltrado(){
     if(id_transferencia) qs.set("id_transferencia", id_transferencia);
     if(monto_min) qs.set("monto_min", monto_min);
     if(monto_max) qs.set("monto_max", monto_max);
+    if(turno) qs.set("turno", turno);
+    if(cuenta_receptora) qs.set("cuenta_receptora", cuenta_receptora);
+    if(created_by) qs.set("created_by", created_by);
 
     const queryString = qs.toString();
     const url = queryString
@@ -1419,7 +1425,7 @@ async function downloadCSVFiltrado(){
       : `${API_BASE}/api/egresos/csv`;
 
     console.log("🔍 URL CSV:", url);
-    console.log("🔍 Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, usuario_casino, id_transferencia, monto_min, monto_max });
+    console.log("🔍 Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, usuario_casino, id_transferencia, monto_min, monto_max, turno, cuenta_receptora, created_by });
 
     const res = await fetch(url,{
       method:"GET",
@@ -1754,9 +1760,10 @@ function toggleFiltros(){
   localStorage.setItem("filtros_visible", isHidden ? "true" : "false");
 }
 
-function populateFiltrosSelects(){
+async function populateFiltrosSelects(){
   const selEmpresa = document.getElementById("empresa_salida");
   const selEtiqueta = document.getElementById("etiqueta");
+  const selCreatedBy = document.getElementById("created_by");
 
   if(selEmpresa){
     selEmpresa.innerHTML = `<option value="">Todas</option>` +
@@ -1766,6 +1773,18 @@ function populateFiltrosSelects(){
   if(selEtiqueta){
     selEtiqueta.innerHTML = `<option value="">Todas</option>` +
       ETIQUETAS.map(e => `<option value="${e}">${e}</option>`).join("");
+  }
+
+  // Cargar lista de usuarios para el filtro "Creado por"
+  if(selCreatedBy){
+    try{
+      const users = await api("/api/users");
+      selCreatedBy.innerHTML = `<option value="">Todos</option>` +
+        users.map(u => `<option value="${u.id}">${u.full_name || u.username} (${u.role})</option>`).join("");
+    }catch(err){
+      console.error("Error cargando usuarios:", err);
+      selCreatedBy.innerHTML = `<option value="">Todos</option>`;
+    }
   }
 }
 
@@ -1785,10 +1804,14 @@ async function buscarEgresos(){
   const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
   const monto_min = document.getElementById("monto_min")?.value || "";
   const monto_max = document.getElementById("monto_max")?.value || "";
+  const turno = document.getElementById("turno")?.value || "";
+  const cuenta_receptora = document.getElementById("cuenta_receptora")?.value?.trim() || "";
+  const created_by = document.getElementById("created_by")?.value || "";
 
   currentFilters = {
     fecha_desde, fecha_hasta, empresa_salida, etiqueta, status, moneda,
-    usuario_casino, id_transferencia, monto_min, monto_max
+    usuario_casino, id_transferencia, monto_min, monto_max,
+    turno, cuenta_receptora, created_by
   };
 
   const qs = new URLSearchParams();
@@ -1805,6 +1828,9 @@ async function buscarEgresos(){
   if(id_transferencia) qs.set("id_transferencia", id_transferencia);
   if(monto_min) qs.set("monto_min", monto_min);
   if(monto_max) qs.set("monto_max", monto_max);
+  if(turno) qs.set("turno", turno);
+  if(cuenta_receptora) qs.set("cuenta_receptora", cuenta_receptora);
+  if(created_by) qs.set("created_by", created_by);
 
   try{
     const { egresos, pagination } = await api(`/api/egresos?${qs.toString()}`);

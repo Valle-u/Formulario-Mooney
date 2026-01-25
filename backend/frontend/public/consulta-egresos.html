@@ -149,6 +149,28 @@
                 <input id="monto_max" type="number" placeholder="Ej: 50000">
               </div>
 
+              <div class="field span3">
+                <label>TURNO</label>
+                <select id="turno">
+                  <option value="">Todos</option>
+                  <option value="Turno mañana">🌅 Turno mañana</option>
+                  <option value="Turno tarde">🌆 Turno tarde</option>
+                  <option value="Turno noche">🌙 Turno noche</option>
+                </select>
+              </div>
+
+              <div class="field span3">
+                <label>CUENTA RECEPTORA</label>
+                <input id="cuenta_receptora" placeholder="Buscar...">
+              </div>
+
+              <div class="field span3">
+                <label>CREADO POR</label>
+                <select id="created_by">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+
               <div class="actions span12" style="display: flex; gap: 12px; flex-wrap: wrap;">
                 <button type="submit" class="btn btn-primary">Buscar</button>
                 <button type="button" id="btnLimpiar" class="btn btn-ghost">Limpiar filtros</button>

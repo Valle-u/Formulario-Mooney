@@ -545,6 +545,8 @@ router.get("/", auth, async (req, res) => {
       id_transferencia,
       monto_min,
       monto_max,
+      turno,
+      cuenta_receptora,
       created_by,
       limit,
       offset
@@ -601,6 +603,16 @@ router.get("/", auth, async (req, res) => {
     if (monto_max) {
       params.push(Number(monto_max));
       where.push(`e.monto <= $${params.length}`);
+    }
+
+    if (turno) {
+      params.push(turno);
+      where.push(`e.turno = $${params.length}`);
+    }
+
+    if (cuenta_receptora) {
+      params.push(`%${cuenta_receptora}%`);
+      where.push(`e.cuenta_receptora ILIKE $${params.length}`);
     }
 
     if (created_by) {
@@ -720,6 +732,8 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       id_transferencia,
       monto_min,
       monto_max,
+      turno,
+      cuenta_receptora,
       created_by
     } = req.query;
 
@@ -764,6 +778,16 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
     if (monto_max) {
       params.push(Number(monto_max));
       where.push(`e.monto <= $${params.length}`);
+    }
+
+    if (turno) {
+      params.push(turno);
+      where.push(`e.turno = $${params.length}`);
+    }
+
+    if (cuenta_receptora) {
+      params.push(`%${cuenta_receptora}%`);
+      where.push(`e.cuenta_receptora ILIKE $${params.length}`);
     }
 
     if (created_by) {
