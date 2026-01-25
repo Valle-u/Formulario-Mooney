@@ -298,11 +298,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
     }
 
+    // Normalizar id_transferencia (siempre, luego validamos si es obligatorio)
+    const idTrim = String(id_transferencia || "").trim();
+
     // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
     if (!esCierreCaja) {
       if (requireNonEmpty(cuenta_receptora, "cuenta_receptora")) return res.status(400).json({ message: "cuenta_receptora es obligatoria" });
 
-      const idTrim = String(id_transferencia || "").trim();
       if (!idTrim) return res.status(400).json({ message: "id_transferencia es obligatorio" });
       // Validar que sea alfanumérico (letras, números, guiones, guiones bajos)
       if (!/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
