@@ -45,7 +45,7 @@ const ETIQUETAS = [
   "Gasto limpieza","Gasto de Cocina","Fondeo de cuenta","Gasto Personal",
   "Adelanto de sueldo","Redireccion de capital","Pago de premios duplicado",
   "Pago LiveChat","Pago LiveChatCelu","Prueba Casa","Duplicado","Error Empleado",
-  "Inversion","Rechazada por el banco","Cierre de Caja Mañana","Cierre de Caja Tarde","Otro"
+  "Inversion","Rechazada por el banco","Cierre de Caja","Otro"
 ];
 
 const ETIQUETAS_CON_USUARIO_CASINO = new Set([
@@ -53,7 +53,7 @@ const ETIQUETAS_CON_USUARIO_CASINO = new Set([
 ]);
 
 const ETIQUETAS_CIERRE_CAJA = new Set([
-  "Cierre de Caja Mañana","Cierre de Caja Tarde"
+  "Cierre de Caja"
 ]);
 
 const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
@@ -417,9 +417,8 @@ function toggleCamposPremio(){
     }
   }
 
-  // Campos a ocultar para Cierre de Caja
+  // Campos a ocultar para Cierre de Caja (turno ahora visible)
   const camposOcultar = [
-    "wrap_turno",
     "wrap_usuario_casino",
     "wrap_id_transferencia",
     "wrap_cuenta_receptora",
@@ -443,7 +442,7 @@ function toggleCamposPremio(){
         }
       } else if(input && !esCierreCaja){
         // Restaurar required según el campo
-        if(id === "wrap_turno" || id === "wrap_id_transferencia" || id === "wrap_cuenta_receptora"){
+        if(id === "wrap_id_transferencia" || id === "wrap_cuenta_receptora"){
           input.setAttribute("required", "required");
         }
       }

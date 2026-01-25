@@ -284,9 +284,9 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     // Detectar si es cierre de caja
     const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
 
-    // Validar turno solo si NO es cierre de caja
+    // Validar turno (ahora siempre obligatorio)
     const turnoNorm = String(turno || "").trim();
-    if (!esCierreCaja && !turnoNorm) {
+    if (!turnoNorm) {
       return res.status(400).json({ message: "Turno es obligatorio" });
     }
 
@@ -298,7 +298,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
     }
 
-    // Para cierre de caja, cuenta_receptora, id_transferencia y turno NO son obligatorios
+    // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
     if (!esCierreCaja) {
       if (requireNonEmpty(cuenta_receptora, "cuenta_receptora")) return res.status(400).json({ message: "cuenta_receptora es obligatoria" });
 
@@ -443,7 +443,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       [
         fechaNorm, // Fecha normalizada en formato ISO
         horaNorm,
-        esCierreCaja ? null : turnoNorm,
+        turnoNorm, // Turno ahora siempre obligatorio
         etiqueta,
         etiqueta === "Otro" ? String(otro_concepto || "").trim() : null,
         raw,
