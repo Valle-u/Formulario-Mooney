@@ -49,7 +49,7 @@ const ETIQUETAS = [
 ];
 
 const ETIQUETAS_CON_USUARIO_CASINO = new Set([
-  "Premio Pagado","Pago de premios duplicado","Duplicado","Error Empleado"
+  "Premio Pagado"
 ]);
 
 const ETIQUETAS_CIERRE_CAJA = new Set([
@@ -63,8 +63,6 @@ const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
    ========================= */
 // Detectar página actual para determinar moneda y tipo
 const IS_USD_PAGE = window.location.pathname.includes('flujo-usd');
-const IS_USD_CONSULTA = window.location.pathname.includes('consulta-usd');
-const CURRENT_MONEDA = (IS_USD_PAGE || IS_USD_CONSULTA) ? 'USD' : 'ARS';
 
 // Handler para cambiar labels según tipo de transacción
 function handleTipoTransaccionChange() {
@@ -1503,11 +1501,6 @@ async function downloadCSVFiltrado(){
     const created_by = document.getElementById("created_by")?.value || "";
     let moneda = document.getElementById("moneda")?.value || "";
 
-    // Forzar USD para página consulta-usd
-    if(IS_USD_CONSULTA) {
-      moneda = 'USD';
-    }
-
     const qs = new URLSearchParams();
 
     if(fecha_desde) qs.set("fecha_desde", fecha_desde);
@@ -1917,11 +1910,6 @@ async function buscarEgresos(){
     usuario_casino, id_transferencia, monto_min, monto_max,
     turno, cuenta_receptora, created_by
   };
-
-  // Forzar filtro USD para página consulta-usd
-  if(IS_USD_CONSULTA) {
-    currentFilters.moneda = 'USD';
-  }
 
   const qs = new URLSearchParams();
   qs.set("limit", String(EGRESOS_LIMIT));
@@ -2784,11 +2772,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   // Consulta Egresos
   if(document.getElementById("egresosTable")){
     populateFiltrosSelects();
-
-    // Auto-filtrar USD en página consulta-usd
-    if(IS_USD_CONSULTA) {
-      currentFiltros.moneda = 'USD';
-    }
 
     document.getElementById("filtrosForm")?.addEventListener("submit", handleFiltrosSubmit);
     document.getElementById("btnLimpiar")?.addEventListener("click", limpiarFiltros);
