@@ -58,8 +58,8 @@ router.post("/", auth, requireAdminOrDireccion, async (req, res) => {
   }
 });
 
-// GET /api/users - Listar usuarios (solo admin y direccion)
-router.get("/", auth, requireAdminOrDireccion, async (req, res) => {
+// GET /api/users - Listar usuarios (acceso para usuarios autenticados)
+router.get("/", auth, async (req, res) => {
   try {
     const r = await query(
       "SELECT id, username, role, full_name, is_active, created_at, created_by FROM users ORDER BY id ASC",
@@ -71,6 +71,27 @@ router.get("/", auth, requireAdminOrDireccion, async (req, res) => {
     return res.json({ users: r.rows });
   } catch {
     return res.status(500).json({ message: "Error listando usuarios" });
+  }
+});
+
+// GET /api/users/for-filter - endpoint para filtros de usuario creador
+router.get("/for-filter", auth, async (req, res) => {
+  try {
+    const isAdminOrDir = req.user?.role === 'admin' || req.user?.role === 'direccion';
+    let rows;
+    if (isAdminOrDir) {
+      const r = await query(
+        "SELECT id, username, full_name, role FROM users ORDER BY id ASC",
+        []
+      );
+      rows = r.rows;
+    } else {
+      const r = await query("SELECT id, username, full_name, role FROM users WHERE id = $1", [req.user?.id]);
+      rows = r.rows;
+    }
+    return res.json({ users: rows });
+  } catch (e) {
+    return res.status(500).json({ message: "Error loading users" });
   }
 });
 
