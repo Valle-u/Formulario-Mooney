@@ -1122,18 +1122,26 @@ async function handleEgresoSubmit(e){
       notas: document.getElementById("notas").value.trim()
     };
 
+    // Detectar si es cierre de caja
+    const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(payload.etiqueta);
+
     // Validaciones básicas
     if(!payload.fecha) throw new Error("Completá FECHA.");
     if(!payload.hora) throw new Error("Completá HORA.");
     if(!payload.turno) throw new Error("Seleccioná TURNO.");
     if(montoNum === null || montoNum <= 0) throw new Error("Monto inválido. Debe ser mayor a 0.");
-    if(!payload.cuenta_receptora) throw new Error("Completá CUENTA RECEPTORA.");
+
+    // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
+    if(!esCierreCaja) {
+      if(!payload.cuenta_receptora) throw new Error("Completá CUENTA RECEPTORA.");
+      if(!payload.id_transferencia) throw new Error("Completá ID TRANSFERENCIA.");
+      if(!/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
+        throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
+      }
+    }
+
     if(!payload.cuenta_salida) throw new Error("Completá CUENTA DE SALIDA.");
     if(!payload.empresa_cuenta_salida) throw new Error("Seleccioná EMPRESA DE SALIDA.");
-    if(!payload.id_transferencia) throw new Error("Completá ID TRANSFERENCIA.");
-    if(!/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
-      throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
-    }
     if(!payload.etiqueta) throw new Error("Seleccioná ETIQUETA.");
 
     if(ETIQUETAS_CON_USUARIO_CASINO.has(payload.etiqueta) && !payload.usuario_casino){
@@ -1196,6 +1204,9 @@ function mostrarModalConfirmacion(payload, montoNum, file){
 
   const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
+  // Detectar si es cierre de caja
+  const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(payload.etiqueta);
+
   body.innerHTML = `
     <p style="margin-bottom:16px; color:var(--muted);">
       Revisá que todos los datos sean correctos antes de confirmar:
@@ -1217,18 +1228,22 @@ function mostrarModalConfirmacion(payload, montoNum, file){
         <label>EMPRESA</label>
         <div class="note">${escapeHtml(payload.empresa_cuenta_salida)}</div>
       </div>
+      ${!esCierreCaja && payload.id_transferencia ? `
       <div class="field span6">
         <label>ID TRANSFERENCIA</label>
         <div class="note"><strong>${escapeHtml(payload.id_transferencia)}</strong></div>
       </div>
+      ` : ''}
       <div class="field span6">
         <label>MONTO</label>
         <div class="note"><strong style="color:var(--green); font-size:18px;">$ ${escapeHtml(montoFormatted)}</strong></div>
       </div>
+      ${!esCierreCaja && payload.cuenta_receptora ? `
       <div class="field span6">
         <label>CUENTA RECEPTORA</label>
         <div class="note">${escapeHtml(payload.cuenta_receptora)}</div>
       </div>
+      ` : ''}
       <div class="field span6">
         <label>CUENTA SALIDA</label>
         <div class="note">${escapeHtml(payload.cuenta_salida)}</div>
