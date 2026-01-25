@@ -451,8 +451,8 @@ function toggleCamposPremio(){
   }
 
   // Campos a ocultar para Cierre de Caja (turno ahora visible)
+  // wrap_usuario_casino ahora es manejado por toggleCasinoUserField()
   const camposOcultar = [
-    "wrap_usuario_casino",
     "wrap_id_transferencia",
     "wrap_cuenta_receptora",
     "wrap_notas"
