@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MooneyMaker • Consulta de Retiros</title>
-  <!-- Build: 2026-01-02-23-03-19 -->
+  <title>MooneyMaker • Historial USD</title>
+  <!-- Build: 2026-01-25 -->
   <link rel="stylesheet" href="styles.css?v=2026010522"/>
 </head>
 
@@ -30,9 +30,9 @@
     <!-- Navegación desktop -->
     <nav class="topbar-center nav-desktop">
       <a href="egreso.html" class="nav-item">Retiros ARS</a>
-      <a href="consulta-egresos.html" class="nav-item active">Historial ARS</a>
+      <a href="consulta-egresos.html" class="nav-item">Historial ARS</a>
       <a href="flujo-usd.html" class="nav-item">Flujo USD</a>
-      <a href="consulta-usd.html" class="nav-item">Historial USD</a>
+      <a href="consulta-usd.html" class="nav-item active">Historial USD</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
     </nav>
@@ -53,9 +53,9 @@
 
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros ARS</a>
-      <a href="consulta-egresos.html" class="mobile-item active">Historial ARS</a>
+      <a href="consulta-egresos.html" class="mobile-item">Historial ARS</a>
       <a href="flujo-usd.html" class="mobile-item">Flujo USD</a>
-      <a href="consulta-usd.html" class="mobile-item">Historial USD</a>
+      <a href="consulta-usd.html" class="mobile-item active">Historial USD</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
@@ -80,12 +80,13 @@
         <!-- FILTROS -->
         <section class="card">
           <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" id="filtrosHeader">
-            <span>🔍 Filtros de búsqueda</span>
+            <span>💵 Flujo de Caja en Dólares</span>
             <button type="button" class="btn btn-ghost" id="btnToggleFiltros" style="margin: 0; padding: 4px 12px; font-size: 14px;" title="Mostrar/Ocultar filtros">
               <span id="filtrosToggleIcon">▼</span>
             </button>
           </div>
 
+          <!-- Consulta USD-only. Auto-filtra moneda=USD -->
           <div class="card-body" id="filtrosBody">
             <form id="filtrosForm" class="grid">
 
@@ -124,14 +125,7 @@
                 </select>
               </div>
 
-              <div class="field span3">
-                <label>MONEDA</label>
-                <select id="moneda">
-                  <option value="">Todas</option>
-                  <option value="ARS">💵 Pesos (ARS)</option>
-                  <option value="USD">💵 Dólares (USD)</option>
-                </select>
-              </div>
+              <!-- Campo MONEDA removido - auto-filtra USD en JavaScript -->
 
               <div class="field span3">
                 <label>USUARIO CASINO</label>
@@ -145,12 +139,12 @@
 
               <div class="field span3">
                 <label>MONTO MÍNIMO</label>
-                <input id="monto_min" type="number" placeholder="Ej: 3000">
+                <input id="monto_min" type="number" placeholder="Ej: 100">
               </div>
 
               <div class="field span3">
                 <label>MONTO MÁXIMO</label>
-                <input id="monto_max" type="number" placeholder="Ej: 50000">
+                <input id="monto_max" type="number" placeholder="Ej: 5000">
               </div>
 
               <div class="field span3">
@@ -188,7 +182,7 @@
         <section class="card" style="margin-top: 20px;">
           <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div>
-              📋 Resultados
+              💵 Transacciones en Dólares
               <span id="resultadosInfo" class="note" style="margin-left: 16px; font-weight: normal;">—</span>
             </div>
             <button id="btnDescargarCsvFiltrado" class="btn btn-ghost" data-admin-only="1" style="margin: 0;">
@@ -207,15 +201,15 @@
                     <th>ID Trans.</th>
                     <th>Etiqueta</th>
                     <th>Usuario Casino</th>
-                    <th>Monto</th>
-                    <th>Moneda</th>
+                    <th>Monto USD</th>
+                    <th>Tipo</th>
                     <th>Estado</th>
                     <th>Creado por</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="egresosTbody">
-                  <tr><td colspan="11" class="muted">Usá los filtros para buscar transferencias</td></tr>
+                  <tr><td colspan="11" class="muted">Usá los filtros para buscar transacciones en dólares</td></tr>
                 </tbody>
               </table>
             </div>
@@ -236,7 +230,7 @@
       <div class="modal-backdrop" onclick="cerrarModal()"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Detalle de transferencia</h3>
+          <h3>Detalle de transferencia USD</h3>
           <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">✕</button>
         </div>
         <div id="detalleBody" style="padding: 20px 24px;">

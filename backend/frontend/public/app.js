@@ -59,6 +59,41 @@ const ETIQUETAS_CIERRE_CAJA = new Set([
 const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
 
 /* =========================
+   DETECCIÓN DE PÁGINA USD
+   ========================= */
+// Detectar página actual para determinar moneda y tipo
+const IS_USD_PAGE = window.location.pathname.includes('flujo-usd');
+const IS_USD_CONSULTA = window.location.pathname.includes('consulta-usd');
+const CURRENT_MONEDA = (IS_USD_PAGE || IS_USD_CONSULTA) ? 'USD' : 'ARS';
+
+// Handler para cambiar labels según tipo de transacción
+function handleTipoTransaccionChange() {
+  const tipo = document.getElementById("tipo_transaccion")?.value;
+
+  // Labels de cuentas
+  const labelCuentaSalida = document.querySelector('label[for="cuenta_salida"]');
+  const labelCuentaReceptora = document.querySelector('label[for="cuenta_receptora"]');
+
+  if (tipo === 'ENTRADA') {
+    // Para ENTRADA: invertir semántica
+    if (labelCuentaSalida) labelCuentaSalida.textContent = 'TITULAR CUENTA EMISORA (quien envía) *';
+    if (labelCuentaReceptora) labelCuentaReceptora.textContent = 'TITULAR CUENTA RECEPTORA (nuestra cuenta) *';
+
+    // ID transferencia opcional para ENTRADA
+    const idTransferenciaInput = document.getElementById("id_transferencia");
+    if (idTransferenciaInput) idTransferenciaInput.removeAttribute('required');
+  } else if (tipo === 'SALIDA') {
+    // Para SALIDA: mantener labels originales
+    if (labelCuentaSalida) labelCuentaSalida.textContent = 'TITULAR CUENTA SALIDA *';
+    if (labelCuentaReceptora) labelCuentaReceptora.textContent = 'TITULAR CUENTA RECEPTORA';
+
+    // ID transferencia requerido para SALIDA
+    const idTransferenciaInput = document.getElementById("id_transferencia");
+    if (idTransferenciaInput) idTransferenciaInput.setAttribute('required', 'required');
+  }
+}
+
+/* =========================
    TOAST - Sistema Unificado
    ========================= */
 function toast(title, msg, type = "error", duration = null){
@@ -1111,7 +1146,8 @@ async function handleEgresoSubmit(e){
       hora_solicitud_cliente: document.getElementById("hora_solicitud_cliente")?.value || "",
       hora_quema_fichas: document.getElementById("hora_quema_fichas")?.value || "",
       monto_transferencia_raw: (montoRaw || "").trim(),
-      moneda: document.getElementById("moneda").value || "ARS",
+      moneda: IS_USD_PAGE ? "USD" : (document.getElementById("moneda")?.value || "ARS"),
+      tipo_transaccion: IS_USD_PAGE ? document.getElementById("tipo_transaccion")?.value : "SALIDA",
       cuenta_receptora: document.getElementById("cuenta_receptora").value.trim(),
       usuario_casino: document.getElementById("usuario_casino").value.trim(),
       cuenta_salida: document.getElementById("cuenta_salida").value.trim(),
@@ -1121,6 +1157,14 @@ async function handleEgresoSubmit(e){
       otro_concepto: document.getElementById("otro_concepto").value.trim(),
       notas: document.getElementById("notas").value.trim()
     };
+
+    // Validación de tipo_transaccion en página USD
+    if (IS_USD_PAGE) {
+      const tipo = document.getElementById("tipo_transaccion")?.value;
+      if (!tipo || !['ENTRADA', 'SALIDA'].includes(tipo)) {
+        throw new Error("Debe seleccionar tipo de transacción (Entrada o Salida)");
+      }
+    }
 
     // Detectar si es cierre de caja
     const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(payload.etiqueta);
@@ -1457,6 +1501,12 @@ async function downloadCSVFiltrado(){
     const turno = document.getElementById("turno")?.value || "";
     const cuenta_receptora = document.getElementById("cuenta_receptora")?.value?.trim() || "";
     const created_by = document.getElementById("created_by")?.value || "";
+    let moneda = document.getElementById("moneda")?.value || "";
+
+    // Forzar USD para página consulta-usd
+    if(IS_USD_CONSULTA) {
+      moneda = 'USD';
+    }
 
     const qs = new URLSearchParams();
 
@@ -1471,6 +1521,7 @@ async function downloadCSVFiltrado(){
     if(turno) qs.set("turno", turno);
     if(cuenta_receptora) qs.set("cuenta_receptora", cuenta_receptora);
     if(created_by) qs.set("created_by", created_by);
+    if(moneda) qs.set("moneda", moneda);
 
     const queryString = qs.toString();
     const url = queryString
@@ -1478,7 +1529,7 @@ async function downloadCSVFiltrado(){
       : `${API_BASE}/api/egresos/csv`;
 
     console.log("🔍 URL CSV:", url);
-    console.log("🔍 Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, usuario_casino, id_transferencia, monto_min, monto_max, turno, cuenta_receptora, created_by });
+    console.log("🔍 Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, moneda, usuario_casino, id_transferencia, monto_min, monto_max, turno, cuenta_receptora, created_by });
 
     const res = await fetch(url,{
       method:"GET",
@@ -1867,6 +1918,11 @@ async function buscarEgresos(){
     turno, cuenta_receptora, created_by
   };
 
+  // Forzar filtro USD para página consulta-usd
+  if(IS_USD_CONSULTA) {
+    currentFilters.moneda = 'USD';
+  }
+
   const qs = new URLSearchParams();
   qs.set("limit", String(EGRESOS_LIMIT));
   qs.set("offset", String(egresosOffset));
@@ -1876,7 +1932,8 @@ async function buscarEgresos(){
   if(empresa_salida) qs.set("empresa_salida", empresa_salida);
   if(etiqueta) qs.set("etiqueta", etiqueta);
   if(status) qs.set("status", status);
-  if(moneda) qs.set("moneda", moneda);
+  // Usar currentFilters.moneda para asegurar que USD forzado se incluya
+  if(currentFilters.moneda) qs.set("moneda", currentFilters.moneda);
   if(usuario_casino) qs.set("usuario_casino", usuario_casino);
   if(id_transferencia) qs.set("id_transferencia", id_transferencia);
   if(monto_min) qs.set("monto_min", monto_min);
@@ -2679,6 +2736,15 @@ document.addEventListener("DOMContentLoaded", ()=>{
       toggleOtroConcepto();
       toggleCamposPremio();
     });
+
+    // Listener para tipo_transaccion en páginas USD
+    if (IS_USD_PAGE) {
+      const tipoSelect = document.getElementById("tipo_transaccion");
+      if (tipoSelect) {
+        tipoSelect.addEventListener('change', handleTipoTransaccionChange);
+      }
+    }
+
     const inputComprobante = document.getElementById("comprobante");
     if (inputComprobante) {
       console.log('✅ Input comprobante encontrado y configurando listeners');
@@ -2718,6 +2784,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
   // Consulta Egresos
   if(document.getElementById("egresosTable")){
     populateFiltrosSelects();
+
+    // Auto-filtrar USD en página consulta-usd
+    if(IS_USD_CONSULTA) {
+      currentFiltros.moneda = 'USD';
+    }
+
     document.getElementById("filtrosForm")?.addEventListener("submit", handleFiltrosSubmit);
     document.getElementById("btnLimpiar")?.addEventListener("click", limpiarFiltros);
     document.getElementById("btnPrev")?.addEventListener("click", egresosPrev);

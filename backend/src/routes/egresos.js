@@ -324,6 +324,17 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "Moneda inválida. Debe ser USD o ARS" });
     }
 
+    // Validar tipo_transaccion
+    const tipoTransaccion = String(req.body.tipo_transaccion || "SALIDA").trim().toUpperCase();
+    if (!["ENTRADA", "SALIDA"].includes(tipoTransaccion)) {
+      return res.status(400).json({ message: "tipo_transaccion inválido. Debe ser ENTRADA o SALIDA" });
+    }
+
+    // Validación: ARS solo puede ser SALIDA
+    if (monedaNorm === "ARS" && tipoTransaccion !== "SALIDA") {
+      return res.status(400).json({ message: "Transacciones ARS solo pueden ser tipo SALIDA" });
+    }
+
     const raw = (monto_transferencia_raw || "").trim();
     const montoNum = parseMontoARSStrict(raw);
     if (montoNum === null) return res.status(400).json({ message: "Monto inválido" });
@@ -434,13 +445,13 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
          cuenta_receptora,usuario_casino,cuenta_salida,empresa_salida,id_transferencia,
          comprobante_url,comprobante_filename,comprobante_mime,comprobante_size,
          notas,created_by,
-         hora_solicitud_cliente,hora_quema_fichas,moneda)
+         hora_solicitud_cliente,hora_quema_fichas,moneda,tipo_transaccion)
        VALUES
         ($1,$2,$3,$4,$5,$6,$7,
          $8,$9,$10,$11,$12,
          $13,$14,$15,$16,
          $17,$18,
-         $19,$20,$21)
+         $19,$20,$21,$22)
        RETURNING id`,
       [
         fechaNorm, // Fecha normalizada en formato ISO
@@ -463,7 +474,8 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
         req.user.id,
         hsNorm,
         hqNorm,
-        monedaNorm
+        monedaNorm,
+        tipoTransaccion
       ]
     );
 
@@ -599,6 +611,14 @@ router.get("/", auth, async (req, res) => {
       where.push(`e.moneda = $${params.length}`);
     }
 
+    if (req.query.tipo_transaccion) {
+      const tipoNorm = String(req.query.tipo_transaccion).trim().toUpperCase();
+      if (["ENTRADA", "SALIDA"].includes(tipoNorm)) {
+        params.push(tipoNorm);
+        where.push(`e.tipo_transaccion = $${params.length}`);
+      }
+    }
+
     if (usuario_casino) {
       params.push(`%${usuario_casino}%`);
       where.push(`e.usuario_casino ILIKE $${params.length}`);
@@ -691,6 +711,7 @@ router.get("/", auth, async (req, res) => {
       monto: Number(e.monto),
       monto_raw: e.monto_raw,
       moneda: e.moneda || 'ARS',
+      tipo_transaccion: e.tipo_transaccion || 'SALIDA',
       cuenta_receptora: e.cuenta_receptora,
       usuario_casino: e.usuario_casino,
       cuenta_salida: e.cuenta_salida,
@@ -809,6 +830,19 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       where.push(`e.created_by = $${params.length}`);
     }
 
+    if (req.query.moneda) {
+      params.push(req.query.moneda.toUpperCase());
+      where.push(`e.moneda = $${params.length}`);
+    }
+
+    if (req.query.tipo_transaccion) {
+      const tipoNorm = String(req.query.tipo_transaccion).trim().toUpperCase();
+      if (["ENTRADA", "SALIDA"].includes(tipoNorm)) {
+        params.push(tipoNorm);
+        where.push(`e.tipo_transaccion = $${params.length}`);
+      }
+    }
+
     const whereClause = where.length ? "WHERE " + where.join(" AND ") : "";
 
     const r = await query(
@@ -832,7 +866,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       "cuenta_receptora",
       "etiqueta","etiqueta_otro",
       "usuario_casino",
-      "monto","monto_raw","moneda",
+      "monto","monto_raw","moneda","tipo_transaccion",
       "comprobante_url",
       "notas",
       "created_by_username","created_at"
@@ -854,6 +888,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       montoToCommaString(Number(x.monto)),
       x.monto_raw || "",
       x.moneda || "ARS",
+      x.tipo_transaccion || "SALIDA",
       x.comprobante_url || "",
       x.notas || "",
       x.created_by_username || "",
