@@ -87,10 +87,10 @@ router.get("/for-filter", auth, async (req, res) => {
         []
       );
       rows = r.rows;
-    } else {
-      const r = await query("SELECT id, username, full_name, role FROM users WHERE id = $1", [req.user?.id]);
+  } else {
+      const r = await query("SELECT id, full_name, role FROM users WHERE id = $1", [req.user?.id]);
       rows = r.rows;
-    }
+  }
     return res.json({ users: rows });
   } catch (e) {
     return res.status(500).json({ message: "Error loading users" });
