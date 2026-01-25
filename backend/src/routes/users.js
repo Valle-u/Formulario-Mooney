@@ -61,10 +61,12 @@ router.post("/", auth, requireAdminOrDireccion, async (req, res) => {
 // GET /api/users - Listar usuarios (acceso para usuarios autenticados)
 router.get("/", auth, async (req, res) => {
   try {
-    const r = await query(
-      "SELECT id, username, role, full_name, is_active, created_at, created_by FROM users ORDER BY id ASC",
-      []
-    );
+    const isAdmin = req.user?.role === "admin";
+    const fields = isAdmin
+      ? "id, username, full_name, role, is_active, created_at, created_by"
+      : "id, full_name, role";
+    const q = `SELECT ${fields} FROM users ORDER BY id ASC`;
+    const r = await query(q, []);
 
     await auditLog(req, { action:"USER_LIST", entity:"users", success:true, status_code:200, details:{ rows: r.rowCount } });
 

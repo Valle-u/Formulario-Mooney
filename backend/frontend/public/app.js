@@ -1579,8 +1579,8 @@ function renderUsers(users){
       <td>${u.id}</td>
       <td>
         ${isCurrentUserAdmin
-          ? `<input data-edit-username="${u.id}" value="${escapeHtml(u.username)}" placeholder="username">`
-          : escapeHtml(u.username)
+          ? `<input data-edit-username="${u.id}" value="${escapeHtml(u.username ?? '')}" placeholder="username">`
+          : escapeHtml(u.username ?? u.full_name ?? '')
         }
       </td>
       <td><input data-edit-name="${u.id}" value="${escapeHtml(u.full_name||"")}" placeholder="Nombre completo"></td>
