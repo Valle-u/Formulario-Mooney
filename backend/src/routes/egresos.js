@@ -9,6 +9,7 @@ import {
   EMPRESAS_SALIDA,
   ETIQUETAS_CON_USUARIO_CASINO,
   ETIQUETAS_PREMIO_MINIMO,
+  ETIQUETAS_CIERRE_CAJA,
   isFutureDateISO,
   parseMontoARSStrict,
   montoToCommaString,
@@ -277,11 +278,17 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const horaNorm = normalizeHoraToTime(hora);
     if (!horaNorm) return res.status(400).json({ message: "Hora inválida. Usá HH:MM" });
 
-    const turnoNorm = String(turno || "").trim();
-    if (!turnoNorm) return res.status(400).json({ message: "Turno es obligatorio" });
-
     const errEtiqueta = requireNonEmpty(etiqueta, "etiqueta");
     if (errEtiqueta) return res.status(400).json({ message: errEtiqueta });
+
+    // Detectar si es cierre de caja
+    const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
+
+    // Validar turno solo si NO es cierre de caja
+    const turnoNorm = String(turno || "").trim();
+    if (!esCierreCaja && !turnoNorm) {
+      return res.status(400).json({ message: "Turno es obligatorio" });
+    }
 
     if (etiqueta === "Otro" && !String(otro_concepto || "").trim()) {
       return res.status(400).json({ message: "Si etiqueta es 'Otro', otro_concepto es obligatorio" });
@@ -291,18 +298,23 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
     }
 
-    if (requireNonEmpty(cuenta_receptora, "cuenta_receptora")) return res.status(400).json({ message: "cuenta_receptora es obligatoria" });
+    // Para cierre de caja, cuenta_receptora, id_transferencia y turno NO son obligatorios
+    if (!esCierreCaja) {
+      if (requireNonEmpty(cuenta_receptora, "cuenta_receptora")) return res.status(400).json({ message: "cuenta_receptora es obligatoria" });
+
+      const idTrim = String(id_transferencia || "").trim();
+      if (!idTrim) return res.status(400).json({ message: "id_transferencia es obligatorio" });
+      // Validar que sea alfanumérico (letras, números, guiones, guiones bajos)
+      if (!/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
+        return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo letras, números, guiones y guiones bajos" });
+      }
+    }
+
+    // Cuenta salida y empresa son siempre obligatorias
     if (requireNonEmpty(cuenta_salida, "cuenta_salida")) return res.status(400).json({ message: "cuenta_salida es obligatoria" });
 
     if (requireNonEmpty(empresa_cuenta_salida, "empresa_cuenta_salida")) return res.status(400).json({ message: "empresa_cuenta_salida es obligatoria" });
     if (!EMPRESAS_SALIDA.includes(empresa_cuenta_salida)) return res.status(400).json({ message: "empresa_salida inválida" });
-
-    const idTrim = String(id_transferencia || "").trim();
-    if (!idTrim) return res.status(400).json({ message: "id_transferencia es obligatorio" });
-    // Validar que sea alfanumérico (letras, números, guiones, guiones bajos)
-    if (!/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
-      return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo letras, números, guiones y guiones bajos" });
-    }
 
     // Validar moneda primero (antes de validar monto mínimo)
     const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
@@ -431,16 +443,16 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       [
         fechaNorm, // Fecha normalizada en formato ISO
         horaNorm,
-        turnoNorm,
+        esCierreCaja ? null : turnoNorm,
         etiqueta,
         etiqueta === "Otro" ? String(otro_concepto || "").trim() : null,
         raw,
         montoNum,
-        String(cuenta_receptora || "").trim(),
+        esCierreCaja ? null : String(cuenta_receptora || "").trim(),
         String(usuario_casino || "").trim() || null,
         String(cuenta_salida || "").trim(),
         empresa_cuenta_salida,
-        idTrim,
+        esCierreCaja ? null : idTrim,
         comprobanteUrl,
         file.originalname,
         file.mimetype,

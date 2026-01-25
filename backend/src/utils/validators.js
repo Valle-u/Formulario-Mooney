@@ -9,6 +9,11 @@ export const ETIQUETAS_CON_USUARIO_CASINO = new Set([
 
 export const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
 
+export const ETIQUETAS_CIERRE_CAJA = new Set([
+  "Cierre de Caja Mañana",
+  "Cierre de Caja Tarde"
+]);
+
 export function isFutureDateISO(yyyyMmDd) {
   const d = new Date(`${yyyyMmDd}T00:00:00`);
   const today = new Date();

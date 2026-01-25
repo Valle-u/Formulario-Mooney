@@ -45,11 +45,15 @@ const ETIQUETAS = [
   "Gasto limpieza","Gasto de Cocina","Fondeo de cuenta","Gasto Personal",
   "Adelanto de sueldo","Redireccion de capital","Pago de premios duplicado",
   "Pago LiveChat","Pago LiveChatCelu","Prueba Casa","Duplicado","Error Empleado",
-  "Inversion","Rechazada por el banco","Otro"
+  "Inversion","Rechazada por el banco","Cierre de Caja Mañana","Cierre de Caja Tarde","Otro"
 ];
 
 const ETIQUETAS_CON_USUARIO_CASINO = new Set([
   "Premio Pagado","Pago de premios duplicado","Duplicado","Error Empleado"
+]);
+
+const ETIQUETAS_CIERRE_CAJA = new Set([
+  "Cierre de Caja Mañana","Cierre de Caja Tarde"
 ]);
 
 const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
@@ -383,9 +387,11 @@ function toggleOtroConcepto(){
 function toggleCamposPremio(){
   const etiqueta = document.getElementById("etiqueta")?.value || "";
 
-  // Mostrar campos solo si es Premio Pagado, Duplicado, o Error Empleado
+  // Detectar tipo de etiqueta
   const esPremio = ETIQUETAS_CON_USUARIO_CASINO.has(etiqueta);
+  const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
 
+  // Campos de premios
   const wrapSolicitud = document.getElementById("wrap_hora_solicitud");
   const inputSolicitud = document.getElementById("hora_solicitud_cliente");
   const wrapQuema = document.getElementById("wrap_hora_quema");
@@ -410,6 +416,39 @@ function toggleCamposPremio(){
       inputQuema.value = "";
     }
   }
+
+  // Campos a ocultar para Cierre de Caja
+  const camposOcultar = [
+    "wrap_turno",
+    "wrap_usuario_casino",
+    "wrap_id_transferencia",
+    "wrap_cuenta_receptora",
+    "wrap_notas"
+  ];
+
+  camposOcultar.forEach(id => {
+    const wrap = document.getElementById(id);
+    const input = wrap?.querySelector("input, select, textarea");
+
+    if(wrap){
+      wrap.classList.toggle("hidden", esCierreCaja);
+
+      // Remover required si está oculto
+      if(input && esCierreCaja){
+        input.removeAttribute("required");
+        if(input.tagName === 'SELECT'){
+          input.value = "";
+        } else {
+          input.value = "";
+        }
+      } else if(input && !esCierreCaja){
+        // Restaurar required según el campo
+        if(id === "wrap_turno" || id === "wrap_id_transferencia" || id === "wrap_cuenta_receptora"){
+          input.setAttribute("required", "required");
+        }
+      }
+    }
+  });
 }
 
 function fileLabel(){
