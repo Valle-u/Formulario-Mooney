@@ -77,20 +77,42 @@ router.get("/", auth, async (req, res) => {
 });
 
 // GET /api/users/for-filter - endpoint para filtros de usuario creador
+// Lógica de jerarquía: admin > direccion > encargado > empleado
 router.get("/for-filter", auth, async (req, res) => {
   try {
-    const isAdminOrDir = req.user?.role === 'admin' || req.user?.role === 'direccion';
+    const userRole = req.user?.role;
     let rows;
-    if (isAdminOrDir) {
+
+    if (userRole === 'admin') {
+      // Admin ve todos los usuarios
       const r = await query(
         "SELECT id, username, full_name, role FROM users ORDER BY id ASC",
         []
       );
       rows = r.rows;
-  } else {
-      const r = await query("SELECT id, full_name, role FROM users WHERE id = $1", [req.user?.id]);
+    } else if (userRole === 'direccion') {
+      // Dirección ve todos excepto admin
+      const r = await query(
+        "SELECT id, username, full_name, role FROM users WHERE role != 'admin' ORDER BY id ASC",
+        []
+      );
       rows = r.rows;
-  }
+    } else if (userRole === 'encargado') {
+      // Encargado ve encargados y empleados
+      const r = await query(
+        "SELECT id, username, full_name, role FROM users WHERE role IN ('encargado', 'empleado') ORDER BY id ASC",
+        []
+      );
+      rows = r.rows;
+    } else {
+      // Empleado solo ve empleados
+      const r = await query(
+        "SELECT id, username, full_name, role FROM users WHERE role = 'empleado' ORDER BY id ASC",
+        []
+      );
+      rows = r.rows;
+    }
+
     return res.json({ users: rows });
   } catch (e) {
     return res.status(500).json({ message: "Error loading users" });

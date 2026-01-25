@@ -1872,10 +1872,11 @@ async function populateFiltrosSelects(){
       ETIQUETAS.map(e => `<option value="${e}">${e}</option>`).join("");
   }
 
-  // Cargar lista de usuarios para el filtro "Creado por"
+  // Cargar lista de usuarios para el filtro "Creado por" según jerarquía
   if(selCreatedBy){
     try{
-      const users = await api("/api/users");
+      const response = await api("/api/users/for-filter");
+      const users = response.users || [];
       selCreatedBy.innerHTML = `<option value="">Todos</option>` +
         users.map(u => `<option value="${u.id}">${u.full_name || u.username} (${u.role})</option>`).join("");
     }catch(err){
