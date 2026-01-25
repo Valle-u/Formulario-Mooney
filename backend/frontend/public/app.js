@@ -923,6 +923,50 @@ function wireIdTransferenciaValidation() {
   });
 }
 
+/* =========================
+   VALIDACIÓN DE NOMBRES (solo letras y espacios)
+   ========================= */
+function wireNombresValidation() {
+  const cuentaSalidaInput = document.getElementById("cuenta_salida");
+  const cuentaReceptoraInput = document.getElementById("cuenta_receptora");
+
+  // Regex: solo letras (incluyendo á, é, í, ó, ú, ñ), espacios y algunos caracteres comunes en nombres
+  const regexNombres = /^[a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]*$/;
+
+  function validarNombre(input) {
+    if (!input) return;
+
+    input.addEventListener("input", (e) => {
+      const valor = e.target.value;
+
+      // Verificar si contiene caracteres no permitidos
+      if (!regexNombres.test(valor)) {
+        // Remover caracteres no permitidos
+        e.target.value = valor.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]/g, "");
+
+        // Mostrar feedback temporal
+        e.target.style.borderColor = "#dc3545";
+
+        // Resetear después de 1 segundo
+        setTimeout(() => {
+          e.target.style.borderColor = "";
+        }, 1000);
+      }
+    });
+
+    // Validar al perder foco
+    input.addEventListener("blur", (e) => {
+      const valor = e.target.value.trim();
+      if (valor && !regexNombres.test(valor)) {
+        e.target.value = valor.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]/g, "");
+      }
+    });
+  }
+
+  validarNombre(cuentaSalidaInput);
+  validarNombre(cuentaReceptoraInput);
+}
+
 function parseMontoARSStrict(raw){
   const v = (raw || "").trim();
   const re = /^\d+(,\d{1,2})?$/;
@@ -2715,6 +2759,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     wireIdTransferenciaAlphanumeric();
     wireFechaValidation(); // Validación de formato dd/mm/aaaa
     wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
+    wireNombresValidation(); // Validación de nombres (solo letras y espacios)
     conectarValidacionTiempoReal(); // Validación en tiempo real
 
     // Sistema de recordar valores (con pequeño delay para asegurar que los selects estén poblados)
