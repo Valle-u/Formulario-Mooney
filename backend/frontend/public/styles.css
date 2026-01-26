@@ -27,13 +27,69 @@
   --card2:#f8f9fb;
   --border:rgba(0,0,0,.08);
   --text:#1a202c;
-  --muted:#64748b;
+  --muted:#475569;
   --blue:#2b93ff;
   --blue2:#1f7fe6;
   --danger:#ff5a5a;
   --shadow:0 2px 8px rgba(0,0,0,.08);
   --radius:6px;
   --input:#1a202c;
+}
+
+/* Sobreescrituras específicas para tema claro (mejorar legibilidad) */
+[data-theme="light"] .section-subtitle {
+  color: #334155;
+}
+
+[data-theme="light"] .section-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .table th {
+  background: rgba(0,0,0,.05);
+  color: #0f172a;
+}
+
+[data-theme="light"] .note {
+  color: #475569;
+}
+
+[data-theme="light"] .nav-item {
+  color: #334155;
+}
+
+[data-theme="light"] .nav-item:hover {
+  color: #0f172a;
+}
+
+[data-theme="light"] .nav-item.active {
+  color: #0f172a;
+}
+
+[data-theme="light"] .user-badge {
+  color: #334155;
+}
+
+[data-theme="light"] .brand {
+  color: #0f172a;
+}
+
+[data-theme="light"] .topbar-right {
+  color: #334155;
+}
+
+[data-theme="light"] label {
+  color: #1e293b;
+}
+
+[data-theme="light"] .mobile-item {
+  color: #334155;
+}
+
+[data-theme="light"] .mobile-item:hover,
+[data-theme="light"] .mobile-item.active {
+  color: #0f172a;
+  background: rgba(0,0,0,.05);
 }
 
 *{box-sizing:border-box}
