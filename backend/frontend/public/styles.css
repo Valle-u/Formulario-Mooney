@@ -309,6 +309,17 @@ label{
   color: var(--muted);
   margin: 0 0 6px;
 }
+
+/* Clearfix para labels con elementos flotantes (checkbox Recordar) */
+.field > label {
+  overflow: hidden;
+}
+
+.field > label::after {
+  content: "";
+  display: table;
+  clear: both;
+}
 .field input, .field select, .field textarea{
   width:100%;
   padding:10px 10px;
