@@ -5,6 +5,9 @@
 
 BEGIN;
 
+-- Deshabilitar trigger temporalmente para evitar error de NOT NULL en changed_by
+ALTER TABLE egresos DISABLE TRIGGER trg_egreso_change;
+
 -- Actualizar registros con "Gasto Personal F" a "Gasto Personal"
 UPDATE egresos
 SET etiqueta = 'Gasto Personal'
@@ -14,6 +17,9 @@ WHERE etiqueta = 'Gasto Personal F';
 UPDATE egresos
 SET etiqueta = 'Gasto Personal A'
 WHERE etiqueta = 'Gasto Personl A';
+
+-- Rehabilitar trigger
+ALTER TABLE egresos ENABLE TRIGGER trg_egreso_change;
 
 -- Nota: "Inversion Reca" es una nueva etiqueta que se agregó al frontend
 -- pero no requiere migración de datos ya que no existía previamente
