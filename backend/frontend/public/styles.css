@@ -84,12 +84,22 @@
 
 [data-theme="light"] .mobile-item {
   color: #334155;
+  background: rgba(0,0,0,.03);
+  border: 1px solid rgba(0,0,0,.1);
+  font-weight: 600;
 }
 
-[data-theme="light"] .mobile-item:hover,
+[data-theme="light"] .mobile-item:hover {
+  color: #1e293b;
+  background: rgba(0,0,0,.06);
+  border-color: rgba(0,0,0,.15);
+}
+
 [data-theme="light"] .mobile-item.active {
-  color: #0f172a;
-  background: rgba(0,0,0,.05);
+  color: #1e40af;
+  background: rgba(37,99,235,.1);
+  border-color: rgba(37,99,235,.3);
+  font-weight: 700;
 }
 
 /* Mejorar topbar en tema claro */
@@ -132,6 +142,32 @@
 [data-theme="light"] .btn-logout:hover {
   background: #1d4ed8;
   box-shadow: 0 2px 4px rgba(0,0,0,.15);
+}
+
+/* Mobile drawer en tema claro */
+[data-theme="light"] .mobile-drawer {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border-left: 1px solid rgba(0,0,0,.12);
+  box-shadow: -2px 0 8px rgba(0,0,0,.1);
+}
+
+[data-theme="light"] .mobile-drawer-head {
+  border-bottom: 1px solid rgba(0,0,0,.12);
+}
+
+[data-theme="light"] .drawer-close {
+  border: 1px solid rgba(0,0,0,.15);
+  background: rgba(0,0,0,.05);
+  color: #1e293b;
+}
+
+[data-theme="light"] .drawer-close:hover {
+  background: rgba(0,0,0,.08);
+  border-color: rgba(0,0,0,.2);
+}
+
+[data-theme="light"] .drawer-overlay {
+  background: rgba(0,0,0,.3);
 }
 
 /* Asegurar inputs legibles en tema claro */
