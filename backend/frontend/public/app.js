@@ -1489,6 +1489,7 @@ async function confirmarYEnviarEgreso(){
       otro_concepto: payload.otro_concepto,
       monto_transferencia_raw: payload.monto_transferencia_raw,
       moneda: payload.moneda,
+      tipo_transaccion: payload.tipo_transaccion,
       cuenta_receptora: payload.cuenta_receptora,
       usuario_casino: payload.usuario_casino,
       cuenta_salida: payload.cuenta_salida,
