@@ -259,7 +259,8 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       notas,
       hora_solicitud_cliente,
       hora_quema_fichas,
-      moneda
+      moneda,
+      tipo_transaccion
     } = data;
 
     const errFecha = requireNonEmpty(fecha, "fecha");
@@ -325,7 +326,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     }
 
     // Validar tipo_transaccion
-    const tipoTransaccion = String(req.body.tipo_transaccion || "SALIDA").trim().toUpperCase();
+    const tipoTransaccion = String(tipo_transaccion || "SALIDA").trim().toUpperCase();
     if (!["ENTRADA", "SALIDA"].includes(tipoTransaccion)) {
       return res.status(400).json({ message: "tipo_transaccion inválido. Debe ser ENTRADA o SALIDA" });
     }
