@@ -202,6 +202,29 @@
   color: #0f172a;
 }
 
+[data-theme="light"] .modal-footer {
+  background: rgba(0,0,0,.02);
+  border-top: 1px solid rgba(0,0,0,.1);
+}
+
+[data-theme="light"] .btn-close {
+  color: #475569;
+}
+
+[data-theme="light"] .btn-close:hover {
+  background: rgba(0,0,0,.08);
+  color: #0f172a;
+}
+
+[data-theme="light"] .password-toggle {
+  color: #475569 !important;
+  opacity: 0.8 !important;
+}
+
+[data-theme="light"] .password-toggle:hover {
+  opacity: 1 !important;
+}
+
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -1189,6 +1212,16 @@ label{
 
 .modal-body {
   padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--card2);
 }
 
 /* Validación de formularios */
