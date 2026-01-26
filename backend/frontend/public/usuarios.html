@@ -181,13 +181,13 @@
     </main>
 
     <!-- Modal Reset Password -->
-    <div id="resetPasswordModal" class="modal-backdrop" style="display: none;">
-      <div class="modal-content" style="max-width: 500px;">
+    <div id="resetPasswordModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+      <div class="modal-content" style="max-width: 420px; width: 90%; margin: 0;">
         <div class="modal-header">
-          <h3>🔑 Resetear Contraseña</h3>
+          <h3 style="font-size: 18px;">🔑 Resetear Contraseña</h3>
           <button id="btnCloseResetModal" class="btn-close">✕</button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="padding: 20px;">
           <div class="field" style="position: relative;">
             <label>Nueva Contraseña *</label>
             <input id="reset_password" type="password" placeholder="Mínimo 8 caracteres" style="padding-right: 40px;">
@@ -199,9 +199,9 @@
             </small>
           </div>
         </div>
-        <div class="modal-footer">
-          <button id="btnConfirmReset" class="btn btn-primary">Cambiar Contraseña</button>
+        <div class="modal-footer" style="padding: 14px 20px;">
           <button id="btnCancelReset" class="btn btn-ghost">Cancelar</button>
+          <button id="btnConfirmReset" class="btn btn-primary">Cambiar Contraseña</button>
         </div>
       </div>
     </div>
