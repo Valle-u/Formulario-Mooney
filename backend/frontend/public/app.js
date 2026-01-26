@@ -2003,6 +2003,9 @@ function renderEgresos(egresos, pagination){
     const info = document.getElementById("resultadosInfo");
     if(info) info.textContent = "0 resultados";
 
+    const sumaTotalEl = document.getElementById("sumaTotal");
+    if(sumaTotalEl) sumaTotalEl.textContent = "—";
+
     document.getElementById("btnPrev").disabled = true;
     document.getElementById("btnNext").disabled = true;
     document.getElementById("paginacionInfo").textContent = "";
@@ -2052,6 +2055,30 @@ function renderEgresos(egresos, pagination){
 
   const info = document.getElementById("resultadosInfo");
   if(info) info.textContent = `Total: ${pagination.total} transferencias`;
+
+  // Calcular suma total de montos
+  const sumaARS = egresos
+    .filter(e => (e.moneda || 'ARS') === 'ARS')
+    .reduce((acc, e) => acc + Number(e.monto), 0);
+
+  const sumaUSD = egresos
+    .filter(e => (e.moneda || 'ARS') === 'USD')
+    .reduce((acc, e) => acc + Number(e.monto), 0);
+
+  const sumaTotalEl = document.getElementById("sumaTotal");
+  if(sumaTotalEl) {
+    let textoSuma = "";
+    if(sumaARS > 0 && sumaUSD > 0) {
+      textoSuma = `💰 ARS $${sumaARS.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})} | USD $${sumaUSD.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    } else if(sumaARS > 0) {
+      textoSuma = `💰 Total: ARS $${sumaARS.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    } else if(sumaUSD > 0) {
+      textoSuma = `💰 Total: USD $${sumaUSD.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    } else {
+      textoSuma = "—";
+    }
+    sumaTotalEl.textContent = textoSuma;
+  }
 
   document.getElementById("btnPrev").disabled = pagination.offset === 0;
   document.getElementById("btnNext").disabled = !pagination.hasMore;
