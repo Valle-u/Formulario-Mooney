@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
 
+/* Tema Oscuro (por defecto) */
 :root{
   --bg:#2f3a4b;
   --sidebar:#2b3444;
@@ -15,6 +16,24 @@
   --shadow:0 14px 40px rgba(0,0,0,.28);
   --radius:6px;
   --input:#e8f0fe;
+}
+
+/* Tema Claro */
+[data-theme="light"]{
+  --bg:#f5f7fa;
+  --sidebar:#ffffff;
+  --topbar:#ffffff;
+  --card:#ffffff;
+  --card2:#f8f9fb;
+  --border:rgba(0,0,0,.08);
+  --text:#1a202c;
+  --muted:#64748b;
+  --blue:#2b93ff;
+  --blue2:#1f7fe6;
+  --danger:#ff5a5a;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
+  --radius:6px;
+  --input:#1a202c;
 }
 
 *{box-sizing:border-box}
@@ -680,6 +699,39 @@ label{
 
 .btn-logout:hover {
   background: #1d4ed8;
+}
+
+/* Botón de tema claro/oscuro */
+.btn-theme {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,.1);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-theme:hover {
+  background: rgba(255,255,255,.15);
+  transform: scale(1.05);
+}
+
+.btn-theme:active {
+  transform: scale(0.95);
+}
+
+[data-theme="light"] .btn-theme {
+  background: rgba(0,0,0,.08);
+}
+
+[data-theme="light"] .btn-theme:hover {
+  background: rgba(0,0,0,.12);
 }
 
 /* Responsive */

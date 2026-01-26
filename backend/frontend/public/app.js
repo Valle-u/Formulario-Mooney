@@ -2710,6 +2710,50 @@ function mostrarHistorialModal(egresoId, changes){
 }
 
 /* =========================
+   TEMA CLARO/OSCURO
+   ========================= */
+function initThemeToggle() {
+  const themeToggleBtn = document.getElementById("themeToggle");
+  const themeToggleMobileBtn = document.getElementById("themeToggleMobile");
+
+  // Cargar tema guardado desde localStorage (por defecto: oscuro)
+  const savedTheme = localStorage.getItem("theme") || "dark";
+  applyTheme(savedTheme);
+
+  // Event listeners para ambos botones (desktop y mobile)
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", toggleTheme);
+  }
+  if (themeToggleMobileBtn) {
+    themeToggleMobileBtn.addEventListener("click", toggleTheme);
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+  const newTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(newTheme);
+  localStorage.setItem("theme", newTheme);
+}
+
+function applyTheme(theme) {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+    updateThemeIcon("☀️");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+    updateThemeIcon("🌙");
+  }
+}
+
+function updateThemeIcon(icon) {
+  const themeToggleBtn = document.getElementById("themeToggle");
+  const themeToggleMobileBtn = document.getElementById("themeToggleMobile");
+  if (themeToggleBtn) themeToggleBtn.textContent = icon;
+  if (themeToggleMobileBtn) themeToggleMobileBtn.textContent = icon;
+}
+
+/* =========================
    BOOTSTRAP
    ========================= */
 document.addEventListener("DOMContentLoaded", ()=>{
@@ -2725,6 +2769,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
   // Activar monitor de inactividad
   setupInactivityMonitor();
+
+  // Inicializar tema claro/oscuro
+  initThemeToggle();
 
   hydrateTopbar();
   document.getElementById("logoutBtn")?.addEventListener("click", logout);
