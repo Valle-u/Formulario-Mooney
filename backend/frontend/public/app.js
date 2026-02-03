@@ -36,27 +36,70 @@ console.log('🔌 API_BASE:', API_BASE);
 const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago"];
 
 const ETIQUETAS = [
-  "Premio Pagado","Pago de servidor","Pago de fichas","Pago de sueldo",
-  "Gasto de publicidad","Gasto de CRM","Pago de Utilidades",
-  "Cambio a USD","Cambio a USDT","Cambio a Peso Fisico",
-  "Gasto de cuenta","Transferencia Rechazada",
-  "Gasto Personal L","Gasto Personal A","Inversion Reca",
-  "Inversion Publicidad","Pago Programacion","Pago Costo de estructura",
-  "Gasto limpieza","Gasto de Cocina","Fondeo de cuenta","Gasto Personal",
-  "Adelanto de sueldo","Redireccion de capital","Pago de premios duplicado",
-  "Pago LiveChat","Pago LiveChatCelu","Prueba Casa","Duplicado","Error Empleado",
-  "Inversion","Rechazada por el banco","Cierre de Caja","Otro"
+  // Unidad M
+  "[Unidad M] Deposito de cliente",
+  "[Unidad M] Premio Pagado",
+  "[Unidad M] Pago de sueldo",
+  "[Unidad M] Pago de Utilidades",
+  "[Unidad M] Gasto de cuenta",
+  "[Unidad M] Transferencia Rechazada",
+  "[Unidad M] IVA",
+  "[Unidad M] Adelanto de sueldo",
+  "[Unidad M] Redireccion de capital",
+  "[Unidad M] Pago de premios duplicado",
+  "[Unidad M] Pago LiveChat",
+  "[Unidad M] Pago LiveChatCelu",
+  "[Unidad M]  Prueba Casa",
+  "[Unidad M]  Duplicado",
+  "[Unidad M]  Error Empleado",
+  "[Unidad M]  Devolucion",
+  "[Unidad M]  NO ESTA EN FORMULARIO",
+  "[Unidad M]  No esta en la planilla empleados",
+  "[Unidad M] Pago de Estructura",
+  // Programacion
+  "[Programacion] Pago de servidor",
+  "[Programacion] Pago de fichas",
+  "[Programacion] Costo Fijo",
+  // Publicidad
+  "[Publicidad]Gasto Fijo",
+  "[Publicidad] Inversion",
+  // Unidad CRM
+  "[Unidad CRM]Gasto Fijo",
+  // Unidad Reca
+  "[Unidad Reca]Inversion",
+  "[Unidad Reca] Cossto Fijo",
+  "[Unidad Reca] Cuenta Comprada",
+  // Granja
+  "[Granja] Costo Fijo",
+  "[Granja] Inversion",
+  "[Granja] Plan de Datos",
+  // Otra
+  "[Otra] Cambio a USD",
+  "[Otra] Cambio a USDT",
+  "[Otra] Cambio a Peso Fisico",
+  "[Otra] Gasto Personal Dragon",
+  "[Otra] Gasto Personal William",
+  "[Otra] Gasto limpieza",
+  "[Otra] Gasto de Cocina",
+  "[Otra] ROBO",
+  "[Otra] Recepcion de USDT",
+  "[Otra] Recepcion de USD",
+  "[Otra] Recepcion Dolar Fisico",
+  "[Otra] Recepcion Peso Fisico",
+  // Especiales
+  "Cierre de Caja",
+  "Otro"
 ];
 
 const ETIQUETAS_CON_USUARIO_CASINO = new Set([
-  "Premio Pagado"
+  "[Unidad M] Premio Pagado"
 ]);
 
 const ETIQUETAS_CIERRE_CAJA = new Set([
   "Cierre de Caja"
 ]);
 
-const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
+const ETIQUETAS_PREMIO_MINIMO = new Set(["[Unidad M] Premio Pagado"]);
 
 /* =========================
    DETECCIÓN DE PÁGINA USD

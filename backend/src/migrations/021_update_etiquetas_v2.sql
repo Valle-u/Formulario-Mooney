@@ -1,0 +1,63 @@
+-- Migración 021: Actualizar etiquetas de egresos v2
+-- Esta migración NO modifica datos existentes, solo documenta los cambios de etiquetas.
+-- Las etiquetas viejas se mantienen en registros históricos.
+-- Las nuevas etiquetas solo aplican a egresos creados después de este cambio.
+-- Fecha: 2026-02-03
+
+-- CAMBIOS DE ETIQUETAS (solo en frontend, datos históricos se mantienen):
+--
+-- ACTUALIZACIONES DE NOMBRE:
+-- Deposito de cliente         --> [Unidad M] Deposito de cliente
+-- Premio Pagado               --> [Unidad M] Premio Pagado
+-- Pago de servidor            --> [Programacion] Pago de servidor
+-- Pago de fichas              --> [Programacion] Pago de fichas
+-- Pago de sueldo              --> [Unidad M] Pago de sueldo
+-- Gasto de publicidad         --> [Publicidad]Gasto Fijo
+-- Gasto de CRM                --> [Unidad CRM]Gasto Fijo
+-- Pago de Utilidades          --> [Unidad M] Pago de Utilidades
+-- Cambio a USD                --> [Otra] Cambio a USD
+-- Cambio a USDT               --> [Otra] Cambio a USDT
+-- Cambio a Peso Fisico        --> [Otra] Cambio a Peso Fisico
+-- Gasto de cuenta             --> [Unidad M] Gasto de cuenta
+-- Transferencia Rechazada     --> [Unidad M] Transferencia Rechazada
+-- IVA                         --> [Unidad M] IVA
+-- Gasto Personal L            --> [Otra] Gasto Personal Dragon
+-- Gasto Personal A            --> [Otra] Gasto Personal William
+-- Inversion Publicidad        --> [Publicidad] Inversion
+-- Pago Programacion           --> [Programacion] Costo Fijo
+-- Pago Costo de estructura    --> [Unidad M] Pago de Estructura
+-- Gasto limpieza              --> [Otra] Gasto limpieza
+-- Gasto de Cocina             --> [Otra] Gasto de Cocina
+-- Adelanto de sueldo          --> [Unidad M] Adelanto de sueldo
+-- Redireccion de capital      --> [Unidad M] Redireccion de capital
+-- Pago de premios duplicado   --> [Unidad M] Pago de premios duplicado
+-- Pago LiveChat               --> [Unidad M] Pago LiveChat
+-- Pago LiveChatCelu           --> [Unidad M] Pago LiveChatCelu
+-- Prueba Casa                 --> [Unidad M]  Prueba Casa
+-- Duplicado                   --> [Unidad M]  Duplicado
+-- Error Empleado              --> [Unidad M]  Error Empleado
+-- Rechazada por el banco      --> [Unidad M]  Error Empleado (se unifica)
+-- Devolucion                  --> [Unidad M]  Devolucion
+-- NO ESTA EN FORMULARIO       --> [Unidad M]  NO ESTA EN FORMULARIO
+-- INVERSION RECA              --> [Unidad Reca]Inversion
+-- ROBO                        --> [Otra] ROBO
+-- No esta en la planilla      --> [Unidad M]  No esta en la planilla empleados
+--
+-- ETIQUETAS NUEVAS:
+-- [Granja] Costo Fijo
+-- [Granja] Inversion
+-- [Unidad Reca] Cossto Fijo
+-- [Unidad Reca] Cuenta Comprada
+-- [Granja] Plan de Datos
+-- [Otra] Recepcion de USDT
+-- [Otra] Recepcion de USD
+-- [Otra] Recepcion Dolar Fisico
+-- [Otra] Recepcion Peso Fisico
+--
+-- ETIQUETAS ELIMINADAS (del selector, datos históricos se mantienen):
+-- Fondeo de cuenta
+
+-- Esta migración es solo documentación, no ejecuta cambios en la BD.
+-- Los egresos históricos mantienen sus etiquetas originales.
+
+SELECT 'Migración 021: Documentación de cambio de etiquetas v2 - Sin cambios en datos' AS info;

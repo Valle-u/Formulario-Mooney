@@ -1,13 +1,10 @@
 export const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago"];
 
 export const ETIQUETAS_CON_USUARIO_CASINO = new Set([
-  "Premio Pagado",
-  "Pago de premios duplicado",
-  "Duplicado",
-  "Error Empleado"
+  "[Unidad M] Premio Pagado"
 ]);
 
-export const ETIQUETAS_PREMIO_MINIMO = new Set(["Premio Pagado"]);
+export const ETIQUETAS_PREMIO_MINIMO = new Set(["[Unidad M] Premio Pagado"]);
 
 export const ETIQUETAS_CIERRE_CAJA = new Set([
   "Cierre de Caja"
