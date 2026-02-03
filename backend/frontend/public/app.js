@@ -48,7 +48,6 @@ const ETIQUETAS = [
   "[Unidad M] Redireccion de capital",
   "[Unidad M] Pago de premios duplicado",
   "[Unidad M] Pago LiveChat",
-  "[Unidad M] Pago LiveChatCelu",
   "[Unidad M]  Prueba Casa",
   "[Unidad M]  Duplicado",
   "[Unidad M]  Error Empleado",
@@ -68,7 +67,7 @@ const ETIQUETAS = [
   "[Unidad CRM]Gasto Fijo",
   // Unidad Reca
   "[Unidad Reca]Inversion",
-  "[Unidad Reca] Cossto Fijo",
+  "[Unidad Reca] Costo Fijo",
   "[Unidad Reca] Cuenta Comprada",
   // Granja
   "[Granja] Costo Fijo",
