@@ -63,6 +63,7 @@ const ETIQUETAS = [
   // Publicidad
   "[Publicidad]Gasto Fijo",
   "[Publicidad] Inversion",
+  "[Publicidad] Pago Publicista",
   // Unidad CRM
   "[Unidad CRM]Gasto Fijo",
   // Unidad Reca
