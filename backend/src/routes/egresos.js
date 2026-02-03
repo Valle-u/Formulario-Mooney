@@ -700,6 +700,19 @@ router.get("/", auth, async (req, res) => {
     const r = await query(sql, params);
     const total = r.rows.length > 0 ? Number(r.rows[0].total_count) : 0;
 
+    // Consulta adicional para obtener sumas totales (sin paginación)
+    const sumParams = params.slice(0, -2); // Quitar limit y offset
+    const sumSql = `
+      SELECT
+        COALESCE(SUM(CASE WHEN e.moneda = 'ARS' THEN e.monto ELSE 0 END), 0) AS suma_ars,
+        COALESCE(SUM(CASE WHEN e.moneda = 'USD' THEN e.monto ELSE 0 END), 0) AS suma_usd
+      FROM egresos e
+      JOIN users u ON u.id = e.created_by
+      ${whereClause}
+    `;
+    const sumResult = await query(sumSql, sumParams);
+    const sumas = sumResult.rows[0] || { suma_ars: 0, suma_usd: 0 };
+
     const egresos = r.rows.map(e => ({
       id: e.id,
       fecha: formatFechaDDMMAAAA(e.fecha) || e.fecha,
@@ -747,6 +760,10 @@ router.get("/", auth, async (req, res) => {
         limit: lim,
         offset: off,
         hasMore: off + lim < total
+      },
+      sumas: {
+        ars: Number(sumas.suma_ars),
+        usd: Number(sumas.suma_usd)
       }
     });
   } catch (e) {

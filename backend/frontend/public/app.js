@@ -2077,14 +2077,14 @@ async function buscarEgresos(){
   if(created_by) qs.set("created_by", created_by);
 
   try{
-    const { egresos, pagination } = await api(`/api/egresos?${qs.toString()}`);
-    renderEgresos(egresos, pagination);
+    const { egresos, pagination, sumas } = await api(`/api/egresos?${qs.toString()}`);
+    renderEgresos(egresos, pagination, sumas);
   }catch(err){
     tbody.innerHTML = `<tr><td colspan="11" class="muted">${err.message}</td></tr>`;
   }
 }
 
-function renderEgresos(egresos, pagination){
+function renderEgresos(egresos, pagination, sumas){
   const tbody = document.getElementById("egresosTbody");
   if(!tbody) return;
 
@@ -2147,14 +2147,9 @@ function renderEgresos(egresos, pagination){
   const info = document.getElementById("resultadosInfo");
   if(info) info.textContent = `Total: ${pagination.total} transferencias`;
 
-  // Calcular suma total de montos
-  const sumaARS = egresos
-    .filter(e => (e.moneda || 'ARS') === 'ARS')
-    .reduce((acc, e) => acc + Number(e.monto), 0);
-
-  const sumaUSD = egresos
-    .filter(e => (e.moneda || 'ARS') === 'USD')
-    .reduce((acc, e) => acc + Number(e.monto), 0);
+  // Usar sumas totales del backend (suma de TODAS las páginas con filtros aplicados)
+  const sumaARS = sumas?.ars || 0;
+  const sumaUSD = sumas?.usd || 0;
 
   const sumaTotalEl = document.getElementById("sumaTotal");
   if(sumaTotalEl) {
