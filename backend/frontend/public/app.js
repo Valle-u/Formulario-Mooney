@@ -698,7 +698,9 @@ const STORAGE_KEYS = {
   EMPRESA: 'egreso_recordar_empresa',
   EMPRESA_CHECK: 'egreso_recordar_empresa_check',
   CUENTA_SALIDA: 'egreso_recordar_cuenta_salida',
-  CUENTA_SALIDA_CHECK: 'egreso_recordar_cuenta_salida_check'
+  CUENTA_SALIDA_CHECK: 'egreso_recordar_cuenta_salida_check',
+  ETIQUETA: 'egreso_recordar_etiqueta',
+  ETIQUETA_CHECK: 'egreso_recordar_etiqueta_check'
 };
 
 /**
@@ -772,6 +774,26 @@ function restaurarValoresRecordados() {
       inputCuentaSalida.value = valorGuardado;
     }
   }
+
+  // Restaurar ETIQUETA
+  const recordarEtiqueta = localStorage.getItem(STORAGE_KEYS.ETIQUETA_CHECK) === 'true';
+  const checkboxEtiqueta = document.getElementById('recordar_etiqueta');
+  const inputEtiqueta = document.getElementById('etiqueta');
+
+  if (checkboxEtiqueta) {
+    checkboxEtiqueta.checked = recordarEtiqueta;
+  }
+
+  if (recordarEtiqueta && inputEtiqueta) {
+    const valorGuardado = localStorage.getItem(STORAGE_KEYS.ETIQUETA);
+    if (valorGuardado) {
+      inputEtiqueta.value = valorGuardado;
+      // Disparar eventos para actualizar campos condicionales
+      toggleCasinoUserField();
+      toggleOtroConcepto();
+      toggleCamposPremio();
+    }
+  }
 }
 
 /**
@@ -823,6 +845,20 @@ function conectarRecordarValores() {
       guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
     });
   }
+
+  // Event listeners para ETIQUETA
+  const inputEtiqueta = document.getElementById('etiqueta');
+  const checkboxEtiqueta = document.getElementById('recordar_etiqueta');
+
+  if (inputEtiqueta && checkboxEtiqueta) {
+    inputEtiqueta.addEventListener('change', () => {
+      guardarValorSiRecordado('etiqueta', 'recordar_etiqueta', STORAGE_KEYS.ETIQUETA, STORAGE_KEYS.ETIQUETA_CHECK);
+    });
+
+    checkboxEtiqueta.addEventListener('change', () => {
+      guardarValorSiRecordado('etiqueta', 'recordar_etiqueta', STORAGE_KEYS.ETIQUETA, STORAGE_KEYS.ETIQUETA_CHECK);
+    });
+  }
 }
 
 /**
@@ -845,6 +881,10 @@ function limpiarFormularioConRecordar() {
     cuentaSalida: {
       recordar: document.getElementById('recordar_cuenta_salida')?.checked,
       valor: document.getElementById('cuenta_salida')?.value
+    },
+    etiqueta: {
+      recordar: document.getElementById('recordar_etiqueta')?.checked,
+      valor: document.getElementById('etiqueta')?.value
     }
   };
 
@@ -871,6 +911,13 @@ function limpiarFormularioConRecordar() {
     const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
     if (inputCuentaSalida) inputCuentaSalida.value = valoresRecordados.cuentaSalida.valor;
     if (checkboxCuentaSalida) checkboxCuentaSalida.checked = true;
+  }
+
+  if (valoresRecordados.etiqueta.recordar) {
+    const inputEtiqueta = document.getElementById('etiqueta');
+    const checkboxEtiqueta = document.getElementById('recordar_etiqueta');
+    if (inputEtiqueta) inputEtiqueta.value = valoresRecordados.etiqueta.valor;
+    if (checkboxEtiqueta) checkboxEtiqueta.checked = true;
   }
 
   // Restablecer estados visuales
