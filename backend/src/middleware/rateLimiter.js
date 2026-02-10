@@ -1,18 +1,18 @@
 import rateLimit from "express-rate-limit";
 
-// Rate limiter para login: máximo 5 intentos cada 15 minutos
+// Rate limiter para login: muy permisivo (efectivamente desactivado)
+// Se mantiene como protección mínima contra ataques de fuerza bruta extremos
 export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Máximo 5 intentos
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 100, // 100 intentos por minuto (muy permisivo)
   message: {
-    message: "Demasiados intentos de login. Por favor intentá de nuevo en 15 minutos."
+    message: "Demasiados intentos. Esperá un momento."
   },
-  standardHeaders: true, // Retorna info de rate limit en headers `RateLimit-*`
-  legacyHeaders: false, // Deshabilita headers `X-RateLimit-*`
-  // Handler cuando se excede el límite
+  standardHeaders: true,
+  legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
-      message: "Demasiados intentos de login. Por favor intentá de nuevo en 15 minutos.",
+      message: "Demasiados intentos. Esperá un momento.",
       retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
     });
   }

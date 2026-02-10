@@ -8,8 +8,9 @@ import { loginLimiter } from "../middleware/rateLimiter.js";
 const router = express.Router();
 
 // Configuración de intentos de login
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCK_DURATION_MINUTES = 5;
+// Desactivado: sin bloqueo temporal por intentos fallidos
+const MAX_LOGIN_ATTEMPTS = 999; // Efectivamente ilimitado
+const LOCK_DURATION_MINUTES = 0; // Sin bloqueo
 
 // Aplicar rate limiting al endpoint de login
 router.post("/login", loginLimiter, async (req, res) => {

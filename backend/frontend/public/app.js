@@ -59,6 +59,7 @@ const ETIQUETAS = [
   "[Programacion] Pago de servidor",
   "[Programacion] Pago de fichas",
   "[Programacion] Costo Fijo",
+  "[Programacion] Inversion",
   // Publicidad
   "[Publicidad]Gasto Fijo",
   "[Publicidad] Inversion",
@@ -524,6 +525,25 @@ function toggleCamposPremio(){
       }
     }
   });
+
+  // En flujo USD, también ocultar tipo_transaccion para Cierre de Caja
+  if(IS_USD_PAGE){
+    const wrapTipoTransaccion = document.getElementById("wrap_tipo_transaccion");
+    const selectTipoTransaccion = document.getElementById("tipo_transaccion");
+
+    if(wrapTipoTransaccion && selectTipoTransaccion){
+      wrapTipoTransaccion.classList.toggle("hidden", esCierreCaja);
+
+      if(esCierreCaja){
+        // Para Cierre de Caja, establecer SALIDA por defecto y quitar required
+        selectTipoTransaccion.value = "SALIDA";
+        selectTipoTransaccion.removeAttribute("required");
+      } else {
+        // Restaurar required cuando no es Cierre de Caja
+        selectTipoTransaccion.setAttribute("required", "required");
+      }
+    }
+  }
 }
 
 function fileLabel(){
@@ -2245,7 +2265,11 @@ function mostrarDetalle(e){
     : '<span style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⏳ PENDIENTE</span>';
 
   const user = getUser();
-  const canEdit = (user.role === 'admin' || user.role === 'direccion');
+  // Admin/Direccion pueden editar cualquier egreso, otros usuarios solo los propios
+  const isAdminOrDireccion = (user.role === 'admin' || user.role === 'direccion');
+  const isOwner = e.created_by === user.id;
+  const canEdit = isAdminOrDireccion || isOwner;
+  const canDelete = isAdminOrDireccion || isOwner;
 
   body.innerHTML = `
     <div class="grid">
@@ -2347,7 +2371,7 @@ function mostrarDetalle(e){
             <button class="btn btn-primary btn-editar-egreso" style="flex: 1; min-width: 140px;">
               ✏️ Editar
             </button>
-            ${user.role === 'admin' ? `
+            ${canDelete ? `
               <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
                 🗑️ Eliminar
               </button>
@@ -2456,8 +2480,9 @@ function editarEgresoModal(){
   const body = document.getElementById("detalleBody");
   if(!modal || !body) return;
 
-  // Determinar si es un premio (para mostrar campos condicionales)
+  // Determinar si es un premio o cierre de caja (para campos condicionales)
   const esPremio = ETIQUETAS_CON_USUARIO_CASINO.has(egreso.etiqueta);
+  const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(egreso.etiqueta);
 
   // Formulario de edición con TODOS los campos
   body.innerHTML = `
@@ -2542,14 +2567,14 @@ function editarEgresoModal(){
         <input type="text" id="edit_cuenta_salida" value="${escapeHtml(egreso.cuenta_salida)}" required>
       </div>
 
-      <div class="field span6">
-        <label>ID TRANSFERENCIA *</label>
-        <input type="text" id="edit_id_transferencia" value="${escapeHtml(egreso.id_transferencia)}" required>
+      <div class="field span6 ${esCierreCaja ? 'hidden' : ''}" id="edit_wrap_id_transferencia">
+        <label>ID TRANSFERENCIA ${esCierreCaja ? '' : '*'}</label>
+        <input type="text" id="edit_id_transferencia" value="${escapeHtml(egreso.id_transferencia || '')}" ${esCierreCaja ? '' : 'required'}>
       </div>
 
-      <div class="field span6">
-        <label>CUENTA RECEPTORA *</label>
-        <input type="text" id="edit_cuenta_receptora" value="${escapeHtml(egreso.cuenta_receptora)}" required>
+      <div class="field span6 ${esCierreCaja ? 'hidden' : ''}" id="edit_wrap_cuenta_receptora">
+        <label>CUENTA RECEPTORA ${esCierreCaja ? '' : '*'}</label>
+        <input type="text" id="edit_cuenta_receptora" value="${escapeHtml(egreso.cuenta_receptora || '')}" ${esCierreCaja ? '' : 'required'}>
       </div>
 
       <!-- NOTAS -->
@@ -2594,7 +2619,7 @@ function editarEgresoModal(){
       if(wrapHoraSolicitud) wrapHoraSolicitud.classList.toggle('hidden', !esPremioNuevo);
       if(wrapHoraQuema) wrapHoraQuema.classList.toggle('hidden', !esPremioNuevo);
 
-      // Actualizar required
+      // Actualizar required para premios
       const inputUsuario = document.getElementById('edit_usuario_casino');
       const inputHoraSolicitud = document.getElementById('edit_hora_solicitud_cliente');
       const inputHoraQuema = document.getElementById('edit_hora_quema_fichas');
@@ -2602,6 +2627,20 @@ function editarEgresoModal(){
       if(inputUsuario) inputUsuario.required = esPremioNuevo;
       if(inputHoraSolicitud) inputHoraSolicitud.required = esPremioNuevo;
       if(inputHoraQuema) inputHoraQuema.required = esPremioNuevo;
+
+      // Mostrar/ocultar campos para Cierre de Caja
+      const esCierreCajaNuevo = ETIQUETAS_CIERRE_CAJA.has(etiquetaValue);
+      const wrapIdTransferencia = document.getElementById('edit_wrap_id_transferencia');
+      const wrapCuentaReceptora = document.getElementById('edit_wrap_cuenta_receptora');
+      const inputIdTransferencia = document.getElementById('edit_id_transferencia');
+      const inputCuentaReceptora = document.getElementById('edit_cuenta_receptora');
+
+      if(wrapIdTransferencia) wrapIdTransferencia.classList.toggle('hidden', esCierreCajaNuevo);
+      if(wrapCuentaReceptora) wrapCuentaReceptora.classList.toggle('hidden', esCierreCajaNuevo);
+
+      // Actualizar required para Cierre de Caja
+      if(inputIdTransferencia) inputIdTransferencia.required = !esCierreCajaNuevo;
+      if(inputCuentaReceptora) inputCuentaReceptora.required = !esCierreCajaNuevo;
     });
   }
 

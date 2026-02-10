@@ -13,7 +13,8 @@ import {
   isFutureDateISO,
   parseMontoARSStrict,
   montoToCommaString,
-  requireNonEmpty
+  requireNonEmpty,
+  getEtiquetasEquivalentes
 } from "../utils/validators.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
@@ -598,8 +599,16 @@ router.get("/", auth, async (req, res) => {
     }
 
     if (etiqueta) {
-      params.push(etiqueta);
-      where.push(`e.etiqueta = $${params.length}`);
+      // Buscar etiqueta y sus equivalentes legacy/nuevos
+      const etiquetasEquivalentes = getEtiquetasEquivalentes(etiqueta);
+      if (etiquetasEquivalentes.length === 1) {
+        params.push(etiqueta);
+        where.push(`e.etiqueta = $${params.length}`);
+      } else {
+        // Buscar en todas las etiquetas equivalentes
+        params.push(etiquetasEquivalentes);
+        where.push(`e.etiqueta = ANY($${params.length})`);
+      }
     }
 
     if (status) {
@@ -809,8 +818,16 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
     }
 
     if (etiqueta) {
-      params.push(etiqueta);
-      where.push(`e.etiqueta = $${params.length}`);
+      // Buscar etiqueta y sus equivalentes legacy/nuevos
+      const etiquetasEquivalentes = getEtiquetasEquivalentes(etiqueta);
+      if (etiquetasEquivalentes.length === 1) {
+        params.push(etiqueta);
+        where.push(`e.etiqueta = $${params.length}`);
+      } else {
+        // Buscar en todas las etiquetas equivalentes
+        params.push(etiquetasEquivalentes);
+        where.push(`e.etiqueta = ANY($${params.length})`);
+      }
     }
 
     if (usuario_casino) {
@@ -1096,8 +1113,10 @@ router.get("/debug/uploads", auth, async (req, res) => {
   }
 });
 
-// PUT /api/egresos/:id - Editar egreso (solo admin y direccion)
-router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
+// PUT /api/egresos/:id - Editar egreso
+// Admin/Direccion: puede editar cualquier egreso
+// Empleado/Encargado: solo puede editar sus propios egresos
+router.put("/:id", auth, async (req, res) => {
   try {
 
     const { id } = req.params;
@@ -1132,6 +1151,14 @@ router.put("/:id", auth, requireAdminOrDireccion, async (req, res) => {
     }
 
     const oldEgreso = checkEgreso.rows[0];
+
+    // Verificar permisos: admin/direccion pueden editar cualquiera, otros solo los propios
+    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
+    const isOwner = oldEgreso.created_by === req.user.id;
+
+    if (!isAdminOrDireccion && !isOwner) {
+      return res.status(403).json({ message: "Solo podés editar tus propios egresos" });
+    }
 
     // No permitir editar egresos anulados
     if (oldEgreso.status === 'anulado') {
@@ -1330,14 +1357,11 @@ router.get("/:id/history", auth, async (req, res) => {
   }
 });
 
-// DELETE /api/egresos/:id - Eliminar egreso completamente (solo admin)
+// DELETE /api/egresos/:id - Eliminar egreso completamente
+// Admin/Direccion: puede eliminar cualquier egreso
+// Empleado/Encargado: solo puede eliminar sus propios egresos
 router.delete("/:id", auth, async (req, res) => {
   try {
-    // Solo admin puede eliminar
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Solo administradores pueden eliminar egresos" });
-    }
-
     const { id } = req.params;
 
     // Verificar que el egreso existe
@@ -1351,6 +1375,14 @@ router.delete("/:id", auth, async (req, res) => {
     }
 
     const egreso = checkEgreso.rows[0];
+
+    // Verificar permisos: admin/direccion pueden eliminar cualquiera, otros solo los propios
+    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
+    const isOwner = egreso.created_by === req.user.id;
+
+    if (!isAdminOrDireccion && !isOwner) {
+      return res.status(403).json({ message: "Solo podés eliminar tus propios egresos" });
+    }
 
     // Eliminar el egreso de la base de datos
     await query(

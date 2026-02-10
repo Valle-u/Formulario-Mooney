@@ -10,6 +10,51 @@ export const ETIQUETAS_CIERRE_CAJA = new Set([
   "Cierre de Caja"
 ]);
 
+// Mapa de equivalencias: etiquetas legacy <-> etiquetas nuevas con prefijo
+// Permite buscar por cualquiera de las dos versiones y encontrar ambas
+export const ETIQUETAS_LEGACY_MAP = {
+  // Legacy -> Nueva
+  "Deposito de cliente": "[Unidad M] Deposito de cliente",
+  "Premio Pagado": "[Unidad M] Premio Pagado",
+  "Pago de sueldo": "[Unidad M] Pago de sueldo",
+  "Pago de Utilidades": "[Unidad M] Pago de Utilidades",
+  "Gasto de cuenta": "[Unidad M] Gasto de cuenta",
+  "Transferencia Rechazada": "[Unidad M] Transferencia Rechazada",
+  "IVA": "[Unidad M] IVA",
+  "Adelanto de sueldo": "[Unidad M] Adelanto de sueldo",
+  "Redireccion de capital": "[Unidad M] Redireccion de capital",
+  "Pago de premios duplicado": "[Unidad M] Pago de premios duplicado",
+  "Pago LiveChat": "[Unidad M] Pago LiveChat",
+  "Pago de Estructura": "[Unidad M] Pago de Estructura",
+  "Pago de servidor": "[Programacion] Pago de servidor",
+  "Pago de fichas": "[Programacion] Pago de fichas",
+  "Costo Fijo": "[Programacion] Costo Fijo",
+  "Gasto Fijo": "[Publicidad]Gasto Fijo",
+  "Inversion": "[Publicidad] Inversion"
+};
+
+// Función para obtener etiquetas equivalentes (retorna array con la original y su equivalente si existe)
+export function getEtiquetasEquivalentes(etiqueta) {
+  if (!etiqueta) return [];
+
+  const equivalentes = [etiqueta];
+
+  // Buscar si es una etiqueta legacy
+  if (ETIQUETAS_LEGACY_MAP[etiqueta]) {
+    equivalentes.push(ETIQUETAS_LEGACY_MAP[etiqueta]);
+  }
+
+  // Buscar si es una etiqueta nueva (buscar en valores del mapa)
+  for (const [legacy, nueva] of Object.entries(ETIQUETAS_LEGACY_MAP)) {
+    if (nueva === etiqueta) {
+      equivalentes.push(legacy);
+      break;
+    }
+  }
+
+  return equivalentes;
+}
+
 export function isFutureDateISO(yyyyMmDd) {
   const d = new Date(`${yyyyMmDd}T00:00:00`);
   const today = new Date();
