@@ -332,9 +332,11 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "tipo_transaccion inválido. Debe ser ENTRADA o SALIDA" });
     }
 
-    // Validación: ARS solo puede ser SALIDA
-    if (monedaNorm === "ARS" && tipoTransaccion !== "SALIDA") {
-      return res.status(400).json({ message: "Transacciones ARS solo pueden ser tipo SALIDA" });
+    // Validación: ARS solo puede ser ENTRADA para "[Unidad M] Deposito de cliente"
+    if (monedaNorm === "ARS" && tipoTransaccion === "ENTRADA") {
+      if (etiqueta !== "[Unidad M] Deposito de cliente") {
+        return res.status(400).json({ message: "Transacciones ARS solo pueden ser ENTRADA para 'Deposito de cliente'" });
+      }
     }
 
     const raw = (monto_transferencia_raw || "").trim();
@@ -556,6 +558,67 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     if (String(e?.message || "").includes("Tipo de archivo")) return res.status(400).json({ message: "Solo se permite JPG/PNG/PDF" });
 
     return res.status(500).json({ message: "Error guardando egreso" });
+  }
+});
+
+// GET /api/egresos/saldos - Obtener saldos de todas las cuentas
+// Solo Dirección y Admin pueden ver saldos
+router.get("/saldos", auth, requireAdminOrDireccion, async (req, res) => {
+  try {
+    const { empresa, moneda } = req.query;
+
+    let whereClause = "WHERE status NOT IN ('anulado')";
+    const params = [];
+
+    if (empresa) {
+      params.push(empresa);
+      whereClause += ` AND empresa_salida = $${params.length}`;
+    }
+
+    if (moneda) {
+      params.push(moneda.toUpperCase());
+      whereClause += ` AND moneda = $${params.length}`;
+    }
+
+    const sql = `
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        COALESCE(SUM(
+          CASE
+            WHEN tipo_transaccion = 'ENTRADA' THEN monto
+            WHEN tipo_transaccion = 'SALIDA' THEN -monto
+            ELSE 0
+          END
+        ), 0) AS saldo,
+        MAX(created_at) AS ultima_transaccion,
+        COUNT(*) AS total_transacciones
+      FROM egresos
+      ${whereClause}
+      GROUP BY empresa_salida, cuenta_salida, moneda
+      ORDER BY moneda, empresa_salida, cuenta_salida
+    `;
+
+    const result = await query(sql, params);
+
+    // Separar por moneda
+    const saldosARS = result.rows.filter(r => r.moneda === 'ARS');
+    const saldosUSD = result.rows.filter(r => r.moneda === 'USD');
+
+    // Calcular totales
+    const totalARS = saldosARS.reduce((sum, r) => sum + Number(r.saldo), 0);
+    const totalUSD = saldosUSD.reduce((sum, r) => sum + Number(r.saldo), 0);
+
+    return res.json({
+      saldos: result.rows,
+      saldosARS,
+      saldosUSD,
+      totales: { ARS: totalARS, USD: totalUSD }
+    });
+  } catch (error) {
+    console.error("Error obteniendo saldos:", error);
+    return res.status(500).json({ message: "Error obteniendo saldos" });
   }
 });
 
