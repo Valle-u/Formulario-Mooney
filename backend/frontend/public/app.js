@@ -685,7 +685,10 @@ async function cargarSaldos(){
   if (empresa) qs.set('empresa', empresa);
   if (moneda) qs.set('moneda', moneda);
 
+  // Añadimos filtro de cuenta si está seleccionado
   try {
+    const cuenta = document.getElementById('filtro_cuenta')?.value || '';
+    if (cuenta) qs.set('cuenta', cuenta);
     const data = await api(`/api/egresos/saldos?${qs.toString()}`);
     renderSaldos(data || {});
   } catch(err){
@@ -693,6 +696,14 @@ async function cargarSaldos(){
     toast('❌ Error', err.message, 'error');
   }
 }
+// Ensure cuentas refresh triggers saldos reload after empresa selection
+document.addEventListener('DOMContentLoaded', () => {
+  const cuentaSel = document.getElementById('filtro_cuenta');
+  if (cuentaSel) cuentaSel.addEventListener('change', () => {
+    const emp = document.getElementById('filtro_empresa')?.value || '';
+    if (emp) cargarSaldos();
+  });
+});
 
 function renderSaldos(data){
   const tableARS = document.getElementById('saldosTableARS').getElementsByTagName('tbody')[0];
@@ -785,19 +796,59 @@ function cerrarModal(){
   if (m) m.style.display = 'none';
 }
 
+// Toggle resumen de cuenta en la tabla de saldos
+function toggleResumen(key){
+  const el = document.getElementById(`summary-${key}`);
+  if (!el) return;
+  const isHidden = el.style.display === 'none' || el.style.display === '';
+  el.style.display = isHidden ? 'table-row' : 'none';
+}
+
 /* =========================
    POBLAR FILTROS SALDOS (INICIAL)
    ========================= */
-function populateSaldosFilters(){
+async function loadDistinctEmpresas(){
+  try {
+    const res = await api('/api/egresos/distinct-empresas');
+    return res?.empresas || [];
+  } catch (e) {
+    console.error('Error cargando empresas distintas:', e);
+    return [];
+  }
+}
+
+async function populateSaldosFilters(){
   const sel = document.getElementById('filtro_empresa');
+  const cuentaSel = document.getElementById('filtro_cuenta');
   if(!sel) return;
-  const current = new Set();
-  // Usar EMPRESAS_SALIDA para opciones
-  EMPRESAS_SALIDA.forEach(e => {
-    const opt = document.createElement('option');
-    opt.value = e;
-    opt.text = e;
-    sel.appendChild(opt);
+
+  // Llenar empresas: usar constante si disponible, sino llamar a API
+  const empresas = (typeof EMPRESAS_SALIDA !== 'undefined' && Array.isArray(EMPRESAS_SALIDA) && EMPRESAS_SALIDA.length > 0)
+    ? EMPRESAS_SALIDA
+    : await loadDistinctEmpresas();
+
+  // Limpiar y poblar
+  sel.innerHTML = `<option value="">Seleccionar…</option>` + empresas.map(x => `<option value="${x}">${x}</option>`).join('');
+  // Habilitar/Deshabilitar cuenta según empresa
+  sel.addEventListener('change', async (e) => {
+    const val = e.target.value;
+    if (!cuentaSel) return;
+    cuentaSel.innerHTML = `<option value="">Todas</option>`;
+    cuentaSel.disabled = !val;
+    if (val) {
+      try {
+        const data = await api(`/api/egresos/cuentas?empresa_salida=${encodeURIComponent(val)}`);
+        const cuentas = data?.cuentas || [];
+        cuentas.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.text = c;
+          cuentaSel.appendChild(opt);
+        });
+      } catch(err) {
+        console.error('Error cargando cuentas para empresa', val, err);
+      }
+    }
   });
 }
 
@@ -3554,8 +3605,10 @@ function renderFilaSaldo(s) {
     ? new Date(s.ultima_transaccion).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : "-";
 
+  const key = `${s.empresa_salida}__${s.cuenta_salida}__${s.moneda}`;
+  const resumen = `Entradas: ${Number(s.total_entradas||0)} | Salidas: ${Number(s.total_salidas||0)} | Transacciones: ${Number(s.total_transacciones||0)} | Saldo: ${Number(s.saldo||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | Ultima: ${fechaUltima}`;
   return `
-    <tr>
+    <tr data-empresa="${s.empresa_salida}" data-cuenta="${s.cuenta_salida}" data-moneda="${s.moneda}">
       <td><strong>${escapeHtml(s.empresa_salida)}</strong></td>
       <td>${escapeHtml(s.cuenta_salida)}</td>
       <td style="text-align: right; font-weight: 700; color: ${saldoColor};">
@@ -3564,15 +3617,13 @@ function renderFilaSaldo(s) {
       <td style="text-align: center;">${s.total_transacciones}</td>
       <td>${fechaUltima}</td>
       <td>
-        <button class="btn btn-small btn-primary btn-ver-detalle-cuenta"
-                data-empresa="${escapeHtml(s.empresa_salida)}"
-                data-cuenta="${escapeHtml(s.cuenta_salida)}"
-                data-moneda="${escapeHtml(s.moneda)}">
-          👁️ Ver
-        </button>
+        <button class="btn btn-small btn-primary btn-ver-detalle-cuenta" data-empresa="${escapeHtml(s.empresa_salida)}" data-cuenta="${escapeHtml(s.cuenta_salida)}" data-moneda="${escapeHtml(s.moneda)}">👁️ Ver</button>
+        <button class="btn btn-small btn-ghost" onclick="toggleResumen('${key}')" style="margin-left:6px;">Resumen</button>
       </td>
     </tr>
-  `;
+    <tr id="summary-${key}" class="summary-row" style="display:none;">
+      <td colspan="6" class="muted">${resumen}</td>
+    </tr>`;
 }
 
 // Bind botones de detalle

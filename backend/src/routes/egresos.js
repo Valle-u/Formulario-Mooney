@@ -26,7 +26,41 @@ import { uploadToImgBB, isImgBBConfigured } from "../config/imgbb.js";
 // Notificaciones en tiempo real
 import { sendNotification } from "./notifications.js";
 
-const router = express.Router();
+ const router = express.Router();
+
+// GET distinct empresas (for saldos filter)
+router.get("/distinct-empresas", auth, async (req, res) => {
+  try {
+    const result = await query("SELECT DISTINCT empresa_salida FROM egresos WHERE status NOT IN ('anulado') ORDER BY empresa_salida", []);
+    const empresas = result.rows.map(r => r.empresa_salida);
+    return res.json({ empresas });
+  } catch (error) {
+    console.error("Error obteniendo empresas distintas:", error);
+    return res.status(500).json({ message: "Error obteniendo empresas" });
+  }
+});
+
+// GET cuentas por empresa (para dividir por cuentas de una empresa)
+router.get("/cuentas", auth, async (req, res) => {
+  try {
+    const { empresa_salida, moneda } = req.query;
+    if (!empresa_salida) {
+      return res.status(400).json({ message: "Parámetro 'empresa_salida' requerido" });
+    }
+    let sql = "SELECT DISTINCT cuenta_salida FROM egresos WHERE empresa_salida = $1 AND status NOT IN ('anulado')";
+    const params = [empresa_salida];
+    if (moneda) {
+      sql += ` AND moneda = $${params.length + 1}`;
+      params.push(moneda.toUpperCase());
+    }
+    const r = await query(sql, params);
+    const cuentas = r.rows.map(row => row.cuenta_salida);
+    return res.json({ cuentas });
+  } catch (error) {
+    console.error("Error obteniendo cuentas por empresa:", error);
+    return res.status(500).json({ message: "Error obteniendo cuentas" });
+  }
+});
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 10);
 
@@ -561,11 +595,11 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
   }
 });
 
-// GET /api/egresos/saldos - Obtener saldos de todas las cuentas
+// GET /api/egresos/saldos - Obtener saldos de cuentas (opcional por cuenta)
 // Solo Dirección y Admin pueden ver saldos
 router.get("/saldos", auth, requireAdminOrDireccion, async (req, res) => {
   try {
-    const { empresa, moneda } = req.query;
+    const { empresa, moneda, cuenta } = req.query;
 
     let whereClause = "WHERE status NOT IN ('anulado')";
     const params = [];
@@ -579,19 +613,19 @@ router.get("/saldos", auth, requireAdminOrDireccion, async (req, res) => {
       params.push(moneda.toUpperCase());
       whereClause += ` AND moneda = $${params.length}`;
     }
+    if (cuenta) {
+      params.push(cuenta);
+      whereClause += ` AND cuenta_salida = $${params.length}`;
+    }
 
     const sql = `
       SELECT
         empresa_salida,
         cuenta_salida,
         moneda,
-        COALESCE(SUM(
-          CASE
-            WHEN tipo_transaccion = 'ENTRADA' THEN monto
-            WHEN tipo_transaccion = 'SALIDA' THEN -monto
-            ELSE 0
-          END
-        ), 0) AS saldo,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS total_entradas,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS total_salidas,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto ELSE -monto END), 0) AS saldo,
         MAX(created_at) AS ultima_transaccion,
         COUNT(*) AS total_transacciones
       FROM egresos
