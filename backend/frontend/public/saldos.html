@@ -3,237 +3,128 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MooneyMaker • Saldos de Cuentas</title>
-  <link rel="stylesheet" href="styles.css?v=2026021001"/>
+  <title>MooneyMaker • Saldos</title>
+  <link rel="stylesheet" href="styles.css?v=2026010522"/>
 </head>
 
 <body>
   <div class="app-nosidebar">
 
     <!-- TOPBAR -->
-<header class="topbar">
-  <div class="topbar-inner">
-
-    <!-- Marca -->
-    <div class="topbar-left">
-      <span class="brand">MooneyMaker</span>
-    </div>
-
-    <!-- Botón hamburguesa (solo mobile) -->
-    <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
-
-    <!-- Navegación desktop -->
-    <nav class="topbar-center nav-desktop">
-      <a href="egreso.html" class="nav-item">Retiros</a>
-      <a href="consulta-egresos.html" class="nav-item">Historial</a>
-      <a href="flujo-usd.html" class="nav-item">Flujo USD</a>
-      <a href="saldos.html" class="nav-item active" data-admin-only="1">Saldos</a>
-      <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
-    </nav>
-
-    <!-- Acciones desktop -->
-    <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
-      <span id="whoami" class="user-badge">—</span>
-      <button id="logoutBtn" class="btn-logout">Salir</button>
-    </div>
-  </div>
-
-  <!-- Menú mobile (drawer) -->
-  <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
-    <div class="mobile-drawer-head">
-      <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
-    </div>
-
-    <nav class="mobile-nav">
-      <a href="egreso.html" class="mobile-item">Retiros</a>
-      <a href="consulta-egresos.html" class="mobile-item">Historial</a>
-      <a href="flujo-usd.html" class="mobile-item">Flujo USD</a>
-      <a href="saldos.html" class="mobile-item active" data-admin-only="1">Saldos</a>
-      <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
-      <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
-    </nav>
-
-    <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
-      <div id="whoamiMobile" class="user-badge">—</div>
-      <button id="logoutBtnMobile" class="btn-logout">Salir</button>
-    </div>
-  </div>
-
-  <!-- overlay -->
-  <div class="drawer-overlay" id="drawerOverlay"></div>
-</header>
-
-<!-- Container para toast notifications -->
-<div id="toastContainer" class="toast-container"></div>
-
-    <!-- CONTENT -->
-    <main class="content-wrap">
-      <div class="page">
-
-        <!-- FILTROS -->
-        <section class="card" style="margin-bottom: 24px;">
-          <div class="card-header">
-            💰 Saldos de Cuentas en Tiempo Real
-          </div>
-          <div class="card-body">
-            <div class="grid">
-              <div class="field span4">
-                <label>FILTRAR POR EMPRESA</label>
-                <select id="filtro_empresa">
-                  <option value="">-- Todas --</option>
-                </select>
-              </div>
-              <div class="field span4">
-                <label>FILTRAR POR MONEDA</label>
-                <select id="filtro_moneda">
-                  <option value="">-- Todas --</option>
-                  <option value="ARS">ARS (Pesos)</option>
-                  <option value="USD">USD (Dólares)</option>
-                </select>
-              </div>
-              <div class="field span4" style="display: flex; align-items: flex-end;">
-                <button class="btn btn-primary" id="btnFiltrar" style="width: 100%;">🔍 Filtrar</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TOTALES -->
-        <section class="card" style="margin-bottom: 24px;">
-          <div class="card-body">
-            <div class="grid">
-              <div class="field span6" style="text-align: center; padding: 16px; background: var(--bg-muted); border-radius: 8px;">
-                <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">💵 TOTAL ARS</div>
-                <div id="totalARS" style="font-size: 28px; font-weight: 700; color: var(--text);">$0,00</div>
-              </div>
-              <div class="field span6" style="text-align: center; padding: 16px; background: var(--bg-muted); border-radius: 8px;">
-                <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">💵 TOTAL USD</div>
-                <div id="totalUSD" style="font-size: 28px; font-weight: 700; color: var(--text);">$0,00</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TABLA SALDOS ARS -->
-        <section class="card" style="margin-bottom: 24px;">
-          <div class="card-header" style="background: #0891b2; color: white;">
-            💵 Saldos en PESOS (ARS)
-          </div>
-          <div class="card-body" style="padding: 0;">
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Empresa</th>
-                    <th>Cuenta / Titular</th>
-                    <th style="text-align: right;">Saldo</th>
-                    <th>Transacciones</th>
-                    <th>Última Operación</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="saldosARSBody">
-                  <tr><td colspan="6" class="muted">Cargando...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- TABLA SALDOS USD -->
-        <section class="card">
-          <div class="card-header" style="background: #059669; color: white;">
-            💵 Saldos en DÓLARES (USD)
-          </div>
-          <div class="card-body" style="padding: 0;">
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Empresa</th>
-                    <th>Cuenta / Titular</th>
-                    <th style="text-align: right;">Saldo</th>
-                    <th>Transacciones</th>
-                    <th>Última Operación</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="saldosUSDBody">
-                  <tr><td colspan="6" class="muted">Cargando...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false"><span></span><span></span><span></span></button>
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" class="nav-item">Flujo USD</a>
+          <a href="saldos.html" class="nav-item active" data-admin-only="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+        </nav>
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+          <span id="whoami" class="user-badge">—</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
       </div>
-    </main>
+    </header>
 
+    <div class="drawer-overlay" id="drawerOverlay"></div>
   </div>
 
-  <!-- Modal para detalle de cuenta -->
-  <div id="detalleModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width: 800px;">
-      <div class="modal-header">
-        <h2 id="modalTitle">Detalle de Cuenta</h2>
-        <button class="modal-close" id="cerrarModal">✕</button>
+  <!-- CONTENT -->
+  <main class="content-wrap">
+    <div class="page">
+
+      <section class="card">
+        <div class="card-header">Saldos de Cuentas en Tiempo Real</div>
+        <div class="card-body">
+          <form id="filtrosSaldos" class="grid" onsubmit="return false;">
+            <div class="field span4">
+              <label>EMPRESA</label>
+              <select id="filtro_empresa">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="field span4">
+              <label>MONEDA</label>
+              <select id="filtro_moneda">
+                <option value="">Todas</option>
+                <option value="ARS">ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div class="field span2" style="align-self:flex-end;">
+              <label>&nbsp;</label>
+              <button id="btnCargarSaldos" class="btn btn-primary" type="button">Cargar saldos</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- SALDOS ARS -->
+      <section class="card" id="saldosARSSection" style="margin-top: 20px;">
+        <div class="card-header">ARS - Cuentas</div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="table" id="saldosTableARS">
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Cuenta</th>
+                  <th>Saldo</th>
+                  <th>Última Transacción</th>
+                  <th>Transacciones</th>
+                </tr>
+              </thead>
+              <tbody><tr><td colspan="5" class="muted">Cargá saldos para ARS</td></tr></tbody>
+            </table>
+          </div>
+          <div class="note" id="totalARS" style="margin-top:8px; font-weight:600; color: var(--green);"></div>
+        </div>
+      </section>
+
+      <!-- SALDOS USD -->
+      <section class="card" id="saldosUSDSection" style="margin-top: 20px;">
+        <div class="card-header">USD - Cuentas</div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="table" id="saldosTableUSD">
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Cuenta</th>
+                  <th>Saldo</th>
+                  <th>Última Transacción</th>
+                  <th>Transacciones</th>
+                </tr>
+              </thead>
+              <tbody><tr><td colspan="5" class="muted">Cargá saldos para USD</td></tr></tbody>
+            </table>
+          </div>
+          <div class="note" id="totalUSD" style="margin-top:8px; font-weight:600; color: var(--blue);"></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODAL DETALLE DE TRANSACCIONES -->
+  <div id="detalleModal" class="modal" style="display:none;" aria-label="Detalle de cuenta" aria-modal="true" role="dialog">
+    <div class="modal-backdrop" onclick="cerrarModal()"></div>
+    <div class="modal-content">
+      <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="detalleModalTitle">Transacciones</span>
+        <button type="button" class="btn-close" onclick="cerrarModal()">✕</button>
       </div>
-      <div class="modal-body" id="detalleBody">
-        <!-- Contenido dinámico -->
-      </div>
+      <div id="detalleBody" style="padding: 16px; max-height:60vh; overflow:auto;"></div>
     </div>
   </div>
 
-  <script src="app.js?v=2026021001"></script>
-  <script>
-    // Inicialización específica de página Saldos
-    document.addEventListener("DOMContentLoaded", () => {
-      if (!requireAuth()) return;
-      hydrateTopbar();
-      setupInactivityMonitor();
-      initMobileMenu();
-      initThemeToggle();
-
-      // Poblar select de empresas
-      const selEmpresa = document.getElementById("filtro_empresa");
-      if (selEmpresa) {
-        EMPRESAS_SALIDA.forEach(emp => {
-          const opt = document.createElement("option");
-          opt.value = emp;
-          opt.textContent = emp;
-          selEmpresa.appendChild(opt);
-        });
-      }
-
-      // Cargar saldos inicial
-      cargarSaldos();
-
-      // Botón filtrar
-      document.getElementById("btnFiltrar")?.addEventListener("click", cargarSaldos);
-
-      // Cerrar modal
-      document.getElementById("cerrarModal")?.addEventListener("click", cerrarModalSaldos);
-      document.getElementById("detalleModal")?.addEventListener("click", (e) => {
-        if (e.target.id === "detalleModal") cerrarModalSaldos();
-      });
-
-      // Logout
-      document.getElementById("logoutBtn")?.addEventListener("click", logout);
-      document.getElementById("logoutBtnMobile")?.addEventListener("click", logout);
-    });
-
-    function cerrarModalSaldos() {
-      const modal = document.getElementById("detalleModal");
-      if (modal) modal.style.display = "none";
-    }
-  </script>
+  <script src="app.js?v=2026010522"></script>
 </body>
 </html>
