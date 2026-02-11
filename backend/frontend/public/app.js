@@ -108,6 +108,9 @@ const ETIQUETAS_PREMIO_MINIMO = new Set(["[Unidad M] Premio Pagado"]);
 // Detectar página actual para determinar moneda y tipo
 const IS_USD_PAGE = window.location.pathname.includes('flujo-usd');
 
+// Detectar página de saldos (nueva funcionalidad en tiempo real)
+const IS_SALDOS_PAGE = window.location.pathname.includes('saldos.html');
+
 // Handler para cambiar labels según tipo de transacción
 function handleTipoTransaccionChange() {
   const tipo = document.getElementById("tipo_transaccion")?.value;
@@ -239,6 +242,18 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initPasswordToggles);
 } else {
   initPasswordToggles();
+}
+
+// Saldo en tiempo real: inicializar cuando estamos en la página de saldos
+if (IS_SALDOS_PAGE) {
+  document.addEventListener('DOMContentLoaded', () => {
+    populateSaldosFilters();
+    // Cargar saldos por defecto
+    cargarSaldos();
+    // Botón de recarga manual
+    const btn = document.getElementById('btnCargarSaldos');
+    if (btn) btn.addEventListener('click', cargarSaldos);
+  });
 }
 
 /* =========================
@@ -652,6 +667,135 @@ function wireFechaValidation(){
   // Limpiar validación personalizada al empezar a escribir
   el.addEventListener("input", () => {
     el.setCustomValidity("");
+  });
+}
+
+/* =========================
+   SALDOS EN TIEMPO REAL
+   ========================= */
+// Prototipos de UI para saldos: se cargan en saldos.html
+async function cargarSaldos(){
+  // Lectura de filtros
+  const empresa = document.getElementById('filtro_empresa')?.value || '';
+  const moneda = document.getElementById('filtro_moneda')?.value || '';
+
+  const qs = new URLSearchParams();
+  if (empresa) qs.set('empresa', empresa);
+  if (moneda) qs.set('moneda', moneda);
+
+  try {
+    const data = await api(`/api/egresos/saldos?${qs.toString()}`);
+    renderSaldos(data || {});
+  } catch(err){
+    console.error('Error cargando saldos:', err);
+    toast('❌ Error', err.message, 'error');
+  }
+}
+
+function renderSaldos(data){
+  const tableARS = document.getElementById('saldosTableARS').getElementsByTagName('tbody')[0];
+  const tableUSD = document.getElementById('saldosTableUSD').getElementsByTagName('tbody')[0];
+  if(!tableARS || !tableUSD) return;
+
+  const rowsARS = (data?.saldos || []).filter(r => String(r.moneda || 'ARS') === 'ARS');
+  const rowsUSD = (data?.saldos || []).filter(r => String(r.moneda || 'ARS') === 'USD');
+
+  const toRow = (r) => {
+    const saldo = Number(r.saldo) || 0;
+    const color = saldo >= 0 ? '#1f8f3b' : '#d64545';
+    const ultima = r.ultima_transaccion ? new Date(r.ultima_transaccion).toLocaleString() : '';
+    return `<tr data-empresa="${r.empresa_salida}" data-cuenta="${r.cuenta_salida}" data-moneda="${r.moneda}">
+              <td>${escapeHtml(r.empresa_salida || '')}</td>
+              <td>${escapeHtml(r.cuenta_salida || '')}</td>
+              <td style="color:${color}; font-weight:600;">${Number(saldo).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})} ${r.moneda}</td>
+              <td>${escapeHtml(ultima)}</td>
+              <td>${Number(r.total_transacciones || 0)}</td>
+            </tr>`;
+  };
+
+  tableARS.innerHTML = rowsARS.length
+    ? rowsARS.map(toRow).join('')
+    : '<tr><td colspan="5" class="muted">Sin saldos</td></tr>';
+
+  tableUSD.innerHTML = rowsUSD.length
+    ? rowsUSD.map(toRow).join('')
+    : '<tr><td colspan="5" class="muted">Sin saldos</td></tr>';
+
+  // Totales
+  const totalARS = Number(data?.totales?.ARS || 0);
+  const totalUSD = Number(data?.totales?.USD || 0);
+  const elTotalARS = document.getElementById('totalARS');
+  const elTotalUSD = document.getElementById('totalUSD');
+  if (elTotalARS) elTotalARS.textContent = `Total ARS: ${totalARS.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  if (elTotalUSD) elTotalUSD.textContent = `Total USD: ${totalUSD.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
+
+  // Detalle por cuenta (clic en fila)
+  const rows = tableARS.querySelectorAll('tr');
+  rows.forEach(r => r.style.cursor = 'pointer');
+  tableARS.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const empresa = tr.dataset.empresa;
+      const cuenta = tr.dataset.cuenta;
+      const moneda = tr.dataset.moneda;
+      if (empresa && cuenta && moneda) verDetalleCuenta(empresa, cuenta, moneda);
+    });
+  });
+
+  tableUSD.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const empresa = tr.dataset.empresa;
+      const cuenta = tr.dataset.cuenta;
+      const moneda = tr.dataset.moneda;
+      if (empresa && cuenta && moneda) verDetalleCuenta(empresa, cuenta, moneda);
+    });
+  });
+}
+
+async function verDetalleCuenta(empresa, cuenta, moneda){
+  const url = `/api/egresos?empresa_salida=${encodeURIComponent(empresa)}&cuenta_salida=${encodeURIComponent(cuenta)}&moneda=${encodeURIComponent(moneda)}&limit=20`;
+  try {
+    const data = await api(url);
+    const egresos = data?.egresos || [];
+    const body = document.getElementById('detalleBody');
+    const title = document.getElementById('detalleModalTitle');
+    if (title) title.textContent = `Detalle – ${empresa} / ${cuenta} [${moneda}]`;
+    if (body){
+      if (egresos.length === 0){ body.innerHTML = '<div class="muted">No hay movimientos para esta cuenta.</div>'; }
+      else {
+        const html = egresos.map(e => `
+          <div style="padding:6px 0; border-bottom:1px solid var(--border);">
+            <strong>${e.fecha} ${e.hora}</strong> - ${e.etiqueta} • ${e.monto} ${e.moneda} • ${e.id_transferencia || ''}
+          </div>`).join('');
+        body.innerHTML = html;
+      }
+    }
+    // Mostrar modal
+    const modal = document.getElementById('detalleModal');
+    if (modal){ modal.style.display = 'block'; }
+  } catch(err){
+    console.error('Error obteniendo detalle de cuenta:', err);
+    toast('❌ Error', 'No se pudo obtener el detalle de la cuenta', 'error');
+  }
+}
+
+function cerrarModal(){
+  const m = document.getElementById('detalleModal');
+  if (m) m.style.display = 'none';
+}
+
+/* =========================
+   POBLAR FILTROS SALDOS (INICIAL)
+   ========================= */
+function populateSaldosFilters(){
+  const sel = document.getElementById('filtro_empresa');
+  if(!sel) return;
+  const current = new Set();
+  // Usar EMPRESAS_SALIDA para opciones
+  EMPRESAS_SALIDA.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e;
+    opt.text = e;
+    sel.appendChild(opt);
   });
 }
 
