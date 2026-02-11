@@ -244,17 +244,19 @@ if (document.readyState === 'loading') {
   initPasswordToggles();
 }
 
-// Saldo en tiempo real: inicializar cuando estamos en la página de saldos
-if (IS_SALDOS_PAGE) {
-  document.addEventListener('DOMContentLoaded', () => {
+// Saldo en tiempo real: inicializar
+document.addEventListener('DOMContentLoaded', () => {
+  // Populate filters if present
+  if (typeof EMPRESAS_SALIDA !== 'undefined' && document.getElementById('filtro_empresa')) {
     populateSaldosFilters();
-    // Cargar saldos por defecto
+  }
+  // If on saldos page, load initial saldos
+  if (IS_SALDOS_PAGE) {
     cargarSaldos();
-    // Botón de recarga manual
     const btn = document.getElementById('btnCargarSaldos');
     if (btn) btn.addEventListener('click', cargarSaldos);
-  });
-}
+  }
+});
 
 /* =========================
    STORAGE / AUTH
