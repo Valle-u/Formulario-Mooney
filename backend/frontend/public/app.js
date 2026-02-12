@@ -887,6 +887,9 @@ function autoCalcularTurno() {
 
   if (!horaInput || !turnoSelect) return;
 
+  // No auto-calcular si está en modo manual (Cierre de Caja)
+  if (!turnoSelect.disabled) return;
+
   const hora = horaInput.value;
   const turno = calcularTurnoSegunHora(hora);
 
@@ -902,6 +905,60 @@ function autoCalcularTurno() {
       turnoSugerido.textContent = "Se calcula automáticamente según la hora";
       turnoSugerido.style.color = "";
     }
+  }
+}
+
+/**
+ * Maneja el modo del turno según la etiqueta seleccionada
+ * Para "Cierre de Caja": turno manual, sin hora
+ * Para otras etiquetas: turno automático según hora
+ */
+function toggleModoTurnoCierreCaja() {
+  const etiquetaSelect = document.getElementById("etiqueta");
+  const horaField = document.getElementById("hora");
+  const horaWrapper = horaField?.closest(".field");
+  const turnoSelect = document.getElementById("turno");
+  const turnoLabel = document.querySelector("#wrap_turno label");
+  const turnoSugerido = document.getElementById("turno_sugerido");
+
+  if (!etiquetaSelect || !turnoSelect) return;
+
+  const esCierreCaja = etiquetaSelect.value === "Cierre de Caja";
+
+  if (esCierreCaja) {
+    // Modo manual: ocultar hora, habilitar turno manual
+    if (horaWrapper) {
+      horaWrapper.classList.add("hidden");
+      horaField.removeAttribute("required");
+    }
+
+    turnoSelect.disabled = false;
+    turnoSelect.classList.remove("turno-auto");
+    turnoSelect.value = ""; // Reset para que elija
+
+    if (turnoLabel) {
+      turnoLabel.innerHTML = 'TURNO * <span style="color: #6c757d; font-size: 0.85em;">(Manual)</span>';
+    }
+    if (turnoSugerido) {
+      turnoSugerido.textContent = "Seleccioná el turno del cierre";
+      turnoSugerido.style.color = "";
+    }
+  } else {
+    // Modo automático: mostrar hora, deshabilitar turno
+    if (horaWrapper) {
+      horaWrapper.classList.remove("hidden");
+      horaField.setAttribute("required", "required");
+    }
+
+    turnoSelect.disabled = true;
+    turnoSelect.classList.add("turno-auto");
+
+    if (turnoLabel) {
+      turnoLabel.innerHTML = 'TURNO * <span style="color: #6c757d; font-size: 0.85em;">(Automático)</span>';
+    }
+
+    // Recalcular turno según hora actual
+    autoCalcularTurno();
   }
 }
 
@@ -3177,6 +3234,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
       toggleCasinoUserField();
       toggleOtroConcepto();
       toggleCamposPremio();
+      toggleModoTurnoCierreCaja();
     });
 
     // Listener para tipo_transaccion en páginas USD
