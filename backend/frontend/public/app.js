@@ -3526,6 +3526,9 @@ document.addEventListener("DOMContentLoaded", () => {
    SECCIÓN: SALDOS DE CUENTAS
    ========================= */
 
+// Variables globales para modal de saldos
+let modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [] };
+
 // Inicializar página de saldos
 if (location.pathname.includes("saldos.html")) {
   document.addEventListener("DOMContentLoaded", initSaldosPage);
@@ -3535,7 +3538,7 @@ async function initSaldosPage() {
   // Cargar empresas en el filtro
   await cargarEmpresasFiltroSaldos();
 
-  // Event listeners
+  // Event listeners principales
   const btnCargar = document.getElementById("btnCargarSaldos");
   if (btnCargar) {
     btnCargar.addEventListener("click", cargarSaldos);
@@ -3543,16 +3546,31 @@ async function initSaldosPage() {
 
   const filtroEmpresa = document.getElementById("filtro_empresa");
   if (filtroEmpresa) {
-    filtroEmpresa.addEventListener("change", () => {
-      // Auto-cargar cuando cambia empresa
-      cargarSaldos();
-    });
+    filtroEmpresa.addEventListener("change", cargarSaldos);
   }
 
   const filtroMoneda = document.getElementById("filtro_moneda");
   if (filtroMoneda) {
     filtroMoneda.addEventListener("change", cargarSaldos);
   }
+
+  // Event listeners para cerrar modal
+  const modalCloseBtn = document.getElementById("modalCloseBtn");
+  const modalBackdrop = document.getElementById("modalBackdrop");
+
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener("click", cerrarModalSaldos);
+  }
+  if (modalBackdrop) {
+    modalBackdrop.addEventListener("click", cerrarModalSaldos);
+  }
+
+  // Cerrar modal con Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      cerrarModalSaldos();
+    }
+  });
 
   // Cargar saldos iniciales
   await cargarSaldos();
@@ -3619,7 +3637,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
   }
 
   if (totalUSDEl) {
-    const color = totales.USD >= 0 ? "#10b981" : "#ef4444";
+    const color = totales.USD >= 0 ? "#3b82f6" : "#ef4444";
     totalUSDEl.style.color = color;
     totalUSDEl.textContent = `$${Number(totales.USD).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
@@ -3627,7 +3645,11 @@ function renderSaldosTarjetas(data, empresaFiltro) {
   if (!container) return;
 
   if (saldos.length === 0) {
-    container.innerHTML = '<div class="muted" style="text-align: center; padding: 40px;">No hay cuentas registradas con los filtros seleccionados</div>';
+    container.innerHTML = `
+      <div style="text-align: center; padding: 60px 20px; color: var(--muted);">
+        <div style="font-size: 3rem; margin-bottom: 16px;">📭</div>
+        <div>No hay cuentas registradas con los filtros seleccionados</div>
+      </div>`;
     return;
   }
 
@@ -3647,16 +3669,16 @@ function renderSaldosTarjetas(data, empresaFiltro) {
 
     // Calcular total de la empresa
     const totalEmpresa = cuentas.reduce((sum, c) => sum + Number(c.saldo), 0);
-    const totalClass = totalEmpresa >= 0 ? 'positive' : 'negative';
-    const totalFormatted = totalEmpresa.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const balanceClass = totalEmpresa >= 0 ? '' : 'negative';
+    const totalFormatted = Math.abs(totalEmpresa).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     html += `
       <div class="empresa-section">
-        <div class="empresa-section-header">
+        <div class="empresa-header">
           <h3>🏢 ${escapeHtml(empresa)}</h3>
-          <span class="empresa-total ${totalClass}">Balance: $${totalFormatted}</span>
+          <span class="empresa-balance ${balanceClass}">${totalEmpresa >= 0 ? '+' : '-'}$${totalFormatted}</span>
         </div>
-        <div class="titular-cards">
+        <div class="titulares-grid">
     `;
 
     // Tarjeta por cada titular/cuenta
@@ -3664,7 +3686,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
       const entradas = Number(c.total_entradas || 0);
       const salidas = Number(c.total_salidas || 0);
       const balance = Number(c.saldo || 0);
-      const balanceClass = balance >= 0 ? 'balance-pos' : 'balance-neg';
+      const balanceClass = balance >= 0 ? 'positive' : 'negative';
       const monedaClass = c.moneda === 'ARS' ? 'ars' : 'usd';
 
       const fechaUltima = c.ultima_transaccion
@@ -3674,33 +3696,33 @@ function renderSaldosTarjetas(data, empresaFiltro) {
       html += `
         <div class="titular-card">
           <div class="titular-card-header">
-            <h4>${escapeHtml(c.cuenta_salida || "Sin titular")}</h4>
-            <span class="moneda-badge ${monedaClass}">${c.moneda}</span>
+            <h4 title="${escapeHtml(c.cuenta_salida || "Sin titular")}">${escapeHtml(c.cuenta_salida || "Sin titular")}</h4>
+            <span class="moneda-tag ${monedaClass}">${c.moneda}</span>
           </div>
           <div class="titular-stats">
-            <div class="stat-item">
-              <div class="label">Entradas</div>
-              <div class="value entrada">+$${entradas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="stat-row">
+              <span class="stat-label">📥 Entradas</span>
+              <span class="stat-value entrada">+$${entradas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div class="stat-item">
-              <div class="label">Salidas</div>
-              <div class="value salida">-$${salidas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="stat-row">
+              <span class="stat-label">📤 Salidas</span>
+              <span class="stat-value salida">-$${salidas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div class="stat-item">
-              <div class="label">Balance</div>
-              <div class="value ${balanceClass}">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="stat-row">
+              <span class="stat-label">💰 Balance</span>
+              <span class="stat-value balance ${balanceClass}">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
           <div class="titular-card-footer">
-            <div class="meta">
-              <div>📊 ${c.total_transacciones} transacciones</div>
-              <div>🕒 ${fechaUltima}</div>
+            <div class="meta-info">
+              <span>${c.total_transacciones} operaciones</span>
+              <span>Última: ${fechaUltima}</span>
             </div>
             <button class="btn btn-small btn-primary btn-ver-operaciones"
                     data-empresa="${escapeHtml(c.empresa_salida)}"
                     data-cuenta="${escapeHtml(c.cuenta_salida)}"
                     data-moneda="${c.moneda}">
-              Más info
+              Ver más
             </button>
           </div>
         </div>
@@ -3715,7 +3737,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
 
   container.innerHTML = html;
 
-  // Bind eventos de "Más info"
+  // Bind eventos de "Ver más"
   bindVerOperacionesButtons();
 }
 
@@ -3739,101 +3761,299 @@ async function verOperacionesCuenta(empresa, cuenta, moneda) {
 
   if (!modal || !detalleBody) return;
 
+  // Guardar datos para filtros
+  modalSaldosData.empresa = empresa;
+  modalSaldosData.cuenta = cuenta;
+  modalSaldosData.moneda = moneda;
+
   modalTitle.textContent = `${cuenta} - ${empresa} (${moneda})`;
-  detalleBody.innerHTML = '<div class="muted" style="padding: 20px; text-align: center;">Cargando operaciones...</div>';
+  detalleBody.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--muted);">Cargando operaciones...</div>';
   modal.style.display = "flex";
 
   try {
-    // Buscar egresos de esta cuenta
+    // Buscar egresos de esta cuenta (limit alto para tener todos)
     const qs = new URLSearchParams();
     qs.set("empresa_salida", empresa);
     qs.set("moneda", moneda);
-    qs.set("limit", "100");
+    qs.set("limit", "500");
 
     const { egresos } = await api(`/api/egresos?${qs.toString()}`);
 
     // Filtrar por cuenta_salida
-    const egresosCuenta = egresos.filter(e => e.cuenta_salida === cuenta);
+    modalSaldosData.egresos = egresos.filter(e => e.cuenta_salida === cuenta);
 
-    if (egresosCuenta.length === 0) {
-      detalleBody.innerHTML = '<div class="muted" style="padding: 20px; text-align: center;">No se encontraron operaciones</div>';
-      return;
-    }
+    // Extraer etiquetas únicas para el filtro
+    const etiquetasUnicas = [...new Set(modalSaldosData.egresos.map(e => e.etiqueta).filter(Boolean))].sort();
 
-    // Calcular resumen
-    let totalEntradas = 0, totalSalidas = 0;
-    egresosCuenta.forEach(e => {
-      if (e.status !== 'anulado') {
-        if (e.tipo_transaccion === 'ENTRADA') totalEntradas += Number(e.monto);
-        else totalSalidas += Number(e.monto);
-      }
-    });
-    const balance = totalEntradas - totalSalidas;
+    // Renderizar contenido inicial
+    renderModalOperaciones(modalSaldosData.egresos, etiquetasUnicas);
 
-    detalleBody.innerHTML = `
-      <div style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
-        <div style="background: var(--bg); padding: 12px 16px; border-radius: 6px; flex: 1; min-width: 120px;">
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Total Entradas</div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: #10b981;">+$${totalEntradas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div style="background: var(--bg); padding: 12px 16px; border-radius: 6px; flex: 1; min-width: 120px;">
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Total Salidas</div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">-$${totalSalidas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
-        </div>
-        <div style="background: var(--bg); padding: 12px 16px; border-radius: 6px; flex: 1; min-width: 120px;">
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Balance</div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: ${balance >= 0 ? '#10b981' : '#ef4444'};">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
-        </div>
-      </div>
-
-      <div class="table-wrap" style="max-height: 350px; overflow-y: auto;">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Hora</th>
-              <th>Tipo</th>
-              <th>Etiqueta</th>
-              <th style="text-align: right;">Monto</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${egresosCuenta.map(e => {
-              const monto = Number(e.monto).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              const tipoColor = e.tipo_transaccion === "ENTRADA" ? "#10b981" : "#ef4444";
-              const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "📥" : "📤";
-              const statusBadge = e.status === 'activo'
-                ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Activo</span>'
-                : e.status === 'anulado'
-                ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Anulado</span>'
-                : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Editado</span>';
-
-              return `
-                <tr style="${e.status === 'anulado' ? 'opacity: 0.5; text-decoration: line-through;' : ''}">
-                  <td>${escapeHtml(e.fecha || "-")}</td>
-                  <td>${escapeHtml(e.hora || "-")}</td>
-                  <td style="color: ${tipoColor}; font-weight: 600;">${tipoIcon} ${e.tipo_transaccion}</td>
-                  <td>${escapeHtml(e.etiqueta || "-")}</td>
-                  <td style="text-align: right; font-weight: 600; color: ${tipoColor};">
-                    ${e.tipo_transaccion === "ENTRADA" ? "+" : "-"}$${monto}
-                  </td>
-                  <td>${statusBadge}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
-    `;
   } catch (err) {
     console.error("Error cargando operaciones:", err);
-    detalleBody.innerHTML = `<div class="muted" style="padding: 20px; text-align: center; color: #ef4444;">Error: ${err.message}</div>`;
+    detalleBody.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Error: ${err.message}</div>`;
   }
+}
+
+// Renderizar contenido del modal con filtros
+function renderModalOperaciones(egresos, etiquetasUnicas = []) {
+  const detalleBody = document.getElementById("detalleBody");
+  if (!detalleBody) return;
+
+  // Calcular resumen (solo activos)
+  let totalEntradas = 0, totalSalidas = 0;
+  egresos.forEach(e => {
+    if (e.status !== 'anulado') {
+      if (e.tipo_transaccion === 'ENTRADA') totalEntradas += Number(e.monto);
+      else totalSalidas += Number(e.monto);
+    }
+  });
+  const balance = totalEntradas - totalSalidas;
+
+  // Generar opciones de etiquetas
+  const etiquetaOptions = etiquetasUnicas.map(et => `<option value="${escapeHtml(et)}">${escapeHtml(et)}</option>`).join('');
+
+  detalleBody.innerHTML = `
+    <!-- FILTROS -->
+    <div class="modal-filters">
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label>Fecha desde</label>
+          <input type="date" id="modalFiltroFechaDesde">
+        </div>
+        <div class="filter-group">
+          <label>Fecha hasta</label>
+          <input type="date" id="modalFiltroFechaHasta">
+        </div>
+        <div class="filter-group">
+          <label>Tipo</label>
+          <select id="modalFiltroTipo">
+            <option value="">Todos</option>
+            <option value="ENTRADA">Entradas</option>
+            <option value="SALIDA">Salidas</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Estado</label>
+          <select id="modalFiltroEstado">
+            <option value="">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="editado">Editado</option>
+            <option value="anulado">Anulado</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Etiqueta</label>
+          <select id="modalFiltroEtiqueta">
+            <option value="">Todas</option>
+            ${etiquetaOptions}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Monto mín</label>
+          <input type="number" id="modalFiltroMontoMin" placeholder="0" min="0" step="0.01">
+        </div>
+        <div class="filter-group">
+          <label>Monto máx</label>
+          <input type="number" id="modalFiltroMontoMax" placeholder="∞" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary btn-small" id="btnAplicarFiltrosModal">🔍 Filtrar</button>
+        <button class="btn btn-ghost btn-small" id="btnLimpiarFiltrosModal">Limpiar</button>
+      </div>
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="modal-summary">
+      <div class="summary-card">
+        <div class="summary-label">Total Entradas</div>
+        <div class="summary-value entrada">+$${totalEntradas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Total Salidas</div>
+        <div class="summary-value salida">-$${totalSalidas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Balance</div>
+        <div class="summary-value balance ${balance >= 0 ? 'positive' : 'negative'}">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+      </div>
+    </div>
+
+    <!-- TABLA DE OPERACIONES -->
+    <div class="table-wrap" style="max-height: 300px; overflow-y: auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Tipo</th>
+            <th>Etiqueta</th>
+            <th style="text-align: right;">Monto</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="modalOperacionesBody">
+          ${renderFilasOperaciones(egresos)}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top: 12px; font-size: 0.8rem; color: var(--muted);">
+      Mostrando ${egresos.length} operación(es)
+    </div>
+  `;
+
+  // Bind eventos de filtros
+  bindFiltrosModal(etiquetasUnicas);
+}
+
+// Renderizar filas de la tabla de operaciones
+function renderFilasOperaciones(egresos) {
+  if (egresos.length === 0) {
+    return '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">No hay operaciones con estos filtros</td></tr>';
+  }
+
+  return egresos.map(e => {
+    const monto = Number(e.monto).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tipoColor = e.tipo_transaccion === "ENTRADA" ? "#10b981" : "#ef4444";
+    const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "📥" : "📤";
+
+    let statusBadge = '';
+    if (e.status === 'activo') {
+      statusBadge = '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>';
+    } else if (e.status === 'anulado') {
+      statusBadge = '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Anulado</span>';
+    } else {
+      statusBadge = '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Editado</span>';
+    }
+
+    const rowStyle = e.status === 'anulado' ? 'opacity: 0.5;' : '';
+
+    return `
+      <tr style="${rowStyle}">
+        <td>${escapeHtml(e.fecha || "-")}</td>
+        <td>${escapeHtml(e.hora || "-")}</td>
+        <td style="color: ${tipoColor}; font-weight: 600;">${tipoIcon} ${e.tipo_transaccion}</td>
+        <td>${escapeHtml(e.etiqueta || "-")}</td>
+        <td style="text-align: right; font-weight: 600; color: ${tipoColor};">
+          ${e.tipo_transaccion === "ENTRADA" ? "+" : "-"}$${monto}
+        </td>
+        <td>${statusBadge}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// Bind eventos de filtros del modal
+function bindFiltrosModal(etiquetasUnicas) {
+  const btnAplicar = document.getElementById("btnAplicarFiltrosModal");
+  const btnLimpiar = document.getElementById("btnLimpiarFiltrosModal");
+
+  if (btnAplicar) {
+    btnAplicar.addEventListener("click", () => aplicarFiltrosModal(etiquetasUnicas));
+  }
+
+  if (btnLimpiar) {
+    btnLimpiar.addEventListener("click", () => {
+      // Limpiar todos los filtros
+      document.getElementById("modalFiltroFechaDesde").value = "";
+      document.getElementById("modalFiltroFechaHasta").value = "";
+      document.getElementById("modalFiltroTipo").value = "";
+      document.getElementById("modalFiltroEstado").value = "";
+      document.getElementById("modalFiltroEtiqueta").value = "";
+      document.getElementById("modalFiltroMontoMin").value = "";
+      document.getElementById("modalFiltroMontoMax").value = "";
+      // Aplicar sin filtros
+      aplicarFiltrosModal(etiquetasUnicas);
+    });
+  }
+}
+
+// Aplicar filtros en el modal
+function aplicarFiltrosModal(etiquetasUnicas) {
+  const fechaDesde = document.getElementById("modalFiltroFechaDesde")?.value || "";
+  const fechaHasta = document.getElementById("modalFiltroFechaHasta")?.value || "";
+  const tipo = document.getElementById("modalFiltroTipo")?.value || "";
+  const estado = document.getElementById("modalFiltroEstado")?.value || "";
+  const etiqueta = document.getElementById("modalFiltroEtiqueta")?.value || "";
+  const montoMin = parseFloat(document.getElementById("modalFiltroMontoMin")?.value) || 0;
+  const montoMax = parseFloat(document.getElementById("modalFiltroMontoMax")?.value) || Infinity;
+
+  // Filtrar egresos
+  let filtrados = modalSaldosData.egresos.filter(e => {
+    // Filtro por fecha (convertir dd/mm/yyyy a comparable)
+    if (fechaDesde || fechaHasta) {
+      const fechaEgreso = e.fecha ? convertirFechaADate(e.fecha) : null;
+      if (fechaEgreso) {
+        if (fechaDesde && fechaEgreso < new Date(fechaDesde)) return false;
+        if (fechaHasta && fechaEgreso > new Date(fechaHasta + "T23:59:59")) return false;
+      }
+    }
+
+    // Filtro por tipo
+    if (tipo && e.tipo_transaccion !== tipo) return false;
+
+    // Filtro por estado
+    if (estado && e.status !== estado) return false;
+
+    // Filtro por etiqueta
+    if (etiqueta && e.etiqueta !== etiqueta) return false;
+
+    // Filtro por monto
+    const monto = Number(e.monto);
+    if (monto < montoMin) return false;
+    if (montoMax !== Infinity && monto > montoMax) return false;
+
+    return true;
+  });
+
+  // Actualizar resumen y tabla
+  let totalEntradas = 0, totalSalidas = 0;
+  filtrados.forEach(e => {
+    if (e.status !== 'anulado') {
+      if (e.tipo_transaccion === 'ENTRADA') totalEntradas += Number(e.monto);
+      else totalSalidas += Number(e.monto);
+    }
+  });
+  const balance = totalEntradas - totalSalidas;
+
+  // Actualizar resumen visual
+  const summaryCards = document.querySelectorAll(".summary-card .summary-value");
+  if (summaryCards[0]) summaryCards[0].textContent = `+$${totalEntradas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+  if (summaryCards[1]) summaryCards[1].textContent = `-$${totalSalidas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+  if (summaryCards[2]) {
+    summaryCards[2].textContent = `${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+    summaryCards[2].className = `summary-value balance ${balance >= 0 ? 'positive' : 'negative'}`;
+  }
+
+  // Actualizar tabla
+  const tbody = document.getElementById("modalOperacionesBody");
+  if (tbody) {
+    tbody.innerHTML = renderFilasOperaciones(filtrados);
+  }
+
+  // Actualizar contador
+  const contador = document.querySelector(".modal-body > div:last-child");
+  if (contador) {
+    contador.textContent = `Mostrando ${filtrados.length} operación(es)`;
+  }
+}
+
+// Convertir fecha dd/mm/yyyy a Date
+function convertirFechaADate(fechaStr) {
+  if (!fechaStr) return null;
+  const partes = fechaStr.split("/");
+  if (partes.length === 3) {
+    return new Date(partes[2], partes[1] - 1, partes[0]);
+  }
+  return null;
 }
 
 // Cerrar modal de saldos
 function cerrarModalSaldos() {
   const modal = document.getElementById("detalleModal");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.style.display = "none";
+    // Limpiar datos
+    modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [] };
+  }
 }
