@@ -5,6 +5,104 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Saldos</title>
   <link rel="stylesheet" href="styles.css?v=2026010522"/>
+  <style>
+    /* Estilos para tarjetas de titular */
+    .titular-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .titular-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      transition: box-shadow 0.2s;
+    }
+    .titular-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .titular-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .titular-card-header h4 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .titular-card-header .moneda-badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .moneda-badge.ars { background: #10b981; color: white; }
+    .moneda-badge.usd { background: #3b82f6; color: white; }
+    .titular-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stat-item {
+      text-align: center;
+      padding: 8px;
+      background: var(--bg);
+      border-radius: 6px;
+    }
+    .stat-item .label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .stat-item .value {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .stat-item .value.entrada { color: #10b981; }
+    .stat-item .value.salida { color: #ef4444; }
+    .stat-item .value.balance-pos { color: #10b981; }
+    .stat-item .value.balance-neg { color: #ef4444; }
+    .titular-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .titular-card-footer .meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .empresa-section {
+      margin-top: 24px;
+    }
+    .empresa-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .empresa-section-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+    .empresa-total {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .empresa-total.positive { color: #10b981; }
+    .empresa-total.negative { color: #ef4444; }
+  </style>
 </head>
 
 <body>
@@ -67,6 +165,7 @@
     <main class="content-wrap">
       <div class="page">
 
+        <!-- FILTROS -->
         <section class="card">
           <div class="card-header">Saldos de Cuentas en Tiempo Real</div>
           <div class="card-body">
@@ -78,12 +177,6 @@
                 </select>
               </div>
               <div class="field span4">
-                <label>CUENTA</label>
-                <select id="filtro_cuenta" disabled>
-                  <option value="">Todas</option>
-                </select>
-              </div>
-              <div class="field span4">
                 <label>MONEDA</label>
                 <select id="filtro_moneda">
                   <option value="">Todas</option>
@@ -91,68 +184,44 @@
                   <option value="USD">USD</option>
                 </select>
               </div>
-              <div class="field span2" style="align-self:flex-end;">
-                <label>&nbsp;</label>
+              <div class="field span4" style="align-self:flex-end;">
                 <button id="btnCargarSaldos" class="btn btn-primary" type="button">Cargar saldos</button>
               </div>
             </form>
           </div>
         </section>
 
-        <!-- SALDOS ARS -->
-        <section class="card" id="saldosARSSection" style="margin-top: 20px;">
-          <div class="card-header">ARS - Cuentas</div>
-          <div class="card-body">
-            <div class="table-wrap">
-              <table class="table" id="saldosTableARS">
-                <thead>
-                  <tr>
-                    <th>Empresa</th>
-                    <th>Cuenta</th>
-                    <th>Saldo</th>
-                    <th>Última Transacción</th>
-                    <th>Transacciones</th>
-                  </tr>
-                </thead>
-                <tbody><tr><td colspan="5" class="muted">Cargá saldos para ARS</td></tr></tbody>
-              </table>
+        <!-- RESUMEN TOTALES -->
+        <section class="card" style="margin-top: 16px;">
+          <div class="card-body" style="display: flex; gap: 24px; flex-wrap: wrap;">
+            <div>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Total ARS:</span>
+              <span id="totalARS" style="font-weight: 700; font-size: 1.1rem; margin-left: 8px;">$0,00</span>
             </div>
-            <div class="note" id="totalARS" style="margin-top:8px; font-weight:600; color: var(--green);"></div>
+            <div>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Total USD:</span>
+              <span id="totalUSD" style="font-weight: 700; font-size: 1.1rem; margin-left: 8px;">$0,00</span>
+            </div>
           </div>
         </section>
 
-        <!-- SALDOS USD -->
-        <section class="card" id="saldosUSDSection" style="margin-top: 20px;">
-          <div class="card-header">USD - Cuentas</div>
-          <div class="card-body">
-            <div class="table-wrap">
-              <table class="table" id="saldosTableUSD">
-                <thead>
-                  <tr>
-                    <th>Empresa</th>
-                    <th>Cuenta</th>
-                    <th>Saldo</th>
-                    <th>Última Transacción</th>
-                    <th>Transacciones</th>
-                  </tr>
-                </thead>
-                <tbody><tr><td colspan="5" class="muted">Cargá saldos para USD</td></tr></tbody>
-              </table>
-            </div>
-            <div class="note" id="totalUSD" style="margin-top:8px; font-weight:600; color: var(--blue);"></div>
+        <!-- CONTENEDOR DE SALDOS POR EMPRESA/TITULAR -->
+        <div id="saldosContainer">
+          <div class="muted" style="text-align: center; padding: 40px;">
+            Seleccioná una empresa y hacé click en "Cargar saldos"
           </div>
-        </section>
+        </div>
 
       </div>
     </main>
 
     <!-- MODAL DETALLE DE TRANSACCIONES -->
     <div id="detalleModal" class="modal" style="display:none;" aria-label="Detalle de cuenta" aria-modal="true" role="dialog">
-      <div class="modal-backdrop" onclick="cerrarModal()"></div>
-      <div class="modal-content">
+      <div class="modal-backdrop" onclick="cerrarModalSaldos()"></div>
+      <div class="modal-content" style="max-width: 800px; width: 90%;">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <span id="detalleModalTitle">Transacciones</span>
-          <button type="button" class="btn-close" onclick="cerrarModal()">✕</button>
+          <span id="modalTitle">Transacciones</span>
+          <button type="button" class="btn-close" onclick="cerrarModalSaldos()">✕</button>
         </div>
         <div id="detalleBody" style="padding: 16px; max-height:60vh; overflow:auto;"></div>
       </div>

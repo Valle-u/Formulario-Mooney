@@ -3526,16 +3526,67 @@ document.addEventListener("DOMContentLoaded", () => {
    SECCIÓN: SALDOS DE CUENTAS
    ========================= */
 
+// Inicializar página de saldos
+if (location.pathname.includes("saldos.html")) {
+  document.addEventListener("DOMContentLoaded", initSaldosPage);
+}
+
+async function initSaldosPage() {
+  // Cargar empresas en el filtro
+  await cargarEmpresasFiltroSaldos();
+
+  // Event listeners
+  const btnCargar = document.getElementById("btnCargarSaldos");
+  if (btnCargar) {
+    btnCargar.addEventListener("click", cargarSaldos);
+  }
+
+  const filtroEmpresa = document.getElementById("filtro_empresa");
+  if (filtroEmpresa) {
+    filtroEmpresa.addEventListener("change", () => {
+      // Auto-cargar cuando cambia empresa
+      cargarSaldos();
+    });
+  }
+
+  const filtroMoneda = document.getElementById("filtro_moneda");
+  if (filtroMoneda) {
+    filtroMoneda.addEventListener("change", cargarSaldos);
+  }
+
+  // Cargar saldos iniciales
+  await cargarSaldos();
+}
+
+async function cargarEmpresasFiltroSaldos() {
+  const sel = document.getElementById("filtro_empresa");
+  if (!sel) return;
+
+  try {
+    const data = await api("/api/egresos/empresas-cuentas");
+    if (data && data.empresas) {
+      sel.innerHTML = '<option value="">Todas las empresas</option>';
+      data.empresas.forEach(emp => {
+        const opt = document.createElement("option");
+        opt.value = emp;
+        opt.textContent = emp;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    console.error("Error cargando empresas:", e);
+  }
+}
+
 // Cargar saldos desde API
 async function cargarSaldos() {
   const empresa = document.getElementById("filtro_empresa")?.value || "";
   const moneda = document.getElementById("filtro_moneda")?.value || "";
+  const container = document.getElementById("saldosContainer");
 
-  const saldosARSBody = document.getElementById("saldosARSBody");
-  const saldosUSDBody = document.getElementById("saldosUSDBody");
-
-  if (saldosARSBody) saldosARSBody.innerHTML = '<tr><td colspan="6" class="muted">Cargando...</td></tr>';
-  if (saldosUSDBody) saldosUSDBody.innerHTML = '<tr><td colspan="6" class="muted">Cargando...</td></tr>';
+  if (container) {
+    container.innerHTML = '<div class="muted" style="text-align: center; padding: 40px;">Cargando saldos...</div>';
+  }
 
   try {
     const qs = new URLSearchParams();
@@ -3543,19 +3594,21 @@ async function cargarSaldos() {
     if (moneda) qs.set("moneda", moneda);
 
     const data = await api(`/api/egresos/saldos?${qs.toString()}`);
-    renderSaldos(data);
+    renderSaldosTarjetas(data, empresa);
   } catch (err) {
     console.error("Error cargando saldos:", err);
-    if (saldosARSBody) saldosARSBody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${err.message}</td></tr>`;
-    if (saldosUSDBody) saldosUSDBody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${err.message}</td></tr>`;
+    if (container) {
+      container.innerHTML = `<div class="muted" style="text-align: center; padding: 40px; color: #ef4444;">Error: ${err.message}</div>`;
+    }
   }
 }
 
-// Renderizar tablas de saldos
-function renderSaldos(data) {
-  const { saldosARS, saldosUSD, totales } = data;
+// Renderizar saldos como tarjetas por titular
+function renderSaldosTarjetas(data, empresaFiltro) {
+  const { saldos, totales } = data;
+  const container = document.getElementById("saldosContainer");
 
-  // Actualizar totales
+  // Actualizar totales generales
   const totalARSEl = document.getElementById("totalARS");
   const totalUSDEl = document.getElementById("totalUSD");
 
@@ -3571,105 +3624,170 @@ function renderSaldos(data) {
     totalUSDEl.textContent = `$${Number(totales.USD).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
-  // Renderizar tabla ARS
-  const saldosARSBody = document.getElementById("saldosARSBody");
-  if (saldosARSBody) {
-    if (saldosARS.length === 0) {
-      saldosARSBody.innerHTML = '<tr><td colspan="6" class="muted">No hay cuentas ARS registradas</td></tr>';
-    } else {
-      saldosARSBody.innerHTML = saldosARS.map(s => renderFilaSaldo(s)).join("");
-      bindSaldoDetailButtons(saldosARS);
-    }
+  if (!container) return;
+
+  if (saldos.length === 0) {
+    container.innerHTML = '<div class="muted" style="text-align: center; padding: 40px;">No hay cuentas registradas con los filtros seleccionados</div>';
+    return;
   }
 
-  // Renderizar tabla USD
-  const saldosUSDBody = document.getElementById("saldosUSDBody");
-  if (saldosUSDBody) {
-    if (saldosUSD.length === 0) {
-      saldosUSDBody.innerHTML = '<tr><td colspan="6" class="muted">No hay cuentas USD registradas</td></tr>';
-    } else {
-      saldosUSDBody.innerHTML = saldosUSD.map(s => renderFilaSaldo(s)).join("");
-      bindSaldoDetailButtons(saldosUSD);
-    }
-  }
+  // Agrupar por empresa
+  const porEmpresa = {};
+  saldos.forEach(s => {
+    const emp = s.empresa_salida || "Sin empresa";
+    if (!porEmpresa[emp]) porEmpresa[emp] = [];
+    porEmpresa[emp].push(s);
+  });
+
+  let html = '';
+
+  // Para cada empresa, crear una sección con tarjetas de titulares
+  Object.keys(porEmpresa).sort().forEach(empresa => {
+    const cuentas = porEmpresa[empresa];
+
+    // Calcular total de la empresa
+    const totalEmpresa = cuentas.reduce((sum, c) => sum + Number(c.saldo), 0);
+    const totalClass = totalEmpresa >= 0 ? 'positive' : 'negative';
+    const totalFormatted = totalEmpresa.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    html += `
+      <div class="empresa-section">
+        <div class="empresa-section-header">
+          <h3>🏢 ${escapeHtml(empresa)}</h3>
+          <span class="empresa-total ${totalClass}">Balance: $${totalFormatted}</span>
+        </div>
+        <div class="titular-cards">
+    `;
+
+    // Tarjeta por cada titular/cuenta
+    cuentas.forEach(c => {
+      const entradas = Number(c.total_entradas || 0);
+      const salidas = Number(c.total_salidas || 0);
+      const balance = Number(c.saldo || 0);
+      const balanceClass = balance >= 0 ? 'balance-pos' : 'balance-neg';
+      const monedaClass = c.moneda === 'ARS' ? 'ars' : 'usd';
+
+      const fechaUltima = c.ultima_transaccion
+        ? new Date(c.ultima_transaccion).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "Sin transacciones";
+
+      html += `
+        <div class="titular-card">
+          <div class="titular-card-header">
+            <h4>${escapeHtml(c.cuenta_salida || "Sin titular")}</h4>
+            <span class="moneda-badge ${monedaClass}">${c.moneda}</span>
+          </div>
+          <div class="titular-stats">
+            <div class="stat-item">
+              <div class="label">Entradas</div>
+              <div class="value entrada">+$${entradas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="stat-item">
+              <div class="label">Salidas</div>
+              <div class="value salida">-$${salidas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="stat-item">
+              <div class="label">Balance</div>
+              <div class="value ${balanceClass}">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+          </div>
+          <div class="titular-card-footer">
+            <div class="meta">
+              <div>📊 ${c.total_transacciones} transacciones</div>
+              <div>🕒 ${fechaUltima}</div>
+            </div>
+            <button class="btn btn-small btn-primary btn-ver-operaciones"
+                    data-empresa="${escapeHtml(c.empresa_salida)}"
+                    data-cuenta="${escapeHtml(c.cuenta_salida)}"
+                    data-moneda="${c.moneda}">
+              Más info
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  // Bind eventos de "Más info"
+  bindVerOperacionesButtons();
 }
 
-// Renderizar una fila de saldo
-function renderFilaSaldo(s) {
-  const saldo = Number(s.saldo);
-  const saldoFormatted = saldo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const saldoColor = saldo >= 0 ? "#10b981" : "#ef4444";
-  const saldoSign = saldo >= 0 ? "+" : "";
-
-  const fechaUltima = s.ultima_transaccion
-    ? new Date(s.ultima_transaccion).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
-    : "-";
-
-  const key = `${s.empresa_salida}__${s.cuenta_salida}__${s.moneda}`;
-  const resumen = `Entradas: ${Number(s.total_entradas||0)} | Salidas: ${Number(s.total_salidas||0)} | Transacciones: ${Number(s.total_transacciones||0)} | Saldo: ${Number(s.saldo||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | Ultima: ${fechaUltima}`;
-  return `
-    <tr data-empresa="${s.empresa_salida}" data-cuenta="${s.cuenta_salida}" data-moneda="${s.moneda}">
-      <td><strong>${escapeHtml(s.empresa_salida)}</strong></td>
-      <td>${escapeHtml(s.cuenta_salida)}</td>
-      <td style="text-align: right; font-weight: 700; color: ${saldoColor};">
-        ${saldoSign}$${saldoFormatted}
-      </td>
-      <td style="text-align: center;">${s.total_transacciones}</td>
-      <td>${fechaUltima}</td>
-      <td>
-        <button class="btn btn-small btn-primary btn-ver-detalle-cuenta" data-empresa="${escapeHtml(s.empresa_salida)}" data-cuenta="${escapeHtml(s.cuenta_salida)}" data-moneda="${escapeHtml(s.moneda)}">👁️ Ver</button>
-        <button class="btn btn-small btn-ghost" onclick="toggleResumen('${key}')" style="margin-left:6px;">Resumen</button>
-      </td>
-    </tr>
-    <tr id="summary-${key}" class="summary-row" style="display:none;">
-      <td colspan="6" class="muted">${resumen}</td>
-    </tr>`;
-}
-
-// Bind botones de detalle
-function bindSaldoDetailButtons(saldos) {
-  document.querySelectorAll(".btn-ver-detalle-cuenta").forEach(btn => {
+// Bind botones de "Más info"
+function bindVerOperacionesButtons() {
+  document.querySelectorAll(".btn-ver-operaciones").forEach(btn => {
     btn.addEventListener("click", () => {
       const empresa = btn.dataset.empresa;
       const cuenta = btn.dataset.cuenta;
       const moneda = btn.dataset.moneda;
-      verDetalleCuenta(empresa, cuenta, moneda);
+      verOperacionesCuenta(empresa, cuenta, moneda);
     });
   });
 }
 
-// Ver detalle de transacciones de una cuenta
-async function verDetalleCuenta(empresa, cuenta, moneda) {
+// Ver todas las operaciones de una cuenta (modal)
+async function verOperacionesCuenta(empresa, cuenta, moneda) {
   const modal = document.getElementById("detalleModal");
   const modalTitle = document.getElementById("modalTitle");
   const detalleBody = document.getElementById("detalleBody");
 
   if (!modal || !detalleBody) return;
 
-  modalTitle.textContent = `${empresa} - ${cuenta} (${moneda})`;
-  detalleBody.innerHTML = '<div class="muted" style="padding: 20px; text-align: center;">Cargando transacciones...</div>';
+  modalTitle.textContent = `${cuenta} - ${empresa} (${moneda})`;
+  detalleBody.innerHTML = '<div class="muted" style="padding: 20px; text-align: center;">Cargando operaciones...</div>';
   modal.style.display = "flex";
 
   try {
-    // Buscar últimos 20 egresos de esta cuenta
+    // Buscar egresos de esta cuenta
     const qs = new URLSearchParams();
     qs.set("empresa_salida", empresa);
     qs.set("moneda", moneda);
-    qs.set("limit", "20");
+    qs.set("limit", "100");
 
     const { egresos } = await api(`/api/egresos?${qs.toString()}`);
 
-    // Filtrar por cuenta_salida (el backend no tiene este filtro exacto)
+    // Filtrar por cuenta_salida
     const egresosCuenta = egresos.filter(e => e.cuenta_salida === cuenta);
 
     if (egresosCuenta.length === 0) {
-      detalleBody.innerHTML = '<div class="muted" style="padding: 20px; text-align: center;">No se encontraron transacciones recientes</div>';
+      detalleBody.innerHTML = '<div class="muted" style="padding: 20px; text-align: center;">No se encontraron operaciones</div>';
       return;
     }
 
+    // Calcular resumen
+    let totalEntradas = 0, totalSalidas = 0;
+    egresosCuenta.forEach(e => {
+      if (e.status !== 'anulado') {
+        if (e.tipo_transaccion === 'ENTRADA') totalEntradas += Number(e.monto);
+        else totalSalidas += Number(e.monto);
+      }
+    });
+    const balance = totalEntradas - totalSalidas;
+
     detalleBody.innerHTML = `
-      <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
-        <table>
+      <div style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+        <div style="background: var(--bg); padding: 12px 16px; border-radius: 6px; flex: 1; min-width: 120px;">
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Total Entradas</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: #10b981;">+$${totalEntradas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+        </div>
+        <div style="background: var(--bg); padding: 12px 16px; border-radius: 6px; flex: 1; min-width: 120px;">
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Total Salidas</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">-$${totalSalidas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+        </div>
+        <div style="background: var(--bg); padding: 12px 16px; border-radius: 6px; flex: 1; min-width: 120px;">
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Balance</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: ${balance >= 0 ? '#10b981' : '#ef4444'};">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="max-height: 350px; overflow-y: auto;">
+        <table class="table">
           <thead>
             <tr>
               <th>Fecha</th>
@@ -3686,17 +3804,17 @@ async function verDetalleCuenta(empresa, cuenta, moneda) {
               const tipoColor = e.tipo_transaccion === "ENTRADA" ? "#10b981" : "#ef4444";
               const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "📥" : "📤";
               const statusBadge = e.status === 'activo'
-                ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">✓</span>'
+                ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Activo</span>'
                 : e.status === 'anulado'
-                ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">✗</span>'
-                : '<span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">✏️</span>';
+                ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Anulado</span>'
+                : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Editado</span>';
 
               return `
-                <tr>
-                  <td>${escapeHtml(e.fecha)}</td>
+                <tr style="${e.status === 'anulado' ? 'opacity: 0.5; text-decoration: line-through;' : ''}">
+                  <td>${escapeHtml(e.fecha || "-")}</td>
                   <td>${escapeHtml(e.hora || "-")}</td>
                   <td style="color: ${tipoColor}; font-weight: 600;">${tipoIcon} ${e.tipo_transaccion}</td>
-                  <td>${escapeHtml(e.etiqueta)}</td>
+                  <td>${escapeHtml(e.etiqueta || "-")}</td>
                   <td style="text-align: right; font-weight: 600; color: ${tipoColor};">
                     ${e.tipo_transaccion === "ENTRADA" ? "+" : "-"}$${monto}
                   </td>
@@ -3709,7 +3827,13 @@ async function verDetalleCuenta(empresa, cuenta, moneda) {
       </div>
     `;
   } catch (err) {
-    console.error("Error cargando detalle:", err);
+    console.error("Error cargando operaciones:", err);
     detalleBody.innerHTML = `<div class="muted" style="padding: 20px; text-align: center; color: #ef4444;">Error: ${err.message}</div>`;
   }
+}
+
+// Cerrar modal de saldos
+function cerrarModalSaldos() {
+  const modal = document.getElementById("detalleModal");
+  if (modal) modal.style.display = "none";
 }
