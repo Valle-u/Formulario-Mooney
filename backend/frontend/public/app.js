@@ -39,6 +39,7 @@ const ETIQUETAS = [
   // Unidad M
   "[Unidad M] Deposito de cliente",
   "[Unidad M] Premio Pagado",
+  "[Unidad M] Premio por Sorteo",
   "[Unidad M] Pago de sueldo",
   "[Unidad M] Pago de Utilidades",
   "[Unidad M] Gasto de cuenta",
@@ -3585,7 +3586,7 @@ document.addEventListener("DOMContentLoaded", () => {
    ========================= */
 
 // Variables globales para modal de saldos
-let modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [] };
+let modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [], inicioCaja: 0 };
 
 // Inicializar página de saldos
 if (location.pathname.includes("saldos.html")) {
@@ -3593,6 +3594,9 @@ if (location.pathname.includes("saldos.html")) {
 }
 
 async function initSaldosPage() {
+  // Poblar selector de mes y año
+  poblarSelectorPeriodo();
+
   // Cargar empresas en el filtro
   await cargarEmpresasFiltroSaldos();
 
@@ -3610,6 +3614,16 @@ async function initSaldosPage() {
   const filtroMoneda = document.getElementById("filtro_moneda");
   if (filtroMoneda) {
     filtroMoneda.addEventListener("change", cargarSaldos);
+  }
+
+  const filtroMes = document.getElementById("filtro_mes");
+  if (filtroMes) {
+    filtroMes.addEventListener("change", cargarSaldos);
+  }
+
+  const filtroAnio = document.getElementById("filtro_anio");
+  if (filtroAnio) {
+    filtroAnio.addEventListener("change", cargarSaldos);
   }
 
   // Event listeners para cerrar modal
@@ -3632,6 +3646,36 @@ async function initSaldosPage() {
 
   // Cargar saldos iniciales
   await cargarSaldos();
+}
+
+function poblarSelectorPeriodo() {
+  const selMes = document.getElementById("filtro_mes");
+  const selAnio = document.getElementById("filtro_anio");
+  if (!selMes || !selAnio) return;
+
+  const meses = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+
+  const now = new Date();
+  const mesActual = now.getMonth() + 1;
+  const anioActual = now.getFullYear();
+
+  // Poblar meses
+  selMes.innerHTML = meses.map((nombre, i) =>
+    `<option value="${i + 1}" ${i + 1 === mesActual ? 'selected' : ''}>${nombre}</option>`
+  ).join('');
+
+  // Poblar años (desde 2024 hasta actual)
+  selAnio.innerHTML = '';
+  for (let y = anioActual; y >= 2024; y--) {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    if (y === anioActual) opt.selected = true;
+    selAnio.appendChild(opt);
+  }
 }
 
 async function cargarEmpresasFiltroSaldos() {
@@ -3658,6 +3702,8 @@ async function cargarEmpresasFiltroSaldos() {
 async function cargarSaldos() {
   const empresa = document.getElementById("filtro_empresa")?.value || "";
   const moneda = document.getElementById("filtro_moneda")?.value || "";
+  const mes = document.getElementById("filtro_mes")?.value || "";
+  const anio = document.getElementById("filtro_anio")?.value || "";
   const container = document.getElementById("saldosContainer");
 
   if (container) {
@@ -3668,6 +3714,8 @@ async function cargarSaldos() {
     const qs = new URLSearchParams();
     if (empresa) qs.set("empresa", empresa);
     if (moneda) qs.set("moneda", moneda);
+    if (mes) qs.set("mes", mes);
+    if (anio) qs.set("anio", anio);
 
     const data = await api(`/api/egresos/saldos?${qs.toString()}`);
     renderSaldosTarjetas(data, empresa);
@@ -3741,15 +3789,19 @@ function renderSaldosTarjetas(data, empresaFiltro) {
 
     // Tarjeta por cada titular/cuenta
     cuentas.forEach(c => {
+      const inicioCaja = Number(c.inicio_caja || 0);
       const entradas = Number(c.total_entradas || 0);
       const salidas = Number(c.total_salidas || 0);
       const balance = Number(c.saldo || 0);
       const balanceClass = balance >= 0 ? 'positive' : 'negative';
+      const inicioCajaClass = inicioCaja >= 0 ? 'positive' : 'negative';
       const monedaClass = c.moneda === 'ARS' ? 'ars' : 'usd';
 
       const fechaUltima = c.ultima_transaccion
         ? new Date(c.ultima_transaccion).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
         : "Sin transacciones";
+
+      const fmtNum = (n) => Math.abs(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       html += `
         <div class="titular-card">
@@ -3758,17 +3810,21 @@ function renderSaldosTarjetas(data, empresaFiltro) {
             <span class="moneda-tag ${monedaClass}">${c.moneda}</span>
           </div>
           <div class="titular-stats">
+            <div class="stat-row" style="border-bottom: 1px dashed var(--border); padding-bottom: 6px; margin-bottom: 6px;">
+              <span class="stat-label">🏦 Inicio de Caja</span>
+              <span class="stat-value ${inicioCajaClass}" style="font-weight: 700;">${inicioCaja >= 0 ? '' : '-'}$${fmtNum(inicioCaja)}</span>
+            </div>
             <div class="stat-row">
               <span class="stat-label">📥 Entradas</span>
-              <span class="stat-value entrada">+$${entradas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span class="stat-value entrada">+$${fmtNum(entradas)}</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">📤 Salidas</span>
-              <span class="stat-value salida">-$${salidas.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span class="stat-value salida">-$${fmtNum(salidas)}</span>
             </div>
-            <div class="stat-row">
+            <div class="stat-row" style="border-top: 1px solid var(--border); padding-top: 6px; margin-top: 6px;">
               <span class="stat-label">💰 Balance</span>
-              <span class="stat-value balance ${balanceClass}">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span class="stat-value balance ${balanceClass}" style="font-weight: 700;">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
           <div class="titular-card-footer">
@@ -3824,12 +3880,28 @@ async function verOperacionesCuenta(empresa, cuenta, moneda) {
   modalSaldosData.cuenta = cuenta;
   modalSaldosData.moneda = moneda;
 
-  modalTitle.textContent = `${cuenta} - ${empresa} (${moneda})`;
+  // Obtener período seleccionado
+  const mes = document.getElementById("filtro_mes")?.value || (new Date().getMonth() + 1);
+  const anio = document.getElementById("filtro_anio")?.value || new Date().getFullYear();
+  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+  modalTitle.textContent = `${cuenta} - ${empresa} (${moneda}) - ${meses[mes - 1]} ${anio}`;
   detalleBody.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--muted);">Cargando operaciones...</div>';
   modal.style.display = "flex";
 
   try {
-    // Buscar egresos de esta cuenta (limit alto para tener todos)
+    // Obtener inicio de caja para esta cuenta
+    const qsSaldos = new URLSearchParams();
+    qsSaldos.set("empresa", empresa);
+    qsSaldos.set("cuenta", cuenta);
+    qsSaldos.set("moneda", moneda);
+    qsSaldos.set("mes", mes);
+    qsSaldos.set("anio", anio);
+    const saldoData = await api(`/api/egresos/saldos?${qsSaldos.toString()}`);
+    const cuentaSaldo = saldoData.saldos && saldoData.saldos[0];
+    modalSaldosData.inicioCaja = cuentaSaldo ? Number(cuentaSaldo.inicio_caja || 0) : 0;
+
+    // Buscar egresos de esta cuenta del mes seleccionado
     const qs = new URLSearchParams();
     qs.set("empresa_salida", empresa);
     qs.set("moneda", moneda);
@@ -3837,8 +3909,23 @@ async function verOperacionesCuenta(empresa, cuenta, moneda) {
 
     const { egresos } = await api(`/api/egresos?${qs.toString()}`);
 
-    // Filtrar por cuenta_salida
-    modalSaldosData.egresos = egresos.filter(e => e.cuenta_salida === cuenta);
+    // Filtrar por cuenta_salida y por mes/año
+    const mesNum = parseInt(mes);
+    const anioNum = parseInt(anio);
+    modalSaldosData.egresos = egresos.filter(e => {
+      if (e.cuenta_salida !== cuenta) return false;
+      if (e.etiqueta === 'Cierre de Caja') return false;
+      // Filtrar por mes/año usando fecha dd/mm/yyyy
+      if (e.fecha) {
+        const partes = e.fecha.split("/");
+        if (partes.length === 3) {
+          const m = parseInt(partes[1]);
+          const y = parseInt(partes[2]);
+          return m === mesNum && y === anioNum;
+        }
+      }
+      return false;
+    });
 
     // Extraer etiquetas únicas para el filtro
     const etiquetasUnicas = [...new Set(modalSaldosData.egresos.map(e => e.etiqueta).filter(Boolean))].sort();
@@ -3858,6 +3945,7 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
   if (!detalleBody) return;
 
   // Calcular resumen (solo activos)
+  const inicioCaja = modalSaldosData.inicioCaja || 0;
   let totalEntradas = 0, totalSalidas = 0;
   egresos.forEach(e => {
     if (e.status !== 'anulado') {
@@ -3865,7 +3953,9 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
       else totalSalidas += Number(e.monto);
     }
   });
-  const balance = totalEntradas - totalSalidas;
+  const balance = inicioCaja + totalEntradas - totalSalidas;
+
+  const fmtMoney = (n) => Math.abs(n).toLocaleString("es-AR", { minimumFractionDigits: 2 });
 
   // Generar opciones de etiquetas
   const etiquetaOptions = etiquetasUnicas.map(et => `<option value="${escapeHtml(et)}">${escapeHtml(et)}</option>`).join('');
@@ -3874,14 +3964,6 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
     <!-- FILTROS -->
     <div class="modal-filters">
       <div class="filters-grid">
-        <div class="filter-group">
-          <label>Fecha desde</label>
-          <input type="date" id="modalFiltroFechaDesde">
-        </div>
-        <div class="filter-group">
-          <label>Fecha hasta</label>
-          <input type="date" id="modalFiltroFechaHasta">
-        </div>
         <div class="filter-group">
           <label>Tipo</label>
           <select id="modalFiltroTipo">
@@ -3923,17 +4005,21 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
 
     <!-- RESUMEN -->
     <div class="modal-summary">
-      <div class="summary-card">
-        <div class="summary-label">Total Entradas</div>
-        <div class="summary-value entrada">+$${totalEntradas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+      <div class="summary-card" style="border-left: 3px solid #6366f1;">
+        <div class="summary-label">Inicio de Caja</div>
+        <div class="summary-value" style="color: #6366f1; font-weight: 700;">${inicioCaja >= 0 ? '' : '-'}$${fmtMoney(inicioCaja)}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Total Salidas</div>
-        <div class="summary-value salida">-$${totalSalidas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+        <div class="summary-label">Entradas</div>
+        <div class="summary-value entrada">+$${fmtMoney(totalEntradas)}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">Balance</div>
-        <div class="summary-value balance ${balance >= 0 ? 'positive' : 'negative'}">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
+        <div class="summary-label">Salidas</div>
+        <div class="summary-value salida">-$${fmtMoney(totalSalidas)}</div>
+      </div>
+      <div class="summary-card" style="border-left: 3px solid ${balance >= 0 ? '#10b981' : '#ef4444'};">
+        <div class="summary-label">Balance Final</div>
+        <div class="summary-value balance ${balance >= 0 ? 'positive' : 'negative'}" style="font-weight: 700;">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
       </div>
     </div>
 
@@ -4013,8 +4099,6 @@ function bindFiltrosModal(etiquetasUnicas) {
   if (btnLimpiar) {
     btnLimpiar.addEventListener("click", () => {
       // Limpiar todos los filtros
-      document.getElementById("modalFiltroFechaDesde").value = "";
-      document.getElementById("modalFiltroFechaHasta").value = "";
       document.getElementById("modalFiltroTipo").value = "";
       document.getElementById("modalFiltroEstado").value = "";
       document.getElementById("modalFiltroEtiqueta").value = "";
@@ -4028,8 +4112,6 @@ function bindFiltrosModal(etiquetasUnicas) {
 
 // Aplicar filtros en el modal
 function aplicarFiltrosModal(etiquetasUnicas) {
-  const fechaDesde = document.getElementById("modalFiltroFechaDesde")?.value || "";
-  const fechaHasta = document.getElementById("modalFiltroFechaHasta")?.value || "";
   const tipo = document.getElementById("modalFiltroTipo")?.value || "";
   const estado = document.getElementById("modalFiltroEstado")?.value || "";
   const etiqueta = document.getElementById("modalFiltroEtiqueta")?.value || "";
@@ -4038,25 +4120,10 @@ function aplicarFiltrosModal(etiquetasUnicas) {
 
   // Filtrar egresos
   let filtrados = modalSaldosData.egresos.filter(e => {
-    // Filtro por fecha (convertir dd/mm/yyyy a comparable)
-    if (fechaDesde || fechaHasta) {
-      const fechaEgreso = e.fecha ? convertirFechaADate(e.fecha) : null;
-      if (fechaEgreso) {
-        if (fechaDesde && fechaEgreso < new Date(fechaDesde)) return false;
-        if (fechaHasta && fechaEgreso > new Date(fechaHasta + "T23:59:59")) return false;
-      }
-    }
-
-    // Filtro por tipo
     if (tipo && e.tipo_transaccion !== tipo) return false;
-
-    // Filtro por estado
     if (estado && e.status !== estado) return false;
-
-    // Filtro por etiqueta
     if (etiqueta && e.etiqueta !== etiqueta) return false;
 
-    // Filtro por monto
     const monto = Number(e.monto);
     if (monto < montoMin) return false;
     if (montoMax !== Infinity && monto > montoMax) return false;
@@ -4065,6 +4132,7 @@ function aplicarFiltrosModal(etiquetasUnicas) {
   });
 
   // Actualizar resumen y tabla
+  const inicioCaja = modalSaldosData.inicioCaja || 0;
   let totalEntradas = 0, totalSalidas = 0;
   filtrados.forEach(e => {
     if (e.status !== 'anulado') {
@@ -4072,15 +4140,18 @@ function aplicarFiltrosModal(etiquetasUnicas) {
       else totalSalidas += Number(e.monto);
     }
   });
-  const balance = totalEntradas - totalSalidas;
+  const balance = inicioCaja + totalEntradas - totalSalidas;
 
-  // Actualizar resumen visual
+  const fmtMoney = (n) => Math.abs(n).toLocaleString("es-AR", { minimumFractionDigits: 2 });
+
+  // Actualizar resumen visual (4 cards: inicio, entradas, salidas, balance)
   const summaryCards = document.querySelectorAll(".summary-card .summary-value");
-  if (summaryCards[0]) summaryCards[0].textContent = `+$${totalEntradas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
-  if (summaryCards[1]) summaryCards[1].textContent = `-$${totalSalidas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
-  if (summaryCards[2]) {
-    summaryCards[2].textContent = `${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
-    summaryCards[2].className = `summary-value balance ${balance >= 0 ? 'positive' : 'negative'}`;
+  if (summaryCards[0]) summaryCards[0].textContent = `${inicioCaja >= 0 ? '' : '-'}$${fmtMoney(inicioCaja)}`;
+  if (summaryCards[1]) summaryCards[1].textContent = `+$${fmtMoney(totalEntradas)}`;
+  if (summaryCards[2]) summaryCards[2].textContent = `-$${fmtMoney(totalSalidas)}`;
+  if (summaryCards[3]) {
+    summaryCards[3].textContent = `${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+    summaryCards[3].className = `summary-value balance ${balance >= 0 ? 'positive' : 'negative'}`;
   }
 
   // Actualizar tabla
@@ -4112,6 +4183,6 @@ function cerrarModalSaldos() {
   if (modal) {
     modal.style.display = "none";
     // Limpiar datos
-    modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [] };
+    modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [], inicioCaja: 0 };
   }
 }

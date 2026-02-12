@@ -595,60 +595,162 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
   }
 });
 
-// GET /api/egresos/saldos - Obtener saldos de cuentas (opcional por cuenta)
+// GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
 // Solo Dirección y Admin pueden ver saldos
+// Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
 router.get("/saldos", auth, requireAdminOrDireccion, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
 
-    let whereClause = "WHERE status NOT IN ('anulado')";
-    const params = [];
+    // Determinar mes/año a consultar (por defecto: mes actual)
+    const now = new Date();
+    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
+    const anio = parseInt(req.query.anio) || now.getFullYear();
+
+    // Rango del mes seleccionado (formato ISO para comparar con fecha dd/mm/yyyy)
+    // fecha en DB es texto dd/mm/yyyy, necesitamos convertirlo en la query
+    const mesStr = String(mes).padStart(2, "0");
+    const anioStr = String(anio);
+
+    // Construir filtros comunes
+    let empresaFilter = "";
+    let monedaFilter = "";
+    let cuentaFilter = "";
+    const baseParams = [];
 
     if (empresa) {
-      params.push(empresa);
-      whereClause += ` AND empresa_salida = $${params.length}`;
+      baseParams.push(empresa);
+      empresaFilter = ` AND empresa_salida = $${baseParams.length}`;
     }
-
     if (moneda) {
-      params.push(moneda.toUpperCase());
-      whereClause += ` AND moneda = $${params.length}`;
+      baseParams.push(moneda.toUpperCase());
+      monedaFilter = ` AND moneda = $${baseParams.length}`;
     }
     if (cuenta) {
-      params.push(cuenta);
-      whereClause += ` AND cuenta_salida = $${params.length}`;
+      baseParams.push(cuenta);
+      cuentaFilter = ` AND cuenta_salida = $${baseParams.length}`;
     }
 
-    const sql = `
+    const commonFilter = empresaFilter + monedaFilter + cuentaFilter;
+    const nextParamIdx = baseParams.length + 1;
+
+    // 1) Buscar el Cierre de Caja del mes anterior para cada cuenta
+    //    El cierre de enero se hace el 1/02, cierre de febrero el 1/03, etc.
+    //    Buscamos el último Cierre de Caja cuya fecha sea anterior al mes seleccionado
+    //    Fecha en DB: dd/mm/yyyy → convertimos con TO_DATE para comparar
+    const cierreSql = `
+      SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        monto,
+        fecha,
+        tipo_transaccion
+      FROM egresos
+      WHERE status NOT IN ('anulado')
+        AND etiqueta = 'Cierre de Caja'
+        AND TO_DATE(fecha, 'DD/MM/YYYY') < TO_DATE($${nextParamIdx}, 'DD/MM/YYYY')
+        ${commonFilter}
+      ORDER BY empresa_salida, cuenta_salida, moneda,
+               TO_DATE(fecha, 'DD/MM/YYYY') DESC
+    `;
+
+    // Primer día del mes seleccionado como límite
+    const primerDiaMes = `01/${mesStr}/${anioStr}`;
+    const cierreParams = [...baseParams, primerDiaMes];
+    const cierreResult = await query(cierreSql, cierreParams);
+
+    // Mapear cierres por clave empresa|cuenta|moneda
+    const cierreMap = {};
+    cierreResult.rows.forEach(r => {
+      const key = `${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`;
+      cierreMap[key] = Number(r.monto);
+    });
+
+    // 2) Obtener movimientos del mes (excluyendo Cierre de Caja)
+    //    Filtramos por fecha dentro del mes seleccionado
+    const movSql = `
       SELECT
         empresa_salida,
         cuenta_salida,
         moneda,
         COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS total_entradas,
         COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS total_salidas,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto ELSE -monto END), 0) AS saldo,
         MAX(created_at) AS ultima_transaccion,
         COUNT(*) AS total_transacciones
       FROM egresos
-      ${whereClause}
+      WHERE status NOT IN ('anulado')
+        AND etiqueta != 'Cierre de Caja'
+        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextParamIdx}
+        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextParamIdx + 1}
+        ${commonFilter}
       GROUP BY empresa_salida, cuenta_salida, moneda
       ORDER BY moneda, empresa_salida, cuenta_salida
     `;
 
-    const result = await query(sql, params);
+    const movParams = [...baseParams, mes, anio];
+    const movResult = await query(movSql, movParams);
+
+    // 3) Combinar: inicio_caja (cierre anterior) + movimientos del mes
+    //    También incluir cuentas que tengan cierre pero sin movimientos en el mes
+    const cuentasMap = {};
+
+    // Primero, registrar todas las cuentas que tienen cierre previo
+    for (const [key, inicioCaja] of Object.entries(cierreMap)) {
+      const [emp, cta, mon] = key.split("|");
+      cuentasMap[key] = {
+        empresa_salida: emp,
+        cuenta_salida: cta,
+        moneda: mon,
+        inicio_caja: inicioCaja,
+        total_entradas: 0,
+        total_salidas: 0,
+        saldo: inicioCaja,
+        ultima_transaccion: null,
+        total_transacciones: 0
+      };
+    }
+
+    // Luego, agregar/actualizar con movimientos del mes
+    movResult.rows.forEach(r => {
+      const key = `${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`;
+      const entradas = Number(r.total_entradas);
+      const salidas = Number(r.total_salidas);
+      const inicioCaja = cierreMap[key] || 0;
+
+      cuentasMap[key] = {
+        empresa_salida: r.empresa_salida,
+        cuenta_salida: r.cuenta_salida,
+        moneda: r.moneda,
+        inicio_caja: inicioCaja,
+        total_entradas: entradas,
+        total_salidas: salidas,
+        saldo: inicioCaja + entradas - salidas,
+        ultima_transaccion: r.ultima_transaccion,
+        total_transacciones: Number(r.total_transacciones)
+      };
+    });
+
+    const saldos = Object.values(cuentasMap).sort((a, b) => {
+      if (a.moneda !== b.moneda) return a.moneda.localeCompare(b.moneda);
+      if (a.empresa_salida !== b.empresa_salida) return a.empresa_salida.localeCompare(b.empresa_salida);
+      return a.cuenta_salida.localeCompare(b.cuenta_salida);
+    });
 
     // Separar por moneda
-    const saldosARS = result.rows.filter(r => r.moneda === 'ARS');
-    const saldosUSD = result.rows.filter(r => r.moneda === 'USD');
+    const saldosARS = saldos.filter(r => r.moneda === 'ARS');
+    const saldosUSD = saldos.filter(r => r.moneda === 'USD');
 
     // Calcular totales
-    const totalARS = saldosARS.reduce((sum, r) => sum + Number(r.saldo), 0);
-    const totalUSD = saldosUSD.reduce((sum, r) => sum + Number(r.saldo), 0);
+    const totalARS = saldosARS.reduce((sum, r) => sum + r.saldo, 0);
+    const totalUSD = saldosUSD.reduce((sum, r) => sum + r.saldo, 0);
 
     return res.json({
-      saldos: result.rows,
+      saldos,
       saldosARS,
       saldosUSD,
-      totales: { ARS: totalARS, USD: totalUSD }
+      totales: { ARS: totalARS, USD: totalUSD },
+      periodo: { mes, anio }
     });
   } catch (error) {
     console.error("Error obteniendo saldos:", error);

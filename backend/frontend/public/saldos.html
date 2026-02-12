@@ -441,13 +441,20 @@
           <div class="card-header">Saldos de Cuentas</div>
           <div class="card-body">
             <form id="filtrosSaldos" class="grid" onsubmit="return false;">
-              <div class="field span4">
+              <div class="field span3">
+                <label>PERÍODO</label>
+                <div style="display: flex; gap: 8px;">
+                  <select id="filtro_mes" style="flex: 1;"></select>
+                  <select id="filtro_anio" style="width: 100px;"></select>
+                </div>
+              </div>
+              <div class="field span3">
                 <label>EMPRESA</label>
                 <select id="filtro_empresa">
                   <option value="">Todas las empresas</option>
                 </select>
               </div>
-              <div class="field span4">
+              <div class="field span3">
                 <label>MONEDA</label>
                 <select id="filtro_moneda">
                   <option value="">Todas</option>
@@ -455,7 +462,7 @@
                   <option value="USD">USD (Dólares)</option>
                 </select>
               </div>
-              <div class="field span4" style="align-self:flex-end;">
+              <div class="field span3" style="align-self:flex-end;">
                 <button id="btnCargarSaldos" class="btn btn-primary" type="button">🔄 Actualizar</button>
               </div>
             </form>
