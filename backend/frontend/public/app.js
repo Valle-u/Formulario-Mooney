@@ -3675,7 +3675,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
     html += `
       <div class="empresa-section">
         <div class="empresa-header">
-          <h3>🏢 ${escapeHtml(empresa)}</h3>
+          <h3>${escapeHtml(empresa)}</h3>
           <span class="empresa-balance ${balanceClass}">${totalEmpresa >= 0 ? '+' : '-'}$${totalFormatted}</span>
         </div>
         <div class="titulares-grid">
