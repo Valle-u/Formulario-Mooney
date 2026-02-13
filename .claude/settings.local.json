@@ -8,7 +8,12 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(dir:*)",
-      "Bash(node test-alerts-endpoint.js:*)"
+      "Bash(node test-alerts-endpoint.js:*)",
+      "mcp__Desktop_Commander__get_file_info",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
