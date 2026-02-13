@@ -599,8 +599,11 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 // HELPER: Calcular saldos de un mes dado
 // ═══════════════════════════════════════════════════
 async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
-  const mesStr = String(mes).padStart(2, "0");
-  const anioStr = String(anio);
+  // Robustly derive month/year for filtering
+  const mm = Number.isFinite(Number(mes)) ? Number(mes) : (new Date()).getMonth() + 1;
+  const aa = Number.isFinite(Number(anio)) ? Number(anio) : new Date().getFullYear();
+  const mesStr = String(mm).padStart(2, "0");
+  const anioStr = String(aa);
 
   // Construir filtros comunes
   const baseParams = [];
@@ -658,7 +661,7 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
     ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
   `;
-  const movResult = await query(movSql, [...baseParams, mes, anio]);
+  const movResult = await query(movSql, [...baseParams, mm, aa]);
 
   // 3) Combinar: construir cuentasMap con desglose
   const cuentasMap = {};
