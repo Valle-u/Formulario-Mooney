@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Saldos</title>
+  <link rel="stylesheet" href="styles.css?v=2026010522"/>
+  <style>
+    /* ============================
+       ESTILOS SECCIÓN SALDOS
+       ============================ */
+
+    /* Contenedor principal de saldos */
+    #saldosContainer {
+      margin-top: 20px;
+    }
+
+    /* Sección por empresa */
+    .empresa-section {
+      background: var(--card);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .empresa-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .empresa-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .empresa-header h3::before {
+      content: '';
+      width: 4px;
+      height: 20px;
+      background: var(--blue);
+      border-radius: 2px;
+    }
+
+    .empresa-header .empresa-balance {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #10b981;
+    }
+
+    .empresa-header .empresa-balance.negative {
+      color: #ef4444;
+    }
+
+    /* Grid de tarjetas de titulares */
+    .titulares-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      padding: 20px;
+      background: var(--card2);
+    }
+
+    /* Tarjeta de titular */
+    .titular-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .titular-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    }
+
+    .titular-card-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .titular-card-header h4 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+    }
+
+    .moneda-tag {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .moneda-tag.ars {
+      background: #10b981;
+      color: white;
+    }
+
+    .moneda-tag.usd {
+      background: #3b82f6;
+      color: white;
+    }
+
+    /* Stats del titular */
+    .titular-stats {
+      padding: 16px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+      padding-top: 12px;
+      margin-top: 4px;
+    }
+
+    .stat-row .stat-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-row .stat-value {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .stat-row .stat-value.entrada {
+      color: #10b981;
+    }
+
+    .stat-row .stat-value.salida {
+      color: #ef4444;
+    }
+
+    .stat-row .stat-value.balance {
+      font-size: 1.1rem;
+    }
+
+    .stat-row .stat-value.balance.positive {
+      color: #10b981;
+    }
+
+    .stat-row .stat-value.balance.negative {
+      color: #ef4444;
+    }
+
+    /* Footer de tarjeta */
+    .titular-card-footer {
+      padding: 12px 16px;
+      background: var(--card2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .titular-card-footer .meta-info {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .titular-card-footer .meta-info span {
+      display: block;
+    }
+
+    /* Resumen totales */
+    .totales-bar {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .total-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .total-item .total-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .total-item .total-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    /* Modal mejorado */
+    .modal-content {
+      max-width: 900px;
+      width: 95%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+      border-radius: 4px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .modal-close:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* Filtros en modal */
+    .modal-filters {
+      background: var(--card2);
+      padding: 16px;
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+    }
+
+    .modal-filters .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .modal-filters .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .modal-filters .filter-group label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .modal-filters .filter-group input,
+    .modal-filters .filter-group select {
+      padding: 8px 10px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--card);
+      color: var(--text);
+    }
+
+    .modal-filters .filter-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* Resumen en modal */
+    .modal-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .summary-card {
+      background: var(--card2);
+      padding: 14px;
+      border-radius: var(--radius);
+      text-align: center;
+    }
+
+    .summary-card .summary-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .summary-card .summary-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .summary-card .summary-value.entrada {
+      color: #10b981;
+    }
+
+    .summary-card .summary-value.salida {
+      color: #ef4444;
+    }
+
+    .summary-card .summary-value.balance.positive {
+      color: #10b981;
+    }
+
+    .summary-card .summary-value.balance.negative {
+      color: #ef4444;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .empresa-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+      }
+
+      .titulares-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+
+      .modal-summary {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-filters .filters-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-nosidebar">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" class="nav-item">Flujo USD</a>
+          <a href="saldos.html" class="nav-item active" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+        </nav>
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+          <span id="whoami" class="user-badge">—</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
+      </div>
+
+      <!-- Menú mobile (drawer) -->
+      <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <span class="brand">MooneyMaker</span>
+          <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+        </div>
+
+        <nav class="mobile-nav">
+          <a href="egreso.html" class="mobile-item">Retiros</a>
+          <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+          <a href="flujo-usd.html" class="mobile-item">Flujo USD</a>
+          <a href="saldos.html" class="mobile-item active" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+        </nav>
+
+        <div class="mobile-actions">
+          <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+          <div id="whoamiMobile" class="user-badge">—</div>
+          <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+        </div>
+      </div>
+
+      <!-- overlay -->
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="content-wrap">
+      <div class="page">
+
+        <!-- FILTROS -->
+        <section class="card">
+          <div class="card-header">Saldos de Cuentas</div>
+          <div class="card-body">
+            <form id="filtrosSaldos" class="grid" onsubmit="return false;">
+              <div class="field span3">
+                <label>PERÍODO</label>
+                <div style="display: flex; gap: 8px;">
+                  <select id="filtro_mes" style="flex: 1;"></select>
+                  <select id="filtro_anio" style="width: 100px;"></select>
+                </div>
+              </div>
+              <div class="field span3">
+                <label>EMPRESA</label>
+                <select id="filtro_empresa">
+                  <option value="">Todas las empresas</option>
+                </select>
+              </div>
+              <div class="field span3">
+                <label>MONEDA</label>
+                <select id="filtro_moneda">
+                  <option value="">Todas</option>
+                  <option value="ARS">ARS (Pesos)</option>
+                  <option value="USD">USD (Dólares)</option>
+                </select>
+              </div>
+              <div class="field span3" style="align-self:flex-end;">
+                <button id="btnCargarSaldos" class="btn btn-primary" type="button">🔄 Actualizar</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- RESUMEN TOTALES -->
+        <section class="card" style="margin-top: 16px;">
+          <div class="card-body">
+            <div class="totales-bar">
+              <div class="total-item">
+                <span class="total-label">Total ARS:</span>
+                <span id="totalARS" class="total-value" style="color: #10b981;">$0,00</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">Total USD:</span>
+                <span id="totalUSD" class="total-value" style="color: #3b82f6;">$0,00</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CONTENEDOR DE SALDOS POR EMPRESA/TITULAR -->
+        <div id="saldosContainer">
+          <div style="text-align: center; padding: 60px 20px; color: var(--muted);">
+            <div style="font-size: 3rem; margin-bottom: 16px;">📊</div>
+            <div>Seleccioná una empresa o hacé click en "Actualizar"</div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- MODAL DETALLE DE OPERACIONES -->
+    <div id="detalleModal" class="modal" style="display:none;">
+      <div class="modal-backdrop" id="modalBackdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Operaciones</h3>
+          <button type="button" class="modal-close" id="modalCloseBtn">✕</button>
+        </div>
+        <div class="modal-body" id="detalleBody">
+          <!-- Contenido dinámico -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js?v=2026010522"></script>
+</body>
+</html>
