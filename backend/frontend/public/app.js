@@ -425,6 +425,10 @@ function hydrateTopbar(){
   if(elMobile) elMobile.textContent = `${u.username || "Usuario"} • ${roleLabels[u.role] || u.role || "—"}`;
 
   // Ocultar elementos según permisos
+  // data-admin-strict="1" -> Solo admin
+  document.querySelectorAll("[data-admin-strict='1']")
+    .forEach(a => a.style.display = (u.role === "admin") ? "" : "none");
+
   // data-admin-only="1" -> Solo admin y direccion
   document.querySelectorAll("[data-admin-only='1']")
     .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion") ? "" : "none");

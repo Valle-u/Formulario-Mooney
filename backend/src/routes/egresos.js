@@ -3,7 +3,7 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { query } from "../config/db.js";
-import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
+import { auth, requireAdminOrDireccion, requireAdmin } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
 import {
   EMPRESAS_SALIDA,
@@ -598,7 +598,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 // GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
 // Solo Dirección y Admin pueden ver saldos
 // Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
-router.get("/saldos", auth, requireAdminOrDireccion, async (req, res) => {
+router.get("/saldos", auth, requireAdmin, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
 
