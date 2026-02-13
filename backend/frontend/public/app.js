@@ -1559,6 +1559,15 @@ async function handleEgresoSubmit(e){
       const now = new Date();
       horaValue = now.toTimeString().slice(0,5);
     }
+    // Si es cierre de caja, desactivar required de hora para evitar validaciones innecesarias
+    const horaEl = document.getElementById("hora");
+    if (horaEl) {
+      if (esCierreCajaActual) {
+        horaEl.removeAttribute('required');
+      } else {
+        horaEl.setAttribute('required', 'required');
+      }
+    }
 
     const payload = {
       fecha: document.getElementById("fecha").value,
