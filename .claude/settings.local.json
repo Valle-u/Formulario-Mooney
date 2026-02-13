@@ -8,7 +8,10 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(dir:*)",
-      "Bash(node test-alerts-endpoint.js:*)"
+      "Bash(node test-alerts-endpoint.js:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nstyle\\(saldos\\): header de empresa mas sutil con barra celeste\n\n- Cambiar header de degradado azul a fondo neutro\n- Agregar barra vertical celeste como acento visual\n- Balance con fondo sutil en lugar de badge blanco\n- Colores de texto verde/rojo segun positivo/negativo\n- Remover emoji de empresa \\(la barra es el indicador\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
