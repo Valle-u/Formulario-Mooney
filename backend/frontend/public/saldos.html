@@ -373,6 +373,32 @@
         grid-template-columns: 1fr 1fr;
       }
     }
+
+    /* Badge sin cierre previo */
+    .badge-sin-cierre {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #f59e0b;
+      color: #fff;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Botón outline */
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+    .btn-outline:hover {
+      background: var(--border);
+    }
   </style>
 </head>
 
@@ -462,8 +488,9 @@
                   <option value="USD">USD (Dólares)</option>
                 </select>
               </div>
-              <div class="field span3" style="align-self:flex-end;">
+              <div class="field span3" style="align-self:flex-end; display: flex; gap: 8px;">
                 <button id="btnCargarSaldos" class="btn btn-primary" type="button">🔄 Actualizar</button>
+                <button id="btnExportCSV" class="btn btn-outline" type="button">📥 CSV</button>
               </div>
             </form>
           </div>

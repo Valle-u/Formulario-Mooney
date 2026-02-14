@@ -595,166 +595,244 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
   }
 });
 
-// GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
-// Solo Dirección y Admin pueden ver saldos
-// Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
-router.get("/saldos", auth, requireAdmin, async (req, res) => {
-  try {
-    const { empresa, moneda, cuenta } = req.query;
+// ═══════════════════════════════════════════════════
+// HELPER: Calcular saldos de un mes dado
+// ═══════════════════════════════════════════════════
+async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
+  // Robustly derive month/year for filtering
+  const mm = Number.isFinite(Number(mes)) ? Number(mes) : (new Date()).getMonth() + 1;
+  const aa = Number.isFinite(Number(anio)) ? Number(anio) : new Date().getFullYear();
+  const mesStr = String(mm).padStart(2, "0");
+  const anioStr = String(aa);
 
-    // Determinar mes/año a consultar (por defecto: mes actual)
-    const now = new Date();
-    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
-    const anio = parseInt(req.query.anio) || now.getFullYear();
+  // Construir filtros comunes
+  const baseParams = [];
+  let commonFilter = "";
 
-    // Rango del mes seleccionado (formato ISO para comparar con fecha dd/mm/yyyy)
-    // fecha en DB es texto dd/mm/yyyy, necesitamos convertirlo en la query
-    const mesStr = String(mes).padStart(2, "0");
-    const anioStr = String(anio);
+  if (empresa) {
+    baseParams.push(empresa);
+    commonFilter += ` AND empresa_salida = $${baseParams.length}`;
+  }
+  if (moneda) {
+    baseParams.push(moneda.toUpperCase());
+    commonFilter += ` AND moneda = $${baseParams.length}`;
+  }
+  if (cuenta) {
+    baseParams.push(cuenta);
+    commonFilter += ` AND cuenta_salida = $${baseParams.length}`;
+  }
 
-    // Construir filtros comunes
-    let empresaFilter = "";
-    let monedaFilter = "";
-    let cuentaFilter = "";
-    const baseParams = [];
+  const nextIdx = baseParams.length + 1;
 
-    if (empresa) {
-      baseParams.push(empresa);
-      empresaFilter = ` AND empresa_salida = $${baseParams.length}`;
-    }
-    if (moneda) {
-      baseParams.push(moneda.toUpperCase());
-      monedaFilter = ` AND moneda = $${baseParams.length}`;
-    }
-    if (cuenta) {
-      baseParams.push(cuenta);
-      cuentaFilter = ` AND cuenta_salida = $${baseParams.length}`;
-    }
+  // 1) Cierre de Caja anterior al mes seleccionado
+  const cierreSql = `
+    SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
+      empresa_salida, cuenta_salida, moneda, monto
+    FROM egresos
+    WHERE status NOT IN ('anulado')
+      AND etiqueta = 'Cierre de Caja'
+      AND TO_DATE(fecha, 'DD/MM/YYYY') < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
+      ${commonFilter}
+    ORDER BY empresa_salida, cuenta_salida, moneda,
+             TO_DATE(fecha, 'DD/MM/YYYY') DESC
+  `;
+  const primerDiaMes = `01/${mesStr}/${anioStr}`;
+  const cierreResult = await query(cierreSql, [...baseParams, primerDiaMes]);
 
-    const commonFilter = empresaFilter + monedaFilter + cuentaFilter;
-    const nextParamIdx = baseParams.length + 1;
+  const cierreMap = {};
+  cierreResult.rows.forEach(r => {
+    cierreMap[`${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`] = Number(r.monto);
+  });
 
-    // 1) Buscar el Cierre de Caja del mes anterior para cada cuenta
-    //    El cierre de enero se hace el 1/02, cierre de febrero el 1/03, etc.
-    //    Buscamos el último Cierre de Caja cuya fecha sea anterior al mes seleccionado
-    //    Fecha en DB: dd/mm/yyyy → convertimos con TO_DATE para comparar
-    const cierreSql = `
-      SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
-        empresa_salida,
-        cuenta_salida,
-        moneda,
-        monto,
-        fecha,
-        tipo_transaccion
-      FROM egresos
-      WHERE status NOT IN ('anulado')
-        AND etiqueta = 'Cierre de Caja'
-        AND TO_DATE(fecha, 'DD/MM/YYYY') < TO_DATE($${nextParamIdx}, 'DD/MM/YYYY')
-        ${commonFilter}
-      ORDER BY empresa_salida, cuenta_salida, moneda,
-               TO_DATE(fecha, 'DD/MM/YYYY') DESC
-    `;
+  // 2) Movimientos del mes con desglose por etiqueta (query fusionada)
+  const movSql = `
+    SELECT
+      empresa_salida, cuenta_salida, moneda, etiqueta,
+      COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
+      COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
+      MAX(created_at) AS ultima_transaccion,
+      COUNT(*) AS cnt
+    FROM egresos
+    WHERE status NOT IN ('anulado')
+      AND etiqueta != 'Cierre de Caja'
+      AND EXTRACT(MONTH FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextIdx}
+      AND EXTRACT(YEAR FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextIdx + 1}
+      ${commonFilter}
+    GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
+    ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
+  `;
+  const movResult = await query(movSql, [...baseParams, mm, aa]);
 
-    // Primer día del mes seleccionado como límite
-    const primerDiaMes = `01/${mesStr}/${anioStr}`;
-    const cierreParams = [...baseParams, primerDiaMes];
-    const cierreResult = await query(cierreSql, cierreParams);
+  // 3) Combinar: construir cuentasMap con desglose
+  const cuentasMap = {};
 
-    // Mapear cierres por clave empresa|cuenta|moneda
-    const cierreMap = {};
-    cierreResult.rows.forEach(r => {
-      const key = `${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`;
-      cierreMap[key] = Number(r.monto);
-    });
+  // Cuentas con cierre previo (pueden no tener movimientos este mes)
+  for (const [key, inicioCaja] of Object.entries(cierreMap)) {
+    const [emp, cta, mon] = key.split("|");
+    cuentasMap[key] = {
+      empresa_salida: emp,
+      cuenta_salida: cta,
+      moneda: mon,
+      inicio_caja: inicioCaja,
+      tiene_cierre_previo: true,
+      total_entradas: 0,
+      total_salidas: 0,
+      saldo: inicioCaja,
+      ultima_transaccion: null,
+      total_transacciones: 0,
+      desglose_etiquetas: []
+    };
+  }
 
-    // 2) Obtener movimientos del mes (excluyendo Cierre de Caja)
-    //    Filtramos por fecha dentro del mes seleccionado
-    const movSql = `
-      SELECT
-        empresa_salida,
-        cuenta_salida,
-        moneda,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS total_entradas,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS total_salidas,
-        MAX(created_at) AS ultima_transaccion,
-        COUNT(*) AS total_transacciones
-      FROM egresos
-      WHERE status NOT IN ('anulado')
-        AND etiqueta != 'Cierre de Caja'
-        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextParamIdx}
-        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextParamIdx + 1}
-        ${commonFilter}
-      GROUP BY empresa_salida, cuenta_salida, moneda
-      ORDER BY moneda, empresa_salida, cuenta_salida
-    `;
+  // Agregar movimientos (agrupados por etiqueta → agregar a cuenta)
+  movResult.rows.forEach(r => {
+    const key = `${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`;
+    const entradas = Number(r.entradas);
+    const salidas = Number(r.salidas);
+    const cnt = Number(r.cnt);
 
-    const movParams = [...baseParams, mes, anio];
-    const movResult = await query(movSql, movParams);
-
-    // 3) Combinar: inicio_caja (cierre anterior) + movimientos del mes
-    //    También incluir cuentas que tengan cierre pero sin movimientos en el mes
-    const cuentasMap = {};
-
-    // Primero, registrar todas las cuentas que tienen cierre previo
-    for (const [key, inicioCaja] of Object.entries(cierreMap)) {
-      const [emp, cta, mon] = key.split("|");
-      cuentasMap[key] = {
-        empresa_salida: emp,
-        cuenta_salida: cta,
-        moneda: mon,
-        inicio_caja: inicioCaja,
-        total_entradas: 0,
-        total_salidas: 0,
-        saldo: inicioCaja,
-        ultima_transaccion: null,
-        total_transacciones: 0
-      };
-    }
-
-    // Luego, agregar/actualizar con movimientos del mes
-    movResult.rows.forEach(r => {
-      const key = `${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`;
-      const entradas = Number(r.total_entradas);
-      const salidas = Number(r.total_salidas);
+    if (!cuentasMap[key]) {
       const inicioCaja = cierreMap[key] || 0;
-
       cuentasMap[key] = {
         empresa_salida: r.empresa_salida,
         cuenta_salida: r.cuenta_salida,
         moneda: r.moneda,
         inicio_caja: inicioCaja,
-        total_entradas: entradas,
-        total_salidas: salidas,
-        saldo: inicioCaja + entradas - salidas,
-        ultima_transaccion: r.ultima_transaccion,
-        total_transacciones: Number(r.total_transacciones)
+        tiene_cierre_previo: !!cierreMap[key],
+        total_entradas: 0,
+        total_salidas: 0,
+        saldo: inicioCaja,
+        ultima_transaccion: null,
+        total_transacciones: 0,
+        desglose_etiquetas: []
       };
+    }
+
+    const c = cuentasMap[key];
+    c.total_entradas += entradas;
+    c.total_salidas += salidas;
+    c.total_transacciones += cnt;
+    if (r.ultima_transaccion && (!c.ultima_transaccion || r.ultima_transaccion > c.ultima_transaccion)) {
+      c.ultima_transaccion = r.ultima_transaccion;
+    }
+
+    // Desglose por etiqueta
+    c.desglose_etiquetas.push({
+      etiqueta: r.etiqueta,
+      entradas,
+      salidas,
+      total: entradas + salidas,
+      count: cnt
+    });
+  });
+
+  // Calcular saldo final y ordenar desglose
+  for (const c of Object.values(cuentasMap)) {
+    c.saldo = c.inicio_caja + c.total_entradas - c.total_salidas;
+    c.desglose_etiquetas.sort((a, b) => b.total - a.total);
+  }
+
+  const saldos = Object.values(cuentasMap).sort((a, b) => {
+    if (a.moneda !== b.moneda) return a.moneda.localeCompare(b.moneda);
+    if (a.empresa_salida !== b.empresa_salida) return a.empresa_salida.localeCompare(b.empresa_salida);
+    return a.cuenta_salida.localeCompare(b.cuenta_salida);
+  });
+
+  return { saldos, periodo: { mes, anio } };
+}
+
+// GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
+// Solo Admin puede ver saldos
+// Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
+router.get("/saldos", auth, requireAdmin, async (req, res) => {
+  try {
+    const { empresa, moneda, cuenta } = req.query;
+    const now = new Date();
+    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
+    const anio = parseInt(req.query.anio) || now.getFullYear();
+
+    // Calcular saldos del mes actual
+    const current = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
+
+    // Calcular saldos del mes anterior (para comparación)
+    let prevMes = mes - 1;
+    let prevAnio = anio;
+    if (prevMes < 1) { prevMes = 12; prevAnio--; }
+
+    const prev = await computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio });
+
+    // Mapear saldos anteriores por clave
+    const prevMap = {};
+    prev.saldos.forEach(s => {
+      prevMap[`${s.empresa_salida}|${s.cuenta_salida}|${s.moneda}`] = s.saldo;
     });
 
-    const saldos = Object.values(cuentasMap).sort((a, b) => {
-      if (a.moneda !== b.moneda) return a.moneda.localeCompare(b.moneda);
-      if (a.empresa_salida !== b.empresa_salida) return a.empresa_salida.localeCompare(b.empresa_salida);
-      return a.cuenta_salida.localeCompare(b.cuenta_salida);
+    // Agregar comparación a cada cuenta
+    current.saldos.forEach(s => {
+      const key = `${s.empresa_salida}|${s.cuenta_salida}|${s.moneda}`;
+      const prevSaldo = prevMap[key];
+      if (prevSaldo !== undefined) {
+        s.saldo_anterior = prevSaldo;
+        s.diferencia = s.saldo - prevSaldo;
+        s.diferencia_pct = prevSaldo !== 0
+          ? Math.round(((s.saldo - prevSaldo) / Math.abs(prevSaldo)) * 1000) / 10
+          : null;
+      } else {
+        s.saldo_anterior = null;
+        s.diferencia = null;
+        s.diferencia_pct = null;
+      }
     });
 
     // Separar por moneda
-    const saldosARS = saldos.filter(r => r.moneda === 'ARS');
-    const saldosUSD = saldos.filter(r => r.moneda === 'USD');
-
-    // Calcular totales
+    const saldosARS = current.saldos.filter(r => r.moneda === 'ARS');
+    const saldosUSD = current.saldos.filter(r => r.moneda === 'USD');
     const totalARS = saldosARS.reduce((sum, r) => sum + r.saldo, 0);
     const totalUSD = saldosUSD.reduce((sum, r) => sum + r.saldo, 0);
 
     return res.json({
-      saldos,
+      saldos: current.saldos,
       saldosARS,
       saldosUSD,
       totales: { ARS: totalARS, USD: totalUSD },
-      periodo: { mes, anio }
+      periodo: current.periodo
     });
   } catch (error) {
     console.error("Error obteniendo saldos:", error);
     return res.status(500).json({ message: "Error obteniendo saldos" });
+  }
+});
+
+// GET /api/egresos/saldos/csv - Exportar saldos a CSV
+router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
+  try {
+    const { empresa, moneda, cuenta } = req.query;
+    const now = new Date();
+    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
+    const anio = parseInt(req.query.anio) || now.getFullYear();
+
+    const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
+
+    const columns = ["Empresa", "Cuenta", "Moneda", "Inicio Caja", "Entradas", "Salidas", "Balance", "Cant. Operaciones"];
+    const rows = saldos.map(s => [
+      s.empresa_salida,
+      s.cuenta_salida,
+      s.moneda,
+      s.inicio_caja.toFixed(2),
+      s.total_entradas.toFixed(2),
+      s.total_salidas.toFixed(2),
+      s.saldo.toFixed(2),
+      s.total_transacciones
+    ]);
+
+    const mesStr = String(mes).padStart(2, "0");
+    const csv = withBOM(toCSV({ columns, rows }));
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="saldos_${mesStr}_${anio}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    console.error("Error exportando saldos CSV:", error);
+    return res.status(500).json({ message: "Error exportando saldos" });
   }
 });
 

@@ -1550,9 +1550,28 @@ async function handleEgresoSubmit(e){
       turnoSelect.disabled = false;
     }
 
+    // Determine if cierre de caja
+    const etiquetaActual = document.getElementById("etiqueta").value;
+    const esCierreCajaActual = ETIQUETAS_CIERRE_CAJA.has(etiquetaActual);
+    // Hora: si cierre de caja, usar hora actual
+    let horaValue = document.getElementById("hora")?.value || "";
+    if (esCierreCajaActual) {
+      const now = new Date();
+      horaValue = now.toTimeString().slice(0,5);
+    }
+    // Si es cierre de caja, desactivar required de hora para evitar validaciones innecesarias
+    const horaEl = document.getElementById("hora");
+    if (horaEl) {
+      if (esCierreCajaActual) {
+        horaEl.removeAttribute('required');
+      } else {
+        horaEl.setAttribute('required', 'required');
+      }
+    }
+
     const payload = {
       fecha: document.getElementById("fecha").value,
-      hora: document.getElementById("hora").value,
+      hora: horaValue,
       turno: document.getElementById("turno").value,
       hora_solicitud_cliente: document.getElementById("hora_solicitud_cliente")?.value || "",
       hora_quema_fichas: document.getElementById("hora_quema_fichas")?.value || "",
@@ -1560,13 +1579,13 @@ async function handleEgresoSubmit(e){
       moneda: IS_USD_PAGE ? "USD" : (document.getElementById("moneda")?.value || "ARS"),
       tipo_transaccion: IS_USD_PAGE
         ? document.getElementById("tipo_transaccion")?.value
-        : (document.getElementById("etiqueta")?.value === "[Unidad M] Deposito de cliente" ? "ENTRADA" : "SALIDA"),
+        : (etiquetaActual === "[Unidad M] Deposito de cliente" ? "ENTRADA" : "SALIDA"),
       cuenta_receptora: document.getElementById("cuenta_receptora").value.trim(),
       usuario_casino: document.getElementById("usuario_casino").value.trim(),
       cuenta_salida: document.getElementById("cuenta_salida").value.trim(),
       empresa_cuenta_salida: document.getElementById("empresa_salida").value,
       id_transferencia: document.getElementById("id_transferencia").value.trim(),
-      etiqueta: document.getElementById("etiqueta").value,
+      etiqueta: etiquetaActual,
       otro_concepto: document.getElementById("otro_concepto").value.trim(),
       notas: document.getElementById("notas").value.trim()
     };
@@ -3641,6 +3660,12 @@ async function initSaldosPage() {
     modalBackdrop.addEventListener("click", cerrarModalSaldos);
   }
 
+  // Exportar CSV
+  const btnCSV = document.getElementById("btnExportCSV");
+  if (btnCSV) {
+    btnCSV.addEventListener("click", downloadSaldosCSV);
+  }
+
   // Cerrar modal con Escape
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -3687,7 +3712,7 @@ async function cargarEmpresasFiltroSaldos() {
   if (!sel) return;
 
   try {
-    const data = await api("/api/egresos/empresas-cuentas");
+    const data = await api("/api/egresos/distinct-empresas");
     if (data && data.empresas) {
       sel.innerHTML = '<option value="">Todas las empresas</option>';
       data.empresas.forEach(emp => {
@@ -3807,11 +3832,54 @@ function renderSaldosTarjetas(data, empresaFiltro) {
 
       const fmtNum = (n) => Math.abs(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+      // Badge sin cierre previo
+      const sinCierreHTML = (!c.tiene_cierre_previo && inicioCaja === 0)
+        ? ' <span class="badge-sin-cierre">Sin cierre previo</span>'
+        : '';
+
+      // Comparación mes a mes
+      let compHTML = '';
+      if (c.saldo_anterior !== null && c.saldo_anterior !== undefined) {
+        const diff = c.diferencia || 0;
+        const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
+        const color = diff > 0 ? '#10b981' : diff < 0 ? '#ef4444' : 'var(--muted)';
+        const pct = c.diferencia_pct !== null ? ` (${c.diferencia_pct > 0 ? '+' : ''}${c.diferencia_pct}%)` : '';
+        compHTML = `
+            <div class="stat-row" style="border-top: 1px dashed var(--border); padding-top: 4px; margin-top: 2px;">
+              <span class="stat-label" style="font-size: 0.75rem;">vs mes anterior</span>
+              <span style="font-size: 0.8rem; font-weight: 600; color: ${color};">
+                ${arrow} ${diff >= 0 ? '+' : ''}$${fmtNum(diff)}${pct}
+              </span>
+            </div>`;
+      }
+
+      // Desglose por etiqueta (top 3)
+      let etiqHTML = '';
+      if (c.desglose_etiquetas && c.desglose_etiquetas.length > 0) {
+        const topEtiq = c.desglose_etiquetas.slice(0, 3).map(e => {
+          return `<div style="display: flex; justify-content: space-between; font-size: 0.78rem; padding: 2px 0;">
+            <span style="color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(e.etiqueta)}">${escapeHtml(e.etiqueta)}</span>
+            <span style="font-weight: 600;">$${fmtNum(e.total)}</span>
+          </div>`;
+        }).join('');
+        const masHTML = c.desglose_etiquetas.length > 3
+          ? `<div style="font-size: 0.7rem; color: var(--muted); margin-top: 2px;">+${c.desglose_etiquetas.length - 3} más...</div>`
+          : '';
+        etiqHTML = `
+          <div style="padding: 8px 16px; border-top: 1px solid var(--border);">
+            <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Top etiquetas</div>
+            ${topEtiq}
+            ${masHTML}
+          </div>`;
+      }
+
       html += `
         <div class="titular-card">
           <div class="titular-card-header">
             <h4 title="${escapeHtml(c.cuenta_salida || "Sin titular")}">${escapeHtml(c.cuenta_salida || "Sin titular")}</h4>
-            <span class="moneda-tag ${monedaClass}">${c.moneda}</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="moneda-tag ${monedaClass}">${c.moneda}</span>${sinCierreHTML}
+            </div>
           </div>
           <div class="titular-stats">
             <div class="stat-row" style="border-bottom: 1px dashed var(--border); padding-bottom: 6px; margin-bottom: 6px;">
@@ -3829,8 +3897,8 @@ function renderSaldosTarjetas(data, empresaFiltro) {
             <div class="stat-row" style="border-top: 1px solid var(--border); padding-top: 6px; margin-top: 6px;">
               <span class="stat-label">💰 Balance</span>
               <span class="stat-value balance ${balanceClass}" style="font-weight: 700;">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          </div>
+            </div>${compHTML}
+          </div>${etiqHTML}
           <div class="titular-card-footer">
             <div class="meta-info">
               <span>${c.total_transacciones} operaciones</span>
