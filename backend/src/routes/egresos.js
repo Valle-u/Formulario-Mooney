@@ -1297,17 +1297,40 @@ router.get("/:id/comprobante", auth, async (req, res) => {
                            egreso.comprobante_url.includes('ibb.co'));
 
     if (isExternalUrl) {
+      // Verificar que la URL externa siga accesible antes de redirigir.
+      // Si no está disponible, intentar servir el comprobante localmente como fallback.
+      const externalUrl = egreso.comprobante_url;
       const storageType = egreso.comprobante_url.includes('ibb.co') ? 'ImgBB' : 'R2';
-      console.log(`  ✅ Redirigiendo a ${storageType}: ${egreso.comprobante_url}`);
-      await auditLog(req, {
-        action: "COMPROBANTE_VIEW",
-        entity: "egresos",
-        entity_id: id,
-        success: true,
-        status_code: 302,
-        details: { url: egreso.comprobante_url, storage: storageType }
-      });
-      return res.redirect(egreso.comprobante_url);
+      let accessible = false;
+      try {
+        const urlObj = new URL(externalUrl);
+        const httpModule = urlObj.protocol === 'https:' ? require('https') : require('http');
+        accessible = await new Promise((resolve) => {
+          const reqHead = httpModule.request(externalUrl, { method: 'HEAD' }, (resp) => {
+            resolve(resp.statusCode >= 200 && resp.statusCode < 400);
+          });
+          reqHead.on('error', () => resolve(false));
+          reqHead.end();
+        });
+      } catch (err) {
+        accessible = false;
+      }
+
+      if (accessible) {
+        console.log(`  ✅ Redirigiendo a ${storageType}: ${externalUrl}`);
+        await auditLog(req, {
+          action: "COMPROBANTE_VIEW",
+          entity: "egresos",
+          entity_id: id,
+          success: true,
+          status_code: 302,
+          details: { url: externalUrl, storage: storageType }
+        });
+        return res.redirect(externalUrl);
+      } else {
+        // Fall back to local if disponible
+        console.log('🔄 Img/Blob no accesible externamente. intentando fallback local.');
+      }
     }
 
     // Si está en disco local, servir el archivo
@@ -1395,6 +1418,19 @@ router.get("/debug/uploads", auth, async (req, res) => {
 // Empleado/Encargado: solo puede editar sus propios egresos
 router.put("/:id", auth, async (req, res) => {
   try {
+    // Cargar egreso existente para validaciones previas
+    const { id } = req.params;
+    const existing = await query("SELECT * FROM egresos WHERE id = $1", [id]);
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ message: "Egreso no encontrado" });
+    }
+    const oldEgreso = existing.rows[0];
+    // Si es Cierre de Caja, no permitir cambiar la moneda
+    const esCierreCajaOld = ETIQUETAS_CIERRE_CAJA.has(oldEgreso.etiqueta);
+    const nuevaMoneda = req.body?.moneda ? String(req.body.moneda).toUpperCase() : null;
+    if (esCierreCajaOld && nuevaMoneda && nuevaMoneda !== oldEgreso.moneda) {
+      return res.status(400).json({ message: "No se puede cambiar la moneda de un Cierre de Caja" });
+    }
 
     const { id } = req.params;
     const {
