@@ -1443,11 +1443,13 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(404).json({ message: "Egreso no encontrado" });
     }
     const oldEgreso = existing.rows[0];
-    // Si es Cierre de Caja, no permitir cambiar la moneda
+    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
+
+    // Si es Cierre de Caja, solo Admin/Dirección pueden cambiar la moneda
     const esCierreCajaOld = ETIQUETAS_CIERRE_CAJA.has(oldEgreso.etiqueta);
     const nuevaMoneda = req.body?.moneda ? String(req.body.moneda).toUpperCase() : null;
-    if (esCierreCajaOld && nuevaMoneda && nuevaMoneda !== oldEgreso.moneda) {
-      return res.status(400).json({ message: "No se puede cambiar la moneda de un Cierre de Caja" });
+    if (esCierreCajaOld && nuevaMoneda && nuevaMoneda !== oldEgreso.moneda && !isAdminOrDireccion) {
+      return res.status(403).json({ message: "Solo Admin/Dirección pueden cambiar la moneda de un Cierre de Caja" });
     }
 
     const {
@@ -1471,7 +1473,6 @@ router.put("/:id", auth, async (req, res) => {
     } = req.body;
 
     // Verificar permisos: admin/direccion pueden editar cualquiera, otros solo los propios
-    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
     const isOwner = oldEgreso.created_by === req.user.id;
 
     if (!isAdminOrDireccion && !isOwner) {
