@@ -2,6 +2,8 @@ import express from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import http from "http";
+import https from "https";
 import { query } from "../config/db.js";
 import { auth, requireAdminOrDireccion, requireAdmin } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
@@ -1310,7 +1312,7 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       let accessible = false;
       try {
         const urlObj = new URL(externalUrl);
-        const httpModule = urlObj.protocol === 'https:' ? require('https') : require('http');
+        const httpModule = urlObj.protocol === 'https:' ? https : http;
         accessible = await new Promise((resolve) => {
           const reqHead = httpModule.request(externalUrl, { method: 'HEAD' }, (resp) => {
             resolve(resp.statusCode >= 200 && resp.statusCode < 400);
@@ -1438,7 +1440,6 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(400).json({ message: "No se puede cambiar la moneda de un Cierre de Caja" });
     }
 
-    const { id } = req.params;
     const {
       fecha,
       hora,
@@ -1458,18 +1459,6 @@ router.put("/:id", auth, async (req, res) => {
       notas,
       change_reason
     } = req.body;
-
-    // Verificar que el egreso existe
-    const checkEgreso = await query(
-      `SELECT * FROM egresos WHERE id = $1`,
-      [id]
-    );
-
-    if (checkEgreso.rows.length === 0) {
-      return res.status(404).json({ message: "Egreso no encontrado" });
-    }
-
-    const oldEgreso = checkEgreso.rows[0];
 
     // Verificar permisos: admin/direccion pueden editar cualquiera, otros solo los propios
     const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
