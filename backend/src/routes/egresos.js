@@ -631,10 +631,16 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     FROM egresos
     WHERE status NOT IN ('anulado')
       AND etiqueta = 'Cierre de Caja'
-      AND TO_DATE(fecha, 'DD/MM/YYYY') < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
+      AND (CASE
+            WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+            ELSE TO_DATE(fecha, 'DD/MM/YYYY')
+          END) < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
       ${commonFilter}
     ORDER BY empresa_salida, cuenta_salida, moneda,
-             TO_DATE(fecha, 'DD/MM/YYYY') DESC
+             (CASE
+               WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+               ELSE TO_DATE(fecha, 'DD/MM/YYYY')
+             END) DESC
   `;
   const primerDiaMes = `01/${mesStr}/${anioStr}`;
   const cierreResult = await query(cierreSql, [...baseParams, primerDiaMes]);
