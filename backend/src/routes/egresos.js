@@ -2,6 +2,8 @@ import express from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import http from "http";
+import https from "https";
 import { query } from "../config/db.js";
 import { auth, requireAdminOrDireccion, requireAdmin } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
@@ -631,10 +633,16 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     FROM egresos
     WHERE status NOT IN ('anulado')
       AND etiqueta = 'Cierre de Caja'
-      AND TO_DATE(fecha, 'DD/MM/YYYY') < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
+      AND (CASE
+            WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+            ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
+          END) < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
       ${commonFilter}
     ORDER BY empresa_salida, cuenta_salida, moneda,
-             TO_DATE(fecha, 'DD/MM/YYYY') DESC
+             (CASE
+               WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+               ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
+             END) DESC
   `;
   const primerDiaMes = `01/${mesStr}/${anioStr}`;
   const cierreResult = await query(cierreSql, [...baseParams, primerDiaMes]);
@@ -655,8 +663,18 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     FROM egresos
     WHERE status NOT IN ('anulado')
       AND etiqueta != 'Cierre de Caja'
-      AND EXTRACT(MONTH FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextIdx}
-      AND EXTRACT(YEAR FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextIdx + 1}
+      AND EXTRACT(MONTH FROM (
+        CASE
+          WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+          ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
+        END
+      )) = $${nextIdx}
+      AND EXTRACT(YEAR FROM (
+        CASE
+          WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+          ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
+        END
+      )) = $${nextIdx + 1}
       ${commonFilter}
     GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
     ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
@@ -738,7 +756,32 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     return a.cuenta_salida.localeCompare(b.cuenta_salida);
   });
 
-  return { saldos, periodo: { mes, anio } };
+  return { saldos, periodo: { mes: mm, anio: aa } };
+}
+
+function parsePeriodoQuery(req) {
+  const now = new Date();
+  const mesRaw = req.query.mes;
+  const anioRaw = req.query.anio;
+
+  let mes = Number.parseInt(mesRaw, 10);
+  let anio = Number.parseInt(anioRaw, 10);
+
+  if (!Number.isInteger(mes)) mes = now.getMonth() + 1;
+  if (!Number.isInteger(anio)) anio = now.getFullYear();
+
+  if (mes < 1 || mes > 12) {
+    const err = new Error("Mes inválido. Debe estar entre 1 y 12");
+    err.status = 400;
+    throw err;
+  }
+  if (anio < 2020 || anio > 2100) {
+    const err = new Error("Año inválido");
+    err.status = 400;
+    throw err;
+  }
+
+  return { mes, anio };
 }
 
 // GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
@@ -747,9 +790,7 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
 router.get("/saldos", auth, requireAdmin, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
-    const now = new Date();
-    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
-    const anio = parseInt(req.query.anio) || now.getFullYear();
+    const { mes, anio } = parsePeriodoQuery(req);
 
     // Calcular saldos del mes actual
     const current = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
@@ -799,6 +840,9 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error("Error obteniendo saldos:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     return res.status(500).json({ message: "Error obteniendo saldos" });
   }
 });
@@ -807,9 +851,7 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
 router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
-    const now = new Date();
-    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
-    const anio = parseInt(req.query.anio) || now.getFullYear();
+    const { mes, anio } = parsePeriodoQuery(req);
 
     const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
 
@@ -832,6 +874,9 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
     return res.send(csv);
   } catch (error) {
     console.error("Error exportando saldos CSV:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     return res.status(500).json({ message: "Error exportando saldos" });
   }
 });
@@ -1163,6 +1208,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
          to_char(e.hora, 'HH24:MI') AS hora,
          to_char(e.hora_solicitud_cliente, 'HH24:MI') AS hora_solicitud_cliente,
          to_char(e.hora_quema_fichas, 'HH24:MI') AS hora_quema_fichas,
+         to_char((e.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'), 'DD/MM/YYYY HH24:MI:SS') AS created_at_ar,
          u.username AS created_by_username
        FROM egresos e
        JOIN users u ON u.id = e.created_by
@@ -1204,7 +1250,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       x.comprobante_url || "",
       x.notas || "",
       x.created_by_username || "",
-      x.created_at ? new Date(x.created_at).toISOString() : ""
+      x.created_at_ar || ""
     ]));
 
     const csv = withBOM(toCSV({ columns, rows, delimiter: ";" }));
@@ -1297,17 +1343,40 @@ router.get("/:id/comprobante", auth, async (req, res) => {
                            egreso.comprobante_url.includes('ibb.co'));
 
     if (isExternalUrl) {
+      // Verificar que la URL externa siga accesible antes de redirigir.
+      // Si no está disponible, intentar servir el comprobante localmente como fallback.
+      const externalUrl = egreso.comprobante_url;
       const storageType = egreso.comprobante_url.includes('ibb.co') ? 'ImgBB' : 'R2';
-      console.log(`  ✅ Redirigiendo a ${storageType}: ${egreso.comprobante_url}`);
-      await auditLog(req, {
-        action: "COMPROBANTE_VIEW",
-        entity: "egresos",
-        entity_id: id,
-        success: true,
-        status_code: 302,
-        details: { url: egreso.comprobante_url, storage: storageType }
-      });
-      return res.redirect(egreso.comprobante_url);
+      let accessible = false;
+      try {
+        const urlObj = new URL(externalUrl);
+        const httpModule = urlObj.protocol === 'https:' ? https : http;
+        accessible = await new Promise((resolve) => {
+          const reqHead = httpModule.request(externalUrl, { method: 'HEAD' }, (resp) => {
+            resolve(resp.statusCode >= 200 && resp.statusCode < 400);
+          });
+          reqHead.on('error', () => resolve(false));
+          reqHead.end();
+        });
+      } catch (err) {
+        accessible = false;
+      }
+
+      if (accessible) {
+        console.log(`  ✅ Redirigiendo a ${storageType}: ${externalUrl}`);
+        await auditLog(req, {
+          action: "COMPROBANTE_VIEW",
+          entity: "egresos",
+          entity_id: id,
+          success: true,
+          status_code: 302,
+          details: { url: externalUrl, storage: storageType }
+        });
+        return res.redirect(externalUrl);
+      } else {
+        // Fall back to local if disponible
+        console.log('🔄 Img/Blob no accesible externamente. intentando fallback local.');
+      }
     }
 
     // Si está en disco local, servir el archivo
@@ -1395,8 +1464,22 @@ router.get("/debug/uploads", auth, async (req, res) => {
 // Empleado/Encargado: solo puede editar sus propios egresos
 router.put("/:id", auth, async (req, res) => {
   try {
-
+    // Cargar egreso existente para validaciones previas
     const { id } = req.params;
+    const existing = await query("SELECT * FROM egresos WHERE id = $1", [id]);
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ message: "Egreso no encontrado" });
+    }
+    const oldEgreso = existing.rows[0];
+    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
+
+    // Si es Cierre de Caja, solo Admin/Dirección pueden cambiar la moneda
+    const esCierreCajaOld = ETIQUETAS_CIERRE_CAJA.has(oldEgreso.etiqueta);
+    const nuevaMoneda = req.body?.moneda ? String(req.body.moneda).toUpperCase() : null;
+    if (esCierreCajaOld && nuevaMoneda && nuevaMoneda !== oldEgreso.moneda && !isAdminOrDireccion) {
+      return res.status(403).json({ message: "Solo Admin/Dirección pueden cambiar la moneda de un Cierre de Caja" });
+    }
+
     const {
       fecha,
       hora,
@@ -1417,20 +1500,53 @@ router.put("/:id", auth, async (req, res) => {
       change_reason
     } = req.body;
 
-    // Verificar que el egreso existe
-    const checkEgreso = await query(
-      `SELECT * FROM egresos WHERE id = $1`,
-      [id]
-    );
+    const normText = (v) => {
+      if (v === undefined || v === null) return null;
+      const t = String(v).trim();
+      return t === "" ? null : t;
+    };
 
-    if (checkEgreso.rows.length === 0) {
-      return res.status(404).json({ message: "Egreso no encontrado" });
+    const etiquetaFinal = normText(etiqueta) || oldEgreso.etiqueta;
+    const esCierreCajaFinal = ETIQUETAS_CIERRE_CAJA.has(etiquetaFinal);
+
+    const monedaNorm = normText(moneda)
+      ? String(moneda).trim().toUpperCase().replace(/\s*\(.+\)$/, "")
+      : null;
+    if (monedaNorm && !["ARS", "USD"].includes(monedaNorm)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS o USD" });
     }
 
-    const oldEgreso = checkEgreso.rows[0];
+    const idTransferenciaNorm = esCierreCajaFinal ? null : normText(id_transferencia);
+    const cuentaReceptoraNorm = esCierreCajaFinal ? null : normText(cuenta_receptora);
+    const etiquetaOtroNorm = normText(etiqueta_otro);
+    const usuarioCasinoNorm = normText(usuario_casino);
+    const notasNorm = normText(notas);
+
+    let montoNorm = null;
+    if (monto !== undefined && monto !== null && String(monto).trim() !== "") {
+      const n = Number(monto);
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: "Monto inválido. Debe ser mayor a 0" });
+      }
+      montoNorm = n;
+    }
+
+    // Para no cierre de caja, si se envían estos campos, deben venir válidos
+    const sendsIdTransferencia = Object.prototype.hasOwnProperty.call(req.body, "id_transferencia");
+    const sendsCuentaReceptora = Object.prototype.hasOwnProperty.call(req.body, "cuenta_receptora");
+    if (!esCierreCajaFinal) {
+      if (sendsIdTransferencia && !idTransferenciaNorm) {
+        return res.status(400).json({ message: "ID TRANSFERENCIA es obligatorio" });
+      }
+      if (idTransferenciaNorm && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
+        return res.status(400).json({ message: "ID TRANSFERENCIA inválido" });
+      }
+      if (sendsCuentaReceptora && !cuentaReceptoraNorm) {
+        return res.status(400).json({ message: "CUENTA RECEPTORA es obligatoria" });
+      }
+    }
 
     // Verificar permisos: admin/direccion pueden editar cualquiera, otros solo los propios
-    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
     const isOwner = oldEgreso.created_by === req.user.id;
 
     if (!isAdminOrDireccion && !isOwner) {
@@ -1453,23 +1569,29 @@ router.put("/:id", auth, async (req, res) => {
     }
 
     // Validar hora si viene en el body
-    if (hora) {
-      const horaNorm = normalizeHoraToTime(hora);
+    let horaNorm = null;
+    const horaRawNorm = normText(hora);
+    if (horaRawNorm) {
+      horaNorm = normalizeHoraToTime(horaRawNorm);
       if (!horaNorm) {
         return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
       }
     }
 
-    // Validar horas de premios si se envían
-    if (hora_solicitud_cliente) {
-      const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
+    // Validar horas opcionales si se envían
+    let hsNorm = null;
+    const hsRawNorm = normText(hora_solicitud_cliente);
+    if (hsRawNorm) {
+      hsNorm = normalizeHoraOptional(hsRawNorm);
       if (!hsNorm) {
         return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
       }
     }
 
-    if (hora_quema_fichas) {
-      const hqNorm = normalizeHoraToTime(hora_quema_fichas);
+    let hqNorm = null;
+    const hqRawNorm = normText(hora_quema_fichas);
+    if (hqRawNorm) {
+      hqNorm = normalizeHoraToTime(hqRawNorm);
       if (!hqNorm) {
         return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
       }
@@ -1499,10 +1621,10 @@ router.put("/:id", auth, async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $18`,
       [
-        fechaNormalizada, hora, turno, etiqueta, etiqueta_otro,
-        moneda, monto_raw, monto, cuenta_receptora, usuario_casino,
-        hora_solicitud_cliente, hora_quema_fichas, id_transferencia,
-        cuenta_salida, empresa_salida, notas,
+        fechaNormalizada, horaNorm, normText(turno), etiquetaFinal, etiquetaOtroNorm,
+        monedaNorm, normText(monto_raw), montoNorm, cuentaReceptoraNorm, usuarioCasinoNorm,
+        hsNorm, hqNorm, idTransferenciaNorm,
+        normText(cuenta_salida), normText(empresa_salida), notasNorm,
         req.user.id,
         id
       ]
@@ -1525,6 +1647,18 @@ router.put("/:id", auth, async (req, res) => {
 
   } catch (error) {
     console.error("🔥 Error actualizando egreso:", error);
+    if (error?.code === "23514") {
+      return res.status(400).json({
+        message: "Datos inválidos al editar egreso (constraint). Revisá moneda, ID transferencia y campos obligatorios.",
+        constraint: error?.constraint || null
+      });
+    }
+    if (error?.code === "22P02") {
+      return res.status(400).json({ message: "Formato inválido en algún campo (número/fecha/hora)." });
+    }
+    if (error?.code === "23502") {
+      return res.status(400).json({ message: "Faltan campos obligatorios para actualizar el egreso." });
+    }
     return res.status(500).json({ message: "Error actualizando egreso" });
   }
 });
