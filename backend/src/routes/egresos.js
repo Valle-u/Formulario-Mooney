@@ -756,7 +756,32 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     return a.cuenta_salida.localeCompare(b.cuenta_salida);
   });
 
-  return { saldos, periodo: { mes, anio } };
+  return { saldos, periodo: { mes: mm, anio: aa } };
+}
+
+function parsePeriodoQuery(req) {
+  const now = new Date();
+  const mesRaw = req.query.mes;
+  const anioRaw = req.query.anio;
+
+  let mes = Number.parseInt(mesRaw, 10);
+  let anio = Number.parseInt(anioRaw, 10);
+
+  if (!Number.isInteger(mes)) mes = now.getMonth() + 1;
+  if (!Number.isInteger(anio)) anio = now.getFullYear();
+
+  if (mes < 1 || mes > 12) {
+    const err = new Error("Mes inválido. Debe estar entre 1 y 12");
+    err.status = 400;
+    throw err;
+  }
+  if (anio < 2020 || anio > 2100) {
+    const err = new Error("Año inválido");
+    err.status = 400;
+    throw err;
+  }
+
+  return { mes, anio };
 }
 
 // GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
@@ -765,9 +790,7 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
 router.get("/saldos", auth, requireAdmin, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
-    const now = new Date();
-    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
-    const anio = parseInt(req.query.anio) || now.getFullYear();
+    const { mes, anio } = parsePeriodoQuery(req);
 
     // Calcular saldos del mes actual
     const current = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
@@ -817,6 +840,9 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error("Error obteniendo saldos:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     return res.status(500).json({ message: "Error obteniendo saldos" });
   }
 });
@@ -825,9 +851,7 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
 router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
-    const now = new Date();
-    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
-    const anio = parseInt(req.query.anio) || now.getFullYear();
+    const { mes, anio } = parsePeriodoQuery(req);
 
     const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
 
@@ -850,6 +874,9 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
     return res.send(csv);
   } catch (error) {
     console.error("Error exportando saldos CSV:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     return res.status(500).json({ message: "Error exportando saldos" });
   }
 });
@@ -1181,6 +1208,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
          to_char(e.hora, 'HH24:MI') AS hora,
          to_char(e.hora_solicitud_cliente, 'HH24:MI') AS hora_solicitud_cliente,
          to_char(e.hora_quema_fichas, 'HH24:MI') AS hora_quema_fichas,
+         to_char((e.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'), 'DD/MM/YYYY HH24:MI:SS') AS created_at_ar,
          u.username AS created_by_username
        FROM egresos e
        JOIN users u ON u.id = e.created_by
@@ -1222,7 +1250,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       x.comprobante_url || "",
       x.notas || "",
       x.created_by_username || "",
-      x.created_at ? new Date(x.created_at).toISOString() : ""
+      x.created_at_ar || ""
     ]));
 
     const csv = withBOM(toCSV({ columns, rows, delimiter: ";" }));

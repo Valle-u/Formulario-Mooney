@@ -247,6 +247,10 @@ if (document.readyState === 'loading') {
 
 // Saldo en tiempo real: inicializar
 document.addEventListener('DOMContentLoaded', () => {
+  // La inicialización completa de saldos vive en initSaldosPage (sección dedicada).
+  // Evitar inicializaciones duplicadas en saldos.html.
+  if (IS_SALDOS_PAGE) return;
+
   // Populate filters if present
   if (typeof EMPRESAS_SALIDA !== 'undefined' && document.getElementById('filtro_empresa')) {
     populateSaldosFilters();
@@ -3770,6 +3774,59 @@ async function cargarSaldos() {
   }
 }
 
+async function downloadSaldosCSV() {
+  try {
+    const empresa = document.getElementById("filtro_empresa")?.value || "";
+    const moneda = document.getElementById("filtro_moneda")?.value || "";
+    const mes = document.getElementById("filtro_mes")?.value || "";
+    const anio = document.getElementById("filtro_anio")?.value || "";
+
+    const qs = new URLSearchParams();
+    if (empresa) qs.set("empresa", empresa);
+    if (moneda) qs.set("moneda", moneda);
+    if (mes) qs.set("mes", mes);
+    if (anio) qs.set("anio", anio);
+
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/egresos/saldos/csv?${qs.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+
+    if (!res.ok) {
+      let msg = `Error ${res.status}`;
+      try {
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await res.json();
+          msg = data?.message || msg;
+        } else {
+          msg = (await res.text()) || msg;
+        }
+      } catch {}
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+
+    const mesStr = String(mes || (new Date().getMonth() + 1)).padStart(2, "0");
+    const anioStr = String(anio || new Date().getFullYear());
+    a.download = `saldos_${mesStr}_${anioStr}.csv`;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    toast("✅ CSV descargado", "Saldos exportados correctamente", "success");
+  } catch (err) {
+    console.error("Error descargando CSV de saldos:", err);
+    toast("❌ Error", err.message || "No se pudo descargar el CSV", "error");
+  }
+}
+
 // Renderizar saldos como tarjetas por titular
 function renderSaldosTarjetas(data, empresaFiltro) {
   const { saldos, totales } = data;
@@ -4063,7 +4120,7 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
           <select id="modalFiltroEstado">
             <option value="">Todos</option>
             <option value="activo">Activo</option>
-            <option value="editado">Editado</option>
+            <option value="editada">Editado</option>
             <option value="anulado">Anulado</option>
           </select>
         </div>
