@@ -2972,13 +2972,27 @@ function editarEgresoModal(){
         return;
       }
 
+      const etiquetaEdit = document.getElementById('edit_etiqueta').value;
+      const esCierreCajaEdit = ETIQUETAS_CIERRE_CAJA.has(etiquetaEdit);
+      const monedaRaw = document.getElementById('edit_moneda').value;
+      const monedaEdit = (monedaRaw === 'USD' || monedaRaw === 'ARS')
+        ? monedaRaw
+        : (String(monedaRaw || '').toUpperCase().includes('USD') ? 'USD' : 'ARS');
+      const idTransferenciaEdit = document.getElementById('edit_id_transferencia')?.value?.trim() || null;
+      const cuentaReceptoraEdit = document.getElementById('edit_cuenta_receptora')?.value?.trim() || null;
+
+      if(!esCierreCajaEdit && (!idTransferenciaEdit || !cuentaReceptoraEdit)){
+        toast("⚠️ Faltan datos", "Completá ID TRANSFERENCIA y CUENTA RECEPTORA", "warning");
+        return;
+      }
+
       const updates = {
         fecha: fechaValue,
         hora: document.getElementById('edit_hora').value,
         turno: document.getElementById('edit_turno').value,
-        etiqueta: document.getElementById('edit_etiqueta').value,
+        etiqueta: etiquetaEdit,
         etiqueta_otro: document.getElementById('edit_etiqueta_otro')?.value || null,
-        moneda: document.getElementById('edit_moneda').value,
+        moneda: monedaEdit,
         monto_raw: montoValue,
         monto: montoParsed,
         usuario_casino: document.getElementById('edit_usuario_casino')?.value || null,
@@ -2986,8 +3000,8 @@ function editarEgresoModal(){
         hora_quema_fichas: document.getElementById('edit_hora_quema_fichas')?.value || null,
         empresa_salida: document.getElementById('edit_empresa_salida').value,
         cuenta_salida: document.getElementById('edit_cuenta_salida').value,
-        id_transferencia: document.getElementById('edit_id_transferencia').value,
-        cuenta_receptora: document.getElementById('edit_cuenta_receptora').value,
+        id_transferencia: esCierreCajaEdit ? null : idTransferenciaEdit,
+        cuenta_receptora: esCierreCajaEdit ? null : cuentaReceptoraEdit,
         notas: document.getElementById('edit_notas').value,
         change_reason: motivo
       };

@@ -1472,6 +1472,52 @@ router.put("/:id", auth, async (req, res) => {
       change_reason
     } = req.body;
 
+    const normText = (v) => {
+      if (v === undefined || v === null) return null;
+      const t = String(v).trim();
+      return t === "" ? null : t;
+    };
+
+    const etiquetaFinal = normText(etiqueta) || oldEgreso.etiqueta;
+    const esCierreCajaFinal = ETIQUETAS_CIERRE_CAJA.has(etiquetaFinal);
+
+    const monedaNorm = normText(moneda)
+      ? String(moneda).trim().toUpperCase().replace(/\s*\(.+\)$/, "")
+      : null;
+    if (monedaNorm && !["ARS", "USD"].includes(monedaNorm)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS o USD" });
+    }
+
+    const idTransferenciaNorm = esCierreCajaFinal ? null : normText(id_transferencia);
+    const cuentaReceptoraNorm = esCierreCajaFinal ? null : normText(cuenta_receptora);
+    const etiquetaOtroNorm = normText(etiqueta_otro);
+    const usuarioCasinoNorm = normText(usuario_casino);
+    const notasNorm = normText(notas);
+
+    let montoNorm = null;
+    if (monto !== undefined && monto !== null && String(monto).trim() !== "") {
+      const n = Number(monto);
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ message: "Monto inválido. Debe ser mayor a 0" });
+      }
+      montoNorm = n;
+    }
+
+    // Para no cierre de caja, si se envían estos campos, deben venir válidos
+    const sendsIdTransferencia = Object.prototype.hasOwnProperty.call(req.body, "id_transferencia");
+    const sendsCuentaReceptora = Object.prototype.hasOwnProperty.call(req.body, "cuenta_receptora");
+    if (!esCierreCajaFinal) {
+      if (sendsIdTransferencia && !idTransferenciaNorm) {
+        return res.status(400).json({ message: "ID TRANSFERENCIA es obligatorio" });
+      }
+      if (idTransferenciaNorm && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
+        return res.status(400).json({ message: "ID TRANSFERENCIA inválido" });
+      }
+      if (sendsCuentaReceptora && !cuentaReceptoraNorm) {
+        return res.status(400).json({ message: "CUENTA RECEPTORA es obligatoria" });
+      }
+    }
+
     // Verificar permisos: admin/direccion pueden editar cualquiera, otros solo los propios
     const isOwner = oldEgreso.created_by === req.user.id;
 
@@ -1495,23 +1541,29 @@ router.put("/:id", auth, async (req, res) => {
     }
 
     // Validar hora si viene en el body
-    if (hora) {
-      const horaNorm = normalizeHoraToTime(hora);
+    let horaNorm = null;
+    const horaRawNorm = normText(hora);
+    if (horaRawNorm) {
+      horaNorm = normalizeHoraToTime(horaRawNorm);
       if (!horaNorm) {
         return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
       }
     }
 
-    // Validar horas de premios si se envían
-    if (hora_solicitud_cliente) {
-      const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
+    // Validar horas opcionales si se envían
+    let hsNorm = null;
+    const hsRawNorm = normText(hora_solicitud_cliente);
+    if (hsRawNorm) {
+      hsNorm = normalizeHoraOptional(hsRawNorm);
       if (!hsNorm) {
         return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
       }
     }
 
-    if (hora_quema_fichas) {
-      const hqNorm = normalizeHoraToTime(hora_quema_fichas);
+    let hqNorm = null;
+    const hqRawNorm = normText(hora_quema_fichas);
+    if (hqRawNorm) {
+      hqNorm = normalizeHoraToTime(hqRawNorm);
       if (!hqNorm) {
         return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
       }
@@ -1541,10 +1593,10 @@ router.put("/:id", auth, async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $18`,
       [
-        fechaNormalizada, hora, turno, etiqueta, etiqueta_otro,
-        moneda, monto_raw, monto, cuenta_receptora, usuario_casino,
-        hora_solicitud_cliente, hora_quema_fichas, id_transferencia,
-        cuenta_salida, empresa_salida, notas,
+        fechaNormalizada, horaNorm, normText(turno), etiquetaFinal, etiquetaOtroNorm,
+        monedaNorm, normText(monto_raw), montoNorm, cuentaReceptoraNorm, usuarioCasinoNorm,
+        hsNorm, hqNorm, idTransferenciaNorm,
+        normText(cuenta_salida), normText(empresa_salida), notasNorm,
         req.user.id,
         id
       ]
@@ -1567,6 +1619,18 @@ router.put("/:id", auth, async (req, res) => {
 
   } catch (error) {
     console.error("🔥 Error actualizando egreso:", error);
+    if (error?.code === "23514") {
+      return res.status(400).json({
+        message: "Datos inválidos al editar egreso (constraint). Revisá moneda, ID transferencia y campos obligatorios.",
+        constraint: error?.constraint || null
+      });
+    }
+    if (error?.code === "22P02") {
+      return res.status(400).json({ message: "Formato inválido en algún campo (número/fecha/hora)." });
+    }
+    if (error?.code === "23502") {
+      return res.status(400).json({ message: "Faltan campos obligatorios para actualizar el egreso." });
+    }
     return res.status(500).json({ message: "Error actualizando egreso" });
   }
 });
