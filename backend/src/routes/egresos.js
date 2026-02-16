@@ -635,13 +635,13 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
       AND etiqueta = 'Cierre de Caja'
       AND (CASE
             WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
-            ELSE TO_DATE(fecha, 'DD/MM/YYYY')
+            ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
           END) < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
       ${commonFilter}
     ORDER BY empresa_salida, cuenta_salida, moneda,
              (CASE
                WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
-               ELSE TO_DATE(fecha, 'DD/MM/YYYY')
+               ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
              END) DESC
   `;
   const primerDiaMes = `01/${mesStr}/${anioStr}`;
@@ -663,8 +663,18 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     FROM egresos
     WHERE status NOT IN ('anulado')
       AND etiqueta != 'Cierre de Caja'
-      AND EXTRACT(MONTH FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextIdx}
-      AND EXTRACT(YEAR FROM TO_DATE(fecha, 'DD/MM/YYYY')) = $${nextIdx + 1}
+      AND EXTRACT(MONTH FROM (
+        CASE
+          WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+          ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
+        END
+      )) = $${nextIdx}
+      AND EXTRACT(YEAR FROM (
+        CASE
+          WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
+          ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
+        END
+      )) = $${nextIdx + 1}
       ${commonFilter}
     GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
     ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
