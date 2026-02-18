@@ -6,21 +6,32 @@ import { pool } from "../config/db.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function waitForDB(maxRetries = 5, baseDelay = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📡 Testing database connection (attempt ${attempt}/${maxRetries})...`);
+      await pool.query('SELECT NOW()');
+      console.log("✅ Database connection successful");
+      return;
+    } catch (err) {
+      console.error(`❌ Database connection failed (attempt ${attempt}/${maxRetries})`);
+      console.error("   Error:", err?.code || err?.message);
+
+      if (attempt === maxRetries) {
+        throw err;
+      }
+
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.log(`⏳ Retrying in ${delay / 1000}s...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 export async function runMigrations() {
   console.log("🔧 Running database migrations...");
 
-  try {
-    // Test de conexión primero
-    console.log("📡 Testing database connection...");
-    await pool.query('SELECT NOW()');
-    console.log("✅ Database connection successful");
-  } catch (err) {
-    console.error("❌ Database connection failed!");
-    console.error("Error code:", err?.code);
-    console.error("Error message:", err?.message);
-    console.error("Error stack:", err?.stack);
-    throw err;
-  }
+  await waitForDB();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
