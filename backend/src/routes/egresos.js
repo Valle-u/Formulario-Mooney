@@ -792,15 +792,15 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
 
-    // Calcular saldos del mes actual
-    const current = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
-
-    // Calcular saldos del mes anterior (para comparación)
+    // Calcular saldos del mes actual y anterior en paralelo
     let prevMes = mes - 1;
     let prevAnio = anio;
     if (prevMes < 1) { prevMes = 12; prevAnio--; }
 
-    const prev = await computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio });
+    const [current, prev] = await Promise.all([
+      computeSaldos({ empresa, moneda, cuenta, mes, anio }),
+      computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio })
+    ]);
 
     // Mapear saldos anteriores por clave
     const prevMap = {};

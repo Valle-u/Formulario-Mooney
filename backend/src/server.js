@@ -48,14 +48,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necesario para scripts inline
-      styleSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necesario para estilos inline
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https://i.ibb.co", "https://*.ibb.co"],
+      connectSrc: ["'self'", "https://api.imgbb.com"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", "blob:"],
-      frameSrc: ["'self'", "blob:"] // Permitir blob: para vista previa de PDFs
+      frameSrc: ["'self'", "blob:"]
     }
   },
   // Prevent clickjacking

@@ -23,23 +23,28 @@ export async function auditLog(req, {
   const ip = getIp(req);
   const user_agent = req.headers["user-agent"] || "";
 
-  await query(
-    `INSERT INTO audit_logs
-      (actor_user_id, actor_username, actor_role, action, entity, entity_id, success, status_code, ip, user_agent, details)
-     VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [
-      actor_user_id,
-      actor_username,
-      actor_role,
-      action,
-      entity,
-      entity_id,
-      !!success,
-      status_code,
-      ip,
-      user_agent,
-      details ? JSON.stringify(details) : null
-    ]
-  );
+  try {
+    await query(
+      `INSERT INTO audit_logs
+        (actor_user_id, actor_username, actor_role, action, entity, entity_id, success, status_code, ip, user_agent, details)
+       VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        actor_user_id,
+        actor_username,
+        actor_role,
+        action,
+        entity,
+        entity_id,
+        !!success,
+        status_code,
+        ip,
+        user_agent,
+        details ? JSON.stringify(details) : null
+      ]
+    );
+  } catch (err) {
+    // Audit log nunca debe bloquear operaciones del negocio
+    console.error(`⚠️  auditLog falló (${action}):`, err.message);
+  }
 }
