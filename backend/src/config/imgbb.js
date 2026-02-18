@@ -46,14 +46,20 @@ export async function uploadToImgBB(fileBuffer, fileName, mimeType) {
       name: fileName
     }).toString();
 
-    // Hacer la petición a ImgBB
+    // Hacer la petición a ImgBB con timeout de 30 segundos
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch('https://api.imgbb.com/1/upload', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: formBody
+      body: formBody,
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     // Verificar respuesta
     if (!response.ok) {
@@ -79,6 +85,10 @@ export async function uploadToImgBB(fileBuffer, fileName, mimeType) {
 
     if (error.message.includes('413')) {
       throw new Error('Archivo demasiado grande. ImgBB tiene un límite de 32MB por archivo.');
+    }
+
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout subiendo archivo a ImgBB (30s). Intentá de nuevo.');
     }
 
     throw new Error(`Error al subir archivo a ImgBB: ${error.message}`);

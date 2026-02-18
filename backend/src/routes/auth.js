@@ -189,15 +189,21 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     return res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
   } catch (e) {
-    await auditLog(req, {
-      action: "AUTH_LOGIN_FAIL",
-      entity: "auth",
-      success: false,
-      status_code: 500,
-      details: { username: username || null, reason: "server_error" },
-      actor: { id: null, username: username || null, role: null }
-    });
-    return res.status(500).json({ message: "Error en login" });
+    console.error("❌ Error en login:", e.message);
+    // auditLog envuelto en try-catch para evitar crash si DB está caída
+    try {
+      await auditLog(req, {
+        action: "AUTH_LOGIN_FAIL",
+        entity: "auth",
+        success: false,
+        status_code: 500,
+        details: { username: username || null, reason: "server_error", error: e.message },
+        actor: { id: null, username: username || null, role: null }
+      });
+    } catch (auditErr) {
+      console.error("❌ No se pudo registrar audit log:", auditErr.message);
+    }
+    return res.status(500).json({ message: "Error en login. Intentá de nuevo en unos segundos." });
   }
 });
 

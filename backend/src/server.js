@@ -40,6 +40,10 @@ const app = express();
 const PORT = Number(process.env.PORT || 4000);
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
 
+// Trust proxy: necesario en Seenode (k8s) para que express-rate-limit
+// y req.ip funcionen correctamente detrás del proxy reverso
+app.set('trust proxy', 1);
+
 /* =========================
    SEGURIDAD - Headers con Helmet
    ========================= */
@@ -48,14 +52,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necesario para scripts inline
-      styleSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necesario para estilos inline
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https://i.ibb.co", "https://*.ibb.co"],
+      connectSrc: ["'self'", "https://api.imgbb.com"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", "blob:"],
-      frameSrc: ["'self'", "blob:"] // Permitir blob: para vista previa de PDFs
+      frameSrc: ["'self'", "blob:"]
     }
   },
   // Prevent clickjacking
@@ -184,19 +188,27 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Error interno" });
 });
 
-// 🚀 Arranque con migraciones
+// 🚀 Arranque: HTTP primero, migraciones después (resiliente a DB caída temporal)
 let server;
+let dbReady = false;
 
 async function start() {
+  // 1) Arrancar HTTP inmediatamente para que Seenode vea el servidor vivo
+  server = app.listen(PORT, () => {
+    console.log(`✅ API running on ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
+    console.log(`🏥 Health check: ${process.env.BASE_URL || `http://localhost:${PORT}`}/health`);
+  });
+
+  // 2) Correr migraciones con reintentos (la DB puede tardar en estar disponible)
   try {
     await runMigrations();
-    server = app.listen(PORT, () => {
-      console.log(`✅ API running on ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
-      console.log(`🏥 Health check: ${process.env.BASE_URL || `http://localhost:${PORT}`}/health`);
-    });
+    dbReady = true;
+    console.log("✅ Database ready, all systems operational");
   } catch (e) {
-    console.error("❌ Server NOT started due to migration error");
-    process.exit(1);
+    console.error("❌ Migrations failed after retries:", e.message);
+    console.error("⚠️  Server running but database unavailable. Requests will fail until DB recovers.");
+    // NO hacer process.exit(1) — dejar el servidor vivo para que Seenode no entre en loop de reinicios
+    // Las rutas que necesiten DB devolverán 500 naturalmente
   }
 }
 

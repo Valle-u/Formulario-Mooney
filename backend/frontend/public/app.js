@@ -1232,7 +1232,7 @@ async function checkIdTransferenciaDuplicado() {
   if (!idValue || !empresaValue) return;
 
   try {
-    const token = localStorage.getItem("token");
+    const token = getToken();
     if (!token) return;
 
     const url = `${API_BASE}/api/egresos/check-id-transferencia?empresa_salida=${encodeURIComponent(empresaValue)}&id_transferencia=${encodeURIComponent(idValue)}`;
@@ -3371,7 +3371,7 @@ let unreadCount = 0;
 
 // Conectar a SSE (Server-Sent Events)
 function connectToNotifications() {
-  const token = localStorage.getItem("token");
+  const token = getToken();
   if (!token) return;
 
   // Cerrar conexión anterior si existe
@@ -3616,8 +3616,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Conectar a notificaciones si hay un token
-  const token = localStorage.getItem("token");
-  if (token) {
+  if (getToken()) {
     connectToNotifications();
   }
 });
