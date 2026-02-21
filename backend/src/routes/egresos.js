@@ -336,16 +336,15 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
     }
 
-    // Normalizar id_transferencia (siempre, luego validamos si es obligatorio)
-    const idTrim = String(id_transferencia || "").trim();
+    // Normalizar id_transferencia: null explícito = sin ID (checkbox "Sin ID")
+    const idTrim = id_transferencia === null ? null : String(id_transferencia || "").trim() || null;
 
     // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
     if (!esCierreCaja) {
       if (requireNonEmpty(cuenta_receptora, "cuenta_receptora")) return res.status(400).json({ message: "cuenta_receptora es obligatoria" });
 
-      if (!idTrim) return res.status(400).json({ message: "id_transferencia es obligatorio" });
-      // Validar que sea alfanumérico (letras, números, guiones, guiones bajos)
-      if (!/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
+      // id_transferencia puede ser null (checkbox "Sin ID") o un valor alfanumérico válido
+      if (idTrim !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo letras, números, guiones y guiones bajos" });
       }
     }
@@ -1516,7 +1515,9 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(400).json({ message: "Moneda inválida. Debe ser ARS o USD" });
     }
 
-    const idTransferenciaNorm = esCierreCajaFinal ? null : normText(id_transferencia);
+    // id_transferencia puede ser null explícito (checkbox "Sin ID")
+    const idTransferenciaNorm = esCierreCajaFinal ? null
+      : (id_transferencia === null ? null : normText(id_transferencia));
     const cuentaReceptoraNorm = esCierreCajaFinal ? null : normText(cuenta_receptora);
     const etiquetaOtroNorm = normText(etiqueta_otro);
     const usuarioCasinoNorm = normText(usuario_casino);
@@ -1531,14 +1532,12 @@ router.put("/:id", auth, async (req, res) => {
       montoNorm = n;
     }
 
-    // Para no cierre de caja, si se envían estos campos, deben venir válidos
+    // Para no cierre de caja, validar campos si se envían
     const sendsIdTransferencia = Object.prototype.hasOwnProperty.call(req.body, "id_transferencia");
     const sendsCuentaReceptora = Object.prototype.hasOwnProperty.call(req.body, "cuenta_receptora");
     if (!esCierreCajaFinal) {
-      if (sendsIdTransferencia && !idTransferenciaNorm) {
-        return res.status(400).json({ message: "ID TRANSFERENCIA es obligatorio" });
-      }
-      if (idTransferenciaNorm && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
+      // id_transferencia puede ser null (Sin ID) o alfanumérico válido
+      if (idTransferenciaNorm !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido" });
       }
       if (sendsCuentaReceptora && !cuentaReceptoraNorm) {

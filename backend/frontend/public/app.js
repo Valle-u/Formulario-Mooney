@@ -88,6 +88,8 @@ const ETIQUETAS = [
   "[Otra] Recepcion de USD",
   "[Otra] Recepcion Dolar Fisico",
   "[Otra] Recepcion Peso Fisico",
+  "[Otra] Cambio a Pesos",
+  "[Otra] Devolucion de Prestamo",
   // Especiales
   "Cierre de Caja",
   "Otro"
@@ -277,8 +279,28 @@ function getUser(){
 }
 function clearUser(){ localStorage.removeItem(STORAGE_KEY_USER); }
 
+// Decodificar JWT sin verificar firma (solo para leer expiración client-side)
+function decodeJWTPayload(token){
+  try {
+    const base64 = token.split('.')[1];
+    const json = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch { return null; }
+}
+
+// Verificar si el token está expirado (con margen de 60s)
+function isTokenExpired(){
+  const token = getToken();
+  if(!token) return true;
+  const payload = decodeJWTPayload(token);
+  if(!payload || !payload.exp) return true;
+  // Token expirado si faltan menos de 60s
+  return (payload.exp * 1000) < (Date.now() + 60000);
+}
+
 function requireAuth(){
-  if(!getToken()){
+  if(!getToken() || isTokenExpired()){
+    clearToken(); clearUser();
     window.location.href = "index.html";
     return false;
   }
@@ -333,6 +355,15 @@ function setupInactivityMonitor(){
   // Iniciar el timer
   resetInactivityTimer();
 
+  // Cuando el usuario vuelve a la pestaña (especialmente en mobile), verificar token
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && isTokenExpired()){
+      clearToken(); clearUser();
+      toast("⏱️ Sesión expirada", "Tu sesión expiró. Volvé a iniciar sesión.", "error");
+      setTimeout(() => { window.location.href = "index.html"; }, 1500);
+    }
+  });
+
   console.log('🔒 Monitor de inactividad activado (timeout: 30 min)');
 }
 
@@ -340,6 +371,14 @@ function setupInactivityMonitor(){
    API
    ========================= */
 async function api(path, {method="GET", body=null, auth=true, timeout=60000} = {}){
+  // Verificar token antes de hacer la request (evita perder datos en formularios)
+  if(auth && isTokenExpired()){
+    clearToken(); clearUser();
+    toast("⏱️ Sesión expirada", "Tu sesión expiró. Volvé a iniciar sesión.", "error");
+    setTimeout(() => { window.location.href = "index.html"; }, 1500);
+    throw new Error("Sesión expirada");
+  }
+
   const headers = {};
   if(!(body instanceof FormData)) headers["Content-Type"] = "application/json";
   if(auth){
@@ -588,6 +627,34 @@ function wireIdTransferenciaAlphanumeric(){
   // Permitir solo letras, números, guiones y guiones bajos
   el.addEventListener("input", ()=> {
     el.value = el.value.replace(/[^a-zA-Z0-9\-_]/g, "");
+  });
+}
+
+// Checkbox "Sin ID de transferencia": deshabilita el input y lo marca como no obligatorio
+function wireSinIdTransferencia(){
+  const cb = document.getElementById("sin_id_transferencia");
+  const input = document.getElementById("id_transferencia");
+  const feedback = document.getElementById("id_transferencia_feedback");
+  if(!cb || !input) return;
+
+  cb.addEventListener("change", () => {
+    if(cb.checked){
+      input.value = "";
+      input.disabled = true;
+      input.removeAttribute("required");
+      input.style.borderColor = "";
+      input.style.opacity = "0.5";
+      if(feedback){ feedback.textContent = ""; feedback.className = ""; }
+    } else {
+      input.disabled = false;
+      input.style.opacity = "1";
+      // Restaurar required solo si no es ENTRADA ni Cierre de Caja
+      const etiqueta = document.getElementById("etiqueta")?.value || "";
+      const tipo = document.getElementById("tipo_transaccion")?.value || "";
+      if(!ETIQUETAS_CIERRE_CAJA.has(etiqueta) && tipo !== "ENTRADA"){
+        input.setAttribute("required", "required");
+      }
+    }
   });
 }
 
@@ -1174,6 +1241,10 @@ function limpiarFormularioConRecordar() {
   // Resetear formulario
   form.reset();
 
+  // Restaurar estado del input ID transferencia (form.reset unchecks pero no re-enables)
+  const idTransInput = document.getElementById("id_transferencia");
+  if(idTransInput){ idTransInput.disabled = false; idTransInput.style.opacity = "1"; }
+
   // Restaurar valores recordados
   if (valoresRecordados.fecha.recordar) {
     const inputFecha = document.getElementById('fecha');
@@ -1483,6 +1554,11 @@ function validarCampo(campo){
       return true;
 
     case 'id_transferencia':
+      // Si el checkbox "Sin ID" está marcado, siempre válido
+      if(document.getElementById("sin_id_transferencia")?.checked){
+        mostrarExito(campo);
+        return true;
+      }
       if(!valor){
         mostrarError(campo, 'El ID de transferencia es obligatorio');
         return false;
@@ -1588,7 +1664,9 @@ async function handleEgresoSubmit(e){
       usuario_casino: document.getElementById("usuario_casino").value.trim(),
       cuenta_salida: document.getElementById("cuenta_salida").value.trim(),
       empresa_cuenta_salida: document.getElementById("empresa_salida").value,
-      id_transferencia: document.getElementById("id_transferencia").value.trim(),
+      id_transferencia: document.getElementById("sin_id_transferencia")?.checked
+        ? null
+        : document.getElementById("id_transferencia").value.trim(),
       etiqueta: etiquetaActual,
       otro_concepto: document.getElementById("otro_concepto").value.trim(),
       notas: document.getElementById("notas").value.trim()
@@ -1612,11 +1690,14 @@ async function handleEgresoSubmit(e){
     if(montoNum === null || montoNum <= 0) throw new Error("Monto inválido. Debe ser mayor a 0.");
 
     // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
+    const sinIdChecked = document.getElementById("sin_id_transferencia")?.checked;
     if(!esCierreCaja) {
       if(!payload.cuenta_receptora) throw new Error("Completá CUENTA RECEPTORA.");
-      if(!payload.id_transferencia) throw new Error("Completá ID TRANSFERENCIA.");
-      if(!/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
-        throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
+      if(!sinIdChecked) {
+        if(!payload.id_transferencia) throw new Error("Completá ID TRANSFERENCIA.");
+        if(!/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
+          throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
+        }
       }
     }
 
@@ -3254,6 +3335,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     toggleOtroConcepto();
     fileLabel();
     wireIdTransferenciaAlphanumeric();
+    wireSinIdTransferencia(); // Checkbox "Sin ID de transferencia"
     wireFechaValidation(); // Validación de formato dd/mm/aaaa
     wireIdTransferenciaValidation(); // Validación de ID duplicado en tiempo real
     wireNombresValidation(); // Validación de nombres (solo letras y espacios)
