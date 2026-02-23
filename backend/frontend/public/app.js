@@ -411,7 +411,8 @@ async function api(path, {method="GET", body=null, auth=true, timeout=60000} = {
     const data = isJson ? await res.json().catch(()=>null) : await res.text().catch(()=>null);
 
     if(!res.ok){
-      const msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
+      let msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
+      if(data && data.detail) msg += ` (${data.detail})`;
       throw new Error(msg);
     }
     return data;

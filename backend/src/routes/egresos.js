@@ -625,6 +625,11 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
 
   const nextIdx = baseParams.length + 1;
 
+  // Función SQL reutilizable para parsear fecha de forma segura
+  // Filtra filas con fechas inválidas (NULL, vacías, formato desconocido)
+  const FECHA_VALIDA = `(fecha IS NOT NULL AND fecha::text <> '' AND (fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' OR fecha::text ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'))`;
+  const PARSE_FECHA = `(CASE WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD') ELSE TO_DATE(fecha::text, 'DD/MM/YYYY') END)`;
+
   // 1) Cierre de Caja anterior al mes seleccionado
   const cierreSql = `
     SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
@@ -632,16 +637,11 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     FROM egresos
     WHERE status NOT IN ('anulado')
       AND etiqueta = 'Cierre de Caja'
-      AND (CASE
-            WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
-            ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
-          END) < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
+      AND ${FECHA_VALIDA}
+      AND ${PARSE_FECHA} < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
       ${commonFilter}
     ORDER BY empresa_salida, cuenta_salida, moneda,
-             (CASE
-               WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
-               ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
-             END) DESC
+             ${PARSE_FECHA} DESC
   `;
   const primerDiaMes = `01/${mesStr}/${anioStr}`;
   const cierreResult = await query(cierreSql, [...baseParams, primerDiaMes]);
@@ -662,18 +662,9 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
     FROM egresos
     WHERE status NOT IN ('anulado')
       AND etiqueta != 'Cierre de Caja'
-      AND EXTRACT(MONTH FROM (
-        CASE
-          WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
-          ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
-        END
-      )) = $${nextIdx}
-      AND EXTRACT(YEAR FROM (
-        CASE
-          WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD')
-          ELSE TO_DATE(fecha::text, 'DD/MM/YYYY')
-        END
-      )) = $${nextIdx + 1}
+      AND ${FECHA_VALIDA}
+      AND EXTRACT(MONTH FROM ${PARSE_FECHA}) = $${nextIdx}
+      AND EXTRACT(YEAR FROM ${PARSE_FECHA}) = $${nextIdx + 1}
       ${commonFilter}
     GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
     ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
@@ -842,7 +833,12 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     if (error?.status === 400) {
       return res.status(400).json({ message: error.message });
     }
-    return res.status(500).json({ message: "Error obteniendo saldos" });
+    // Devolver detalle del error (solo admin puede ver saldos)
+    return res.status(500).json({
+      message: "Error obteniendo saldos",
+      detail: error?.message || "Error desconocido",
+      code: error?.code || null
+    });
   }
 });
 
