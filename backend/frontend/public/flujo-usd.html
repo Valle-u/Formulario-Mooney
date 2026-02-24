@@ -307,7 +307,13 @@
                 <div class="section-body grid">
                   <div class="field span6">
                     <label>SUBIR ARCHIVO COMPROBANTE *</label>
-                    <input id="comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
+                    <div class="dropzone" id="dropzone_comprobante">
+                      <input id="comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
+                      <div class="dropzone-content">
+                        <span class="dropzone-icon">📎</span>
+                        <span class="dropzone-text">Arrastrá un archivo acá o hacé clic para seleccionar</span>
+                      </div>
+                    </div>
                     <div class="note" id="comprobante_nombre">Ningún archivo seleccionado</div>
                     <div class="note">JPG / PNG / PDF • Máx 10MB</div>
                   </div>

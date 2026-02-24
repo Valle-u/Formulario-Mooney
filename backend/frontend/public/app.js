@@ -33,7 +33,7 @@ console.log('🔌 API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Otra (Especificar en notas)"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Lohas", "Otra (Especificar en notas)"];
 
 const ETIQUETAS = [
   // Unidad M
@@ -615,11 +615,57 @@ function toggleCamposPremio(){
 function fileLabel(){
   const f = document.getElementById("comprobante");
   const out = document.getElementById("comprobante_nombre");
-  console.log('📎 fileLabel ejecutado, input encontrado:', !!f, 'output encontrado:', !!out);
   if(!f || !out) return;
   const fileName = f.files?.[0]?.name;
-  console.log('📎 Archivo seleccionado:', fileName || 'ninguno');
   out.textContent = fileName ? fileName : "Ningún archivo seleccionado";
+  // Actualizar visual de la dropzone
+  const dz = document.getElementById("dropzone_comprobante");
+  if(dz) dz.classList.toggle("has-file", !!fileName);
+}
+
+function wireDropZone(){
+  const dz = document.getElementById("dropzone_comprobante");
+  const input = document.getElementById("comprobante");
+  if(!dz || !input) return;
+
+  const allowed = ["image/jpeg", "image/png", "application/pdf"];
+
+  // Clic en la zona abre el file picker
+  dz.addEventListener("click", (e) => {
+    if(e.target !== input) input.click();
+  });
+
+  // Prevenir defaults en drag events
+  ["dragenter", "dragover", "dragleave", "drop"].forEach(evt => {
+    dz.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); });
+  });
+
+  // Feedback visual al arrastrar
+  ["dragenter", "dragover"].forEach(evt => {
+    dz.addEventListener(evt, () => dz.classList.add("drag-over"));
+  });
+  ["dragleave", "drop"].forEach(evt => {
+    dz.addEventListener(evt, () => dz.classList.remove("drag-over"));
+  });
+
+  // Drop handler
+  dz.addEventListener("drop", (e) => {
+    const file = e.dataTransfer?.files?.[0];
+    if(!file) return;
+    if(!allowed.includes(file.type)){
+      toast("Archivo no válido", "Solo se permiten JPG, PNG o PDF.", "error");
+      return;
+    }
+    if(file.size > 10 * 1024 * 1024){
+      toast("Archivo muy grande", "El máximo es 10MB.", "error");
+      return;
+    }
+    // Asignar archivo al input
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    fileLabel();
+  });
 }
 
 function wireIdTransferenciaAlphanumeric(){
@@ -3393,14 +3439,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     const inputComprobante = document.getElementById("comprobante");
     if (inputComprobante) {
-      console.log('✅ Input comprobante encontrado y configurando listeners');
       inputComprobante.addEventListener("change", fileLabel);
-      inputComprobante.addEventListener("click", () => {
-        console.log('🖱️ Click detectado en input comprobante');
-      });
-    } else {
-      console.error('❌ Input comprobante NO encontrado');
     }
+    wireDropZone();
     document.getElementById("egresoForm")?.addEventListener("submit", handleEgresoSubmit);
 
     // Event listeners para el modal de confirmación
