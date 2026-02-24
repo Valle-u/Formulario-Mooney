@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MooneyMaker • Flujo USD</title>
+  <title>MooneyMaker • Flujo USD/USDT/USDT</title>
   <!-- Build: 2026-01-25 -->
   <link rel="stylesheet" href="styles.css?v=2026010522"/>
 </head>
@@ -31,7 +31,7 @@
     <nav class="topbar-center nav-desktop">
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
-      <a href="flujo-usd.html" class="nav-item active">Flujo USD</a>
+      <a href="flujo-usd.html" class="nav-item active">Flujo USD/USDT</a>
       <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -55,7 +55,7 @@
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
-      <a href="flujo-usd.html" class="mobile-item active">Flujo USD</a>
+      <a href="flujo-usd.html" class="mobile-item active">Flujo USD/USDT</a>
       <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
@@ -98,7 +98,7 @@
         <!-- FORM CARD -->
         <section class="card">
           <div class="card-header">
-            Flujo de Caja en Dólares (USD)
+            Flujo de Caja en Dólares / Tether (USD/USDT)
           </div>
 
           <div class="card-body">
@@ -116,15 +116,25 @@
                 </div>
 
                 <div class="section-body grid">
-                  <!-- TIPO DE TRANSACCIÓN (NUEVO - Solo USD) -->
+                  <!-- MONEDA USD/USDT -->
+                  <div class="field span4" id="wrap_moneda_usd_page">
+                    <label>MONEDA *</label>
+                    <select id="moneda_usd_page" required>
+                      <option value="USDT">₮ USDT (Tether)</option>
+                      <option value="USD">💵 USD (Dólares)</option>
+                    </select>
+                    <div class="note">Elegí la moneda de la transacción</div>
+                  </div>
+
+                  <!-- TIPO DE TRANSACCIÓN -->
                   <div class="field span4" id="wrap_tipo_transaccion">
                     <label>TIPO DE TRANSACCIÓN *</label>
                     <select id="tipo_transaccion" required>
                       <option value="">-- Seleccionar --</option>
-                      <option value="ENTRADA">📥 Entrada (Ingreso USD)</option>
-                      <option value="SALIDA">📤 Salida (Egreso USD)</option>
+                      <option value="ENTRADA">📥 Entrada</option>
+                      <option value="SALIDA">📤 Salida</option>
                     </select>
-                    <div class="note">Elegí si es un ingreso o egreso en dólares</div>
+                    <div class="note">Elegí si es un ingreso o egreso</div>
                   </div>
 
                   <div class="field span4">
@@ -329,7 +339,7 @@
       <div class="modal-backdrop" id="modalBackdrop"></div>
       <div class="modal-content">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <span id="modalTitle">⚠️ Confirmar Transacción USD</span>
+          <span id="modalTitle">⚠️ Confirmar Transacción USD/USDT</span>
           <button type="button" id="btnCerrarModal" style="background:none; border:none; color:var(--text); font-size:24px; cursor:pointer; padding:0; line-height:1;" aria-label="Cerrar modal">&times;</button>
         </div>
         <div class="card-body" id="confirmacionBody" style="max-height:70vh; overflow-y:auto;">

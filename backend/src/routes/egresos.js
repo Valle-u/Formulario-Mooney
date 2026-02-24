@@ -357,8 +357,8 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 
     // Validar moneda primero (antes de validar monto mínimo)
     const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
-    if (!["USD", "ARS"].includes(monedaNorm)) {
-      return res.status(400).json({ message: "Moneda inválida. Debe ser USD o ARS" });
+    if (!["USD", "ARS", "USDT"].includes(monedaNorm)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser USD, ARS o USDT" });
     }
 
     // Validar tipo_transaccion
@@ -818,14 +818,17 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     // Separar por moneda
     const saldosARS = current.saldos.filter(r => r.moneda === 'ARS');
     const saldosUSD = current.saldos.filter(r => r.moneda === 'USD');
+    const saldosUSDT = current.saldos.filter(r => r.moneda === 'USDT');
     const totalARS = saldosARS.reduce((sum, r) => sum + r.saldo, 0);
     const totalUSD = saldosUSD.reduce((sum, r) => sum + r.saldo, 0);
+    const totalUSDT = saldosUSDT.reduce((sum, r) => sum + r.saldo, 0);
 
     return res.json({
       saldos: current.saldos,
       saldosARS,
       saldosUSD,
-      totales: { ARS: totalARS, USD: totalUSD },
+      saldosUSDT,
+      totales: { ARS: totalARS, USD: totalUSD, USDT: totalUSDT },
       periodo: current.periodo
     });
   } catch (error) {
@@ -1031,13 +1034,14 @@ router.get("/", auth, async (req, res) => {
     const sumSql = `
       SELECT
         COALESCE(SUM(CASE WHEN e.moneda = 'ARS' THEN e.monto ELSE 0 END), 0) AS suma_ars,
-        COALESCE(SUM(CASE WHEN e.moneda = 'USD' THEN e.monto ELSE 0 END), 0) AS suma_usd
+        COALESCE(SUM(CASE WHEN e.moneda = 'USD' THEN e.monto ELSE 0 END), 0) AS suma_usd,
+        COALESCE(SUM(CASE WHEN e.moneda = 'USDT' THEN e.monto ELSE 0 END), 0) AS suma_usdt
       FROM egresos e
       JOIN users u ON u.id = e.created_by
       ${whereClause}
     `;
     const sumResult = await query(sumSql, sumParams);
-    const sumas = sumResult.rows[0] || { suma_ars: 0, suma_usd: 0 };
+    const sumas = sumResult.rows[0] || { suma_ars: 0, suma_usd: 0, suma_usdt: 0 };
 
     const egresos = r.rows.map(e => ({
       id: e.id,
@@ -1089,7 +1093,8 @@ router.get("/", auth, async (req, res) => {
       },
       sumas: {
         ars: Number(sumas.suma_ars),
-        usd: Number(sumas.suma_usd)
+        usd: Number(sumas.suma_usd),
+        usdt: Number(sumas.suma_usdt)
       }
     });
   } catch (e) {
@@ -1507,8 +1512,8 @@ router.put("/:id", auth, async (req, res) => {
     const monedaNorm = normText(moneda)
       ? String(moneda).trim().toUpperCase().replace(/\s*\(.+\)$/, "")
       : null;
-    if (monedaNorm && !["ARS", "USD"].includes(monedaNorm)) {
-      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS o USD" });
+    if (monedaNorm && !["ARS", "USD", "USDT"].includes(monedaNorm)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
     }
 
     // id_transferencia puede ser null explícito (checkbox "Sin ID")
