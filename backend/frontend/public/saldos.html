@@ -125,6 +125,11 @@
       color: white;
     }
 
+    .moneda-tag.usdt {
+      background: #f59e0b;
+      color: white;
+    }
+
     /* Stats del titular */
     .titular-stats {
       padding: 16px;
@@ -419,7 +424,7 @@
         <nav class="topbar-center nav-desktop">
           <a href="egreso.html" class="nav-item">Retiros</a>
           <a href="consulta-egresos.html" class="nav-item">Historial</a>
-          <a href="flujo-usd.html" class="nav-item">Flujo USD</a>
+          <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
           <a href="saldos.html" class="nav-item active" data-admin-strict="1">Saldos</a>
           <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
           <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -441,7 +446,7 @@
         <nav class="mobile-nav">
           <a href="egreso.html" class="mobile-item">Retiros</a>
           <a href="consulta-egresos.html" class="mobile-item">Historial</a>
-          <a href="flujo-usd.html" class="mobile-item">Flujo USD</a>
+          <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
           <a href="saldos.html" class="mobile-item active" data-admin-strict="1">Saldos</a>
           <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
           <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
@@ -486,6 +491,7 @@
                   <option value="">Todas</option>
                   <option value="ARS">ARS (Pesos)</option>
                   <option value="USD">USD (Dólares)</option>
+                  <option value="USDT">USDT (Tether)</option>
                 </select>
               </div>
               <div class="field span3" style="align-self:flex-end; display: flex; gap: 8px;">
@@ -507,6 +513,10 @@
               <div class="total-item">
                 <span class="total-label">Total USD:</span>
                 <span id="totalUSD" class="total-value" style="color: #3b82f6;">$0,00</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">Total USDT:</span>
+                <span id="totalUSDT" class="total-value" style="color: #f59e0b;">$0,00</span>
               </div>
             </div>
           </div>

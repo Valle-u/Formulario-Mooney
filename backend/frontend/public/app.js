@@ -789,6 +789,7 @@ function renderSaldos(data){
 
   const rowsARS = (data?.saldos || []).filter(r => String(r.moneda || 'ARS') === 'ARS');
   const rowsUSD = (data?.saldos || []).filter(r => String(r.moneda || 'ARS') === 'USD');
+  const rowsUSDT = (data?.saldos || []).filter(r => String(r.moneda || 'ARS') === 'USDT');
 
   const toRow = (r) => {
     const saldo = Number(r.saldo) || 0;
@@ -811,13 +812,23 @@ function renderSaldos(data){
     ? rowsUSD.map(toRow).join('')
     : '<tr><td colspan="5" class="muted">Sin saldos</td></tr>';
 
+  const tableUSDT = document.getElementById('saldosTableUSDT')?.getElementsByTagName('tbody')[0];
+  if (tableUSDT) {
+    tableUSDT.innerHTML = rowsUSDT.length
+      ? rowsUSDT.map(toRow).join('')
+      : '<tr><td colspan="5" class="muted">Sin saldos</td></tr>';
+  }
+
   // Totales
   const totalARS = Number(data?.totales?.ARS || 0);
   const totalUSD = Number(data?.totales?.USD || 0);
+  const totalUSDT = Number(data?.totales?.USDT || 0);
   const elTotalARS = document.getElementById('totalARS');
   const elTotalUSD = document.getElementById('totalUSD');
+  const elTotalUSDT = document.getElementById('totalUSDT');
   if (elTotalARS) elTotalARS.textContent = `Total ARS: ${totalARS.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
   if (elTotalUSD) elTotalUSD.textContent = `Total USD: ${totalUSD.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  if (elTotalUSDT) elTotalUSDT.textContent = `Total USDT: ${totalUSDT.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
 
   // Detalle por cuenta (clic en fila)
   const rows = tableARS.querySelectorAll('tr');
@@ -839,6 +850,18 @@ function renderSaldos(data){
       if (empresa && cuenta && moneda) verDetalleCuenta(empresa, cuenta, moneda);
     });
   });
+
+  if (tableUSDT) {
+    tableUSDT.querySelectorAll('tr').forEach(tr => {
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', () => {
+        const empresa = tr.dataset.empresa;
+        const cuenta = tr.dataset.cuenta;
+        const moneda = tr.dataset.moneda;
+        if (empresa && cuenta && moneda) verDetalleCuenta(empresa, cuenta, moneda);
+      });
+    });
+  }
 }
 
 async function verDetalleCuenta(empresa, cuenta, moneda){
@@ -1657,7 +1680,7 @@ async function handleEgresoSubmit(e){
       hora_solicitud_cliente: document.getElementById("hora_solicitud_cliente")?.value || "",
       hora_quema_fichas: document.getElementById("hora_quema_fichas")?.value || "",
       monto_transferencia_raw: (montoRaw || "").trim(),
-      moneda: IS_USD_PAGE ? "USD" : (document.getElementById("moneda")?.value || "ARS"),
+      moneda: IS_USD_PAGE ? (document.getElementById("moneda_usd_page")?.value || "USDT") : (document.getElementById("moneda")?.value || "ARS"),
       tipo_transaccion: IS_USD_PAGE
         ? document.getElementById("tipo_transaccion")?.value
         : (etiquetaActual === "[Unidad M] Deposito de cliente" ? "ENTRADA" : "SALIDA"),
@@ -2496,7 +2519,9 @@ function renderEgresos(egresos, pagination, sumas){
     });
 
     const moneda = e.moneda || 'ARS';
-    const monedaBadge = moneda === 'USD'
+    const monedaBadge = moneda === 'USDT'
+      ? '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">₮ USDT</span>'
+      : moneda === 'USD'
       ? '<span style="background: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">💵 USD</span>'
       : '<span style="background: #0891b2; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">💵 ARS</span>';
 
@@ -2536,20 +2561,15 @@ function renderEgresos(egresos, pagination, sumas){
   // Usar sumas totales del backend (suma de TODAS las páginas con filtros aplicados)
   const sumaARS = sumas?.ars || 0;
   const sumaUSD = sumas?.usd || 0;
+  const sumaUSDT = sumas?.usdt || 0;
 
   const sumaTotalEl = document.getElementById("sumaTotal");
   if(sumaTotalEl) {
-    let textoSuma = "";
-    if(sumaARS > 0 && sumaUSD > 0) {
-      textoSuma = `💰 ARS $${sumaARS.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})} | USD $${sumaUSD.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    } else if(sumaARS > 0) {
-      textoSuma = `💰 Total: ARS $${sumaARS.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    } else if(sumaUSD > 0) {
-      textoSuma = `💰 Total: USD $${sumaUSD.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    } else {
-      textoSuma = "—";
-    }
-    sumaTotalEl.textContent = textoSuma;
+    const partes = [];
+    if(sumaARS > 0) partes.push(`ARS $${sumaARS.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
+    if(sumaUSD > 0) partes.push(`USD $${sumaUSD.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
+    if(sumaUSDT > 0) partes.push(`USDT $${sumaUSDT.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
+    sumaTotalEl.textContent = partes.length > 0 ? `💰 ${partes.join(" | ")}` : "—";
   }
 
   document.getElementById("btnPrev").disabled = pagination.offset === 0;
@@ -2896,6 +2916,7 @@ function editarEgresoModal(){
         <select id="edit_moneda" required>
           <option value="ARS" ${egreso.moneda === 'ARS' ? 'selected' : ''}>ARS (Pesos)</option>
           <option value="USD" ${egreso.moneda === 'USD' ? 'selected' : ''}>USD (Dólares)</option>
+          <option value="USDT" ${egreso.moneda === 'USDT' ? 'selected' : ''}>USDT (Tether)</option>
         </select>
       </div>
 
@@ -3930,6 +3951,13 @@ function renderSaldosTarjetas(data, empresaFiltro) {
     totalUSDEl.textContent = `$${Number(totales.USD).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
+  const totalUSDTEl = document.getElementById("totalUSDT");
+  if (totalUSDTEl) {
+    const color = (totales.USDT || 0) >= 0 ? "#f59e0b" : "#ef4444";
+    totalUSDTEl.style.color = color;
+    totalUSDTEl.textContent = `$${Number(totales.USDT || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
   if (!container) return;
 
   if (saldos.length === 0) {
@@ -3977,7 +4005,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
       const balance = Number(c.saldo || 0);
       const balanceClass = balance >= 0 ? 'positive' : 'negative';
       const inicioCajaClass = inicioCaja >= 0 ? 'positive' : 'negative';
-      const monedaClass = c.moneda === 'ARS' ? 'ars' : 'usd';
+      const monedaClass = c.moneda === 'ARS' ? 'ars' : c.moneda === 'USDT' ? 'usdt' : 'usd';
 
       const fechaUltima = c.ultima_transaccion
         ? new Date(c.ultima_transaccion).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
