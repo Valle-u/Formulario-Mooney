@@ -37,3 +37,6 @@ backend/backups/
 
 # IMPORTANTE: Solo trabajar en backend/frontend/public
 # NO crear carpeta frontend/ en la raíz
+
+# Archivos temporales de Claude Code
+tmpclaude-*
