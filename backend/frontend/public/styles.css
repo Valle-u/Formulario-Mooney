@@ -2045,11 +2045,11 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar {
-    --sidebar-width: 96px;
+    --sidebar-width: 80px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar {
-    padding: 10px 0;
+    padding: 8px 0;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-inner {
@@ -2087,9 +2087,9 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item {
-    width: 46px;
-    height: 46px;
-    min-height: 46px;
+    width: 42px;
+    height: 42px;
+    min-height: 42px;
     display: grid;
     place-items: center;
     gap: 0;
@@ -2098,7 +2098,7 @@ body {
     line-height: 0;
     color: transparent;
     text-indent: 0;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
   }
 
@@ -2128,15 +2128,15 @@ body {
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge {
-    width: 46px;
-    min-height: 36px;
+    width: 42px;
+    min-height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0;
     min-width: 0;
     padding: 0;
-    border-radius: 12px;
+    border-radius: 10px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item,
@@ -2160,11 +2160,11 @@ body {
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge::before { content: 'USR'; }
 
   body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
-    min-width: 40px;
-    width: 40px;
-    height: 36px;
+    min-width: 34px;
+    width: 34px;
+    height: 32px;
     font-size: 0;
-    border-radius: 10px;
+    border-radius: 9px;
   }
 
   body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn::before {
