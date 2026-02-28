@@ -30,6 +30,36 @@ import { sendNotification } from "./notifications.js";
 
  const router = express.Router();
 
+const SALDOS_CACHE_TTL_MS = Number(process.env.SALDOS_CACHE_TTL_MS || 15000);
+const SALDOS_CACHE_MAX_ENTRIES = Number(process.env.SALDOS_CACHE_MAX_ENTRIES || 100);
+const saldosCache = new Map();
+
+function buildSaldosCacheKey({ empresa, moneda, cuenta, mes, anio }) {
+  return [empresa || "*", moneda || "*", cuenta || "*", String(mes), String(anio)].join("|");
+}
+
+function getSaldosCache(cacheKey) {
+  const item = saldosCache.get(cacheKey);
+  if (!item) return null;
+  if ((Date.now() - item.ts) > SALDOS_CACHE_TTL_MS) {
+    saldosCache.delete(cacheKey);
+    return null;
+  }
+  return item.payload;
+}
+
+function setSaldosCache(cacheKey, payload) {
+  if (saldosCache.size >= SALDOS_CACHE_MAX_ENTRIES) {
+    const firstKey = saldosCache.keys().next().value;
+    if (firstKey) saldosCache.delete(firstKey);
+  }
+  saldosCache.set(cacheKey, { ts: Date.now(), payload });
+}
+
+function clearSaldosCache() {
+  if (saldosCache.size) saldosCache.clear();
+}
+
 // GET distinct empresas (for saldos filter)
 router.get("/distinct-empresas", auth, async (req, res) => {
   try {
@@ -570,6 +600,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       // No fallar la creación del egreso si falla la notificación
     }
 
+    clearSaldosCache();
     return res.status(201).json({ id: egresoId, message: "ok" });
   } catch (e) {
     console.error("🔥 POST /api/egresos ERROR:", e);
@@ -599,12 +630,18 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 // ═══════════════════════════════════════════════════
 // HELPER: Calcular saldos de un mes dado
 // ═══════════════════════════════════════════════════
-async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
+async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown = true }) {
   // Robustly derive month/year for filtering
   const mm = Number.isFinite(Number(mes)) ? Number(mes) : (new Date()).getMonth() + 1;
   const aa = Number.isFinite(Number(anio)) ? Number(anio) : new Date().getFullYear();
   const mesStr = String(mm).padStart(2, "0");
   const anioStr = String(aa);
+  const primerDiaMesISO = `${anioStr}-${mesStr}-01`;
+
+  const next = new Date(aa, mm, 1);
+  const nextMesStr = String(next.getMonth() + 1).padStart(2, "0");
+  const nextAnioStr = String(next.getFullYear());
+  const primerDiaMesSiguienteISO = `${nextAnioStr}-${nextMesStr}-01`;
 
   // Construir filtros comunes
   const baseParams = [];
@@ -632,44 +669,101 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
 
   // 1) Cierre de Caja anterior al mes seleccionado
   const cierreSql = `
+    WITH base AS (
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        monto,
+        ${PARSE_FECHA} AS fecha_parsed
+      FROM egresos
+      WHERE status <> 'anulado'
+        AND etiqueta = 'Cierre de Caja'
+        AND ${FECHA_VALIDA}
+        ${commonFilter}
+    )
     SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
-      empresa_salida, cuenta_salida, moneda, monto
-    FROM egresos
-    WHERE status NOT IN ('anulado')
-      AND etiqueta = 'Cierre de Caja'
-      AND ${FECHA_VALIDA}
-      AND ${PARSE_FECHA} < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
-      ${commonFilter}
-    ORDER BY empresa_salida, cuenta_salida, moneda,
-             ${PARSE_FECHA} DESC
+      empresa_salida,
+      cuenta_salida,
+      moneda,
+      monto
+    FROM base
+    WHERE fecha_parsed < $${nextIdx}::date
+    ORDER BY empresa_salida, cuenta_salida, moneda, fecha_parsed DESC
   `;
-  const primerDiaMes = `01/${mesStr}/${anioStr}`;
-  const cierreResult = await query(cierreSql, [...baseParams, primerDiaMes]);
+  const cierreResult = await query(cierreSql, [...baseParams, primerDiaMesISO]);
 
   const cierreMap = {};
   cierreResult.rows.forEach(r => {
     cierreMap[`${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`] = Number(r.monto);
   });
 
-  // 2) Movimientos del mes con desglose por etiqueta (query fusionada)
-  const movSql = `
-    SELECT
-      empresa_salida, cuenta_salida, moneda, etiqueta,
-      COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
-      COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
-      MAX(created_at) AS ultima_transaccion,
-      COUNT(*) AS cnt
-    FROM egresos
-    WHERE status NOT IN ('anulado')
-      AND etiqueta != 'Cierre de Caja'
-      AND ${FECHA_VALIDA}
-      AND EXTRACT(MONTH FROM ${PARSE_FECHA}) = $${nextIdx}
-      AND EXTRACT(YEAR FROM ${PARSE_FECHA}) = $${nextIdx + 1}
-      ${commonFilter}
-    GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
-    ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
-  `;
-  const movResult = await query(movSql, [...baseParams, mm, aa]);
+  // 2) Movimientos del mes (con o sin desglose por etiqueta)
+  const movSql = includeBreakdown
+    ? `
+      WITH base AS (
+        SELECT
+          empresa_salida,
+          cuenta_salida,
+          moneda,
+          etiqueta,
+          tipo_transaccion,
+          monto,
+          created_at,
+          ${PARSE_FECHA} AS fecha_parsed
+        FROM egresos
+        WHERE status <> 'anulado'
+          AND etiqueta != 'Cierre de Caja'
+          AND ${FECHA_VALIDA}
+          ${commonFilter}
+      )
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        etiqueta,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
+        MAX(created_at) AS ultima_transaccion,
+        COUNT(*) AS cnt
+      FROM base
+      WHERE fecha_parsed >= $${nextIdx}::date
+        AND fecha_parsed < $${nextIdx + 1}::date
+      GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
+      ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
+    `
+    : `
+      WITH base AS (
+        SELECT
+          empresa_salida,
+          cuenta_salida,
+          moneda,
+          tipo_transaccion,
+          monto,
+          created_at,
+          ${PARSE_FECHA} AS fecha_parsed
+        FROM egresos
+        WHERE status <> 'anulado'
+          AND etiqueta != 'Cierre de Caja'
+          AND ${FECHA_VALIDA}
+          ${commonFilter}
+      )
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
+        MAX(created_at) AS ultima_transaccion,
+        COUNT(*) AS cnt
+      FROM base
+      WHERE fecha_parsed >= $${nextIdx}::date
+        AND fecha_parsed < $${nextIdx + 1}::date
+      GROUP BY empresa_salida, cuenta_salida, moneda
+      ORDER BY empresa_salida, cuenta_salida, moneda
+    `;
+
+  const movResult = await query(movSql, [...baseParams, primerDiaMesISO, primerDiaMesSiguienteISO]);
 
   // 3) Combinar: construir cuentasMap con desglose
   const cuentasMap = {};
@@ -724,20 +818,24 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
       c.ultima_transaccion = r.ultima_transaccion;
     }
 
-    // Desglose por etiqueta
-    c.desglose_etiquetas.push({
-      etiqueta: r.etiqueta,
-      entradas,
-      salidas,
-      total: entradas + salidas,
-      count: cnt
-    });
+    // Desglose por etiqueta (solo si fue solicitado)
+    if (includeBreakdown) {
+      c.desglose_etiquetas.push({
+        etiqueta: r.etiqueta,
+        entradas,
+        salidas,
+        total: entradas + salidas,
+        count: cnt
+      });
+    }
   });
 
   // Calcular saldo final y ordenar desglose
   for (const c of Object.values(cuentasMap)) {
     c.saldo = c.inicio_caja + c.total_entradas - c.total_salidas;
-    c.desglose_etiquetas.sort((a, b) => b.total - a.total);
+    if (includeBreakdown) {
+      c.desglose_etiquetas.sort((a, b) => b.total - a.total);
+    }
   }
 
   const saldos = Object.values(cuentasMap).sort((a, b) => {
@@ -779,8 +877,15 @@ function parsePeriodoQuery(req) {
 // Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
 router.get("/saldos", auth, requireAdmin, async (req, res) => {
   try {
+    const routeStart = Date.now();
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
+
+    const cacheKey = buildSaldosCacheKey({ empresa, moneda, cuenta, mes, anio });
+    const cached = getSaldosCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
 
     // Calcular saldos del mes actual y anterior en paralelo
     let prevMes = mes - 1;
@@ -788,8 +893,8 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     if (prevMes < 1) { prevMes = 12; prevAnio--; }
 
     const [current, prev] = await Promise.all([
-      computeSaldos({ empresa, moneda, cuenta, mes, anio }),
-      computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio })
+      computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown: true }),
+      computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio, includeBreakdown: false })
     ]);
 
     // Mapear saldos anteriores por clave
@@ -815,22 +920,28 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
       }
     });
 
-    // Separar por moneda
-    const saldosARS = current.saldos.filter(r => r.moneda === 'ARS');
-    const saldosUSD = current.saldos.filter(r => r.moneda === 'USD');
-    const saldosUSDT = current.saldos.filter(r => r.moneda === 'USDT');
-    const totalARS = saldosARS.reduce((sum, r) => sum + r.saldo, 0);
-    const totalUSD = saldosUSD.reduce((sum, r) => sum + r.saldo, 0);
-    const totalUSDT = saldosUSDT.reduce((sum, r) => sum + r.saldo, 0);
+    // Totales por moneda (sin duplicar payload)
+    const totales = current.saldos.reduce((acc, r) => {
+      const key = String(r.moneda || "").toUpperCase();
+      if (!acc[key]) acc[key] = 0;
+      acc[key] += Number(r.saldo || 0);
+      return acc;
+    }, { ARS: 0, USD: 0, USDT: 0 });
 
-    return res.json({
+    const payload = {
       saldos: current.saldos,
-      saldosARS,
-      saldosUSD,
-      saldosUSDT,
-      totales: { ARS: totalARS, USD: totalUSD, USDT: totalUSDT },
+      totales,
       periodo: current.periodo
-    });
+    };
+
+    setSaldosCache(cacheKey, payload);
+
+    const durationMs = Date.now() - routeStart;
+    if (durationMs > 700) {
+      console.log(`Query saldos lenta (${durationMs}ms)`, { empresa, moneda, cuenta, mes, anio, cuentas: current.saldos.length });
+    }
+
+    return res.json(payload);
   } catch (error) {
     console.error("Error obteniendo saldos:", error);
     if (error?.status === 400) {
@@ -851,7 +962,7 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
 
-    const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
+    const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown: false });
 
     const columns = ["Empresa", "Cuenta", "Moneda", "Inicio Caja", "Entradas", "Salidas", "Balance", "Cant. Operaciones"];
     const rows = saldos.map(s => [
@@ -895,6 +1006,7 @@ router.get("/", auth, async (req, res) => {
       monto_max,
       turno,
       cuenta_receptora,
+      cuenta_salida,
       created_by,
       limit,
       offset
@@ -977,6 +1089,11 @@ router.get("/", auth, async (req, res) => {
     if (cuenta_receptora) {
       params.push(`%${cuenta_receptora}%`);
       where.push(`e.cuenta_receptora ILIKE $${params.length}`);
+    }
+
+    if (cuenta_salida) {
+      params.push(cuenta_salida);
+      where.push(`e.cuenta_salida = $${params.length}`);
     }
 
     if (created_by) {
@@ -1643,6 +1760,7 @@ router.put("/:id", auth, async (req, res) => {
       }
     });
 
+    clearSaldosCache();
     return res.json({ message: "Egreso actualizado correctamente" });
 
   } catch (error) {
@@ -1723,6 +1841,7 @@ router.post("/:id/anular", auth, async (req, res) => {
       }
     });
 
+    clearSaldosCache();
     return res.json({ message: "Egreso anulado correctamente" });
 
   } catch (error) {
@@ -1816,6 +1935,7 @@ router.delete("/:id", auth, async (req, res) => {
       }
     });
 
+    clearSaldosCache();
     return res.json({ message: "Egreso eliminado correctamente" });
 
   } catch (error) {

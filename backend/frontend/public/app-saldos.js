@@ -4,6 +4,53 @@
 
 // Variables globales para modal de saldos
 let modalSaldosData = { empresa: '', cuenta: '', moneda: '', egresos: [], inicioCaja: 0 };
+let lastSaldosData = null;
+let saldosReqSerial = 0;
+let saldosDebounceTimer = null;
+
+const SALDOS_CLIENT_CACHE_TTL_MS = 30000;
+const saldosClientCache = new Map();
+
+function getSaldosFiltros() {
+  return {
+    empresa: document.getElementById("filtro_empresa")?.value || "",
+    moneda: document.getElementById("filtro_moneda")?.value || "",
+    mes: document.getElementById("filtro_mes")?.value || "",
+    anio: document.getElementById("filtro_anio")?.value || ""
+  };
+}
+
+function buildSaldosCacheKey({ empresa, moneda, mes, anio }) {
+  return [empresa || "*", moneda || "*", mes || "*", anio || "*"].join("|");
+}
+
+function getCachedSaldos(cacheKey) {
+  const item = saldosClientCache.get(cacheKey);
+  if (!item) return null;
+  if ((Date.now() - item.ts) > SALDOS_CLIENT_CACHE_TTL_MS) {
+    saldosClientCache.delete(cacheKey);
+    return null;
+  }
+  return item.data;
+}
+
+function setCachedSaldos(cacheKey, data) {
+  saldosClientCache.set(cacheKey, { ts: Date.now(), data });
+}
+
+function scheduleCargarSaldos() {
+  if (saldosDebounceTimer) clearTimeout(saldosDebounceTimer);
+  saldosDebounceTimer = setTimeout(() => {
+    cargarSaldos({ showLoading: false });
+  }, 220);
+}
+
+function findCuentaSaldoInCurrentData(empresa, cuenta, moneda) {
+  if (!lastSaldosData || !Array.isArray(lastSaldosData.saldos)) return null;
+  return lastSaldosData.saldos.find(s =>
+    s.empresa_salida === empresa && s.cuenta_salida === cuenta && s.moneda === moneda
+  ) || null;
+}
 
 // Inicializar página de saldos
 async function initSaldosPage() {
@@ -16,27 +63,27 @@ async function initSaldosPage() {
   // Event listeners principales
   const btnCargar = document.getElementById("btnCargarSaldos");
   if (btnCargar) {
-    btnCargar.addEventListener("click", cargarSaldos);
+    btnCargar.addEventListener("click", () => cargarSaldos({ showLoading: true, force: true }));
   }
 
   const filtroEmpresa = document.getElementById("filtro_empresa");
   if (filtroEmpresa) {
-    filtroEmpresa.addEventListener("change", cargarSaldos);
+    filtroEmpresa.addEventListener("change", scheduleCargarSaldos);
   }
 
   const filtroMoneda = document.getElementById("filtro_moneda");
   if (filtroMoneda) {
-    filtroMoneda.addEventListener("change", cargarSaldos);
+    filtroMoneda.addEventListener("change", scheduleCargarSaldos);
   }
 
   const filtroMes = document.getElementById("filtro_mes");
   if (filtroMes) {
-    filtroMes.addEventListener("change", cargarSaldos);
+    filtroMes.addEventListener("change", scheduleCargarSaldos);
   }
 
   const filtroAnio = document.getElementById("filtro_anio");
   if (filtroAnio) {
-    filtroAnio.addEventListener("change", cargarSaldos);
+    filtroAnio.addEventListener("change", scheduleCargarSaldos);
   }
 
   // Event listeners para cerrar modal
@@ -64,7 +111,7 @@ async function initSaldosPage() {
   });
 
   // Cargar saldos iniciales
-  await cargarSaldos();
+  await cargarSaldos({ showLoading: true, force: true });
 }
 
 function poblarSelectorPeriodo() {
@@ -118,16 +165,23 @@ async function cargarEmpresasFiltroSaldos() {
 }
 
 // Cargar saldos desde API
-async function cargarSaldos() {
-  const empresa = document.getElementById("filtro_empresa")?.value || "";
-  const moneda = document.getElementById("filtro_moneda")?.value || "";
-  const mes = document.getElementById("filtro_mes")?.value || "";
-  const anio = document.getElementById("filtro_anio")?.value || "";
+async function cargarSaldos({ showLoading = true, force = false } = {}) {
+  const { empresa, moneda, mes, anio } = getSaldosFiltros();
   const container = document.getElementById("saldosContainer");
+  const cacheKey = buildSaldosCacheKey({ empresa, moneda, mes, anio });
 
-  if (container) {
+  const cached = force ? null : getCachedSaldos(cacheKey);
+  if (cached) {
+    lastSaldosData = cached;
+    renderSaldosTarjetas(cached, empresa);
+    return;
+  }
+
+  if (showLoading && container) {
     container.innerHTML = '<div class="muted" style="text-align: center; padding: 40px;">Cargando saldos...</div>';
   }
+
+  const requestSerial = ++saldosReqSerial;
 
   try {
     const qs = new URLSearchParams();
@@ -137,8 +191,15 @@ async function cargarSaldos() {
     if (anio) qs.set("anio", anio);
 
     const data = await api(`/api/egresos/saldos?${qs.toString()}`);
+
+    // Ignorar respuestas viejas si hubo un request posterior
+    if (requestSerial !== saldosReqSerial) return;
+
+    setCachedSaldos(cacheKey, data);
+    lastSaldosData = data;
     renderSaldosTarjetas(data, empresa);
   } catch (err) {
+    if (requestSerial !== saldosReqSerial) return;
     console.error("Error cargando saldos:", err);
     if (container) {
       container.innerHTML = `<div class="muted" style="text-align: center; padding: 40px; color: #ef4444;">Error: ${err.message}</div>`;
@@ -412,22 +473,37 @@ async function verOperacionesCuenta(empresa, cuenta, moneda) {
   modal.style.display = "flex";
 
   try {
-    // Obtener inicio de caja para esta cuenta
-    const qsSaldos = new URLSearchParams();
-    qsSaldos.set("empresa", empresa);
-    qsSaldos.set("cuenta", cuenta);
-    qsSaldos.set("moneda", moneda);
-    qsSaldos.set("mes", mes);
-    qsSaldos.set("anio", anio);
-    const saldoData = await api(`/api/egresos/saldos?${qsSaldos.toString()}`);
-    const cuentaSaldo = saldoData.saldos && saldoData.saldos[0];
-    modalSaldosData.inicioCaja = cuentaSaldo ? Number(cuentaSaldo.inicio_caja || 0) : 0;
+    // Obtener inicio de caja para esta cuenta (usar data ya cargada si existe)
+    const cuentaSaldoLocal = findCuentaSaldoInCurrentData(empresa, cuenta, moneda);
+    if (cuentaSaldoLocal) {
+      modalSaldosData.inicioCaja = Number(cuentaSaldoLocal.inicio_caja || 0);
+    } else {
+      const qsSaldos = new URLSearchParams();
+      qsSaldos.set("empresa", empresa);
+      qsSaldos.set("cuenta", cuenta);
+      qsSaldos.set("moneda", moneda);
+      qsSaldos.set("mes", mes);
+      qsSaldos.set("anio", anio);
+      const saldoData = await api(`/api/egresos/saldos?${qsSaldos.toString()}`);
+      const cuentaSaldo = saldoData.saldos && saldoData.saldos[0];
+      modalSaldosData.inicioCaja = cuentaSaldo ? Number(cuentaSaldo.inicio_caja || 0) : 0;
+    }
 
     // Buscar egresos de esta cuenta del mes seleccionado
     const qs = new URLSearchParams();
     qs.set("empresa_salida", empresa);
+    qs.set("cuenta_salida", cuenta);
     qs.set("moneda", moneda);
-    qs.set("limit", "500");
+    const mesNumFiltro = Number(mes);
+    const anioNumFiltro = Number(anio);
+    if (Number.isInteger(mesNumFiltro) && Number.isInteger(anioNumFiltro)) {
+      const desde = `${anioNumFiltro}-${String(mesNumFiltro).padStart(2, "0")}-01`;
+      const ultimoDia = new Date(anioNumFiltro, mesNumFiltro, 0).getDate();
+      const hasta = `${anioNumFiltro}-${String(mesNumFiltro).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
+      qs.set("fecha_desde", desde);
+      qs.set("fecha_hasta", hasta);
+    }
+    qs.set("limit", "1000");
 
     const { egresos } = await api(`/api/egresos?${qs.toString()}`);
 
