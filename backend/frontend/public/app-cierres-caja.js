@@ -366,23 +366,93 @@ function aplicarSlotAlFormulario(row) {
   toast("Slot aplicado", "Completamos el formulario con ese dia y turno.", "info", 4500);
 }
 
+function getKpiFilters() {
+  return {
+    fecha_desde: document.getElementById("kpi_fecha_desde")?.value || "",
+    fecha_hasta: document.getElementById("kpi_fecha_hasta")?.value || "",
+    empresa_salida: document.getElementById("kpi_empresa_salida")?.value || "",
+    moneda: document.getElementById("kpi_moneda")?.value || ""
+  };
+}
+
+function buildCierresQueryParams(filters) {
+  const qs = new URLSearchParams();
+  if (filters.fecha_desde) qs.set("fecha_desde", filters.fecha_desde);
+  if (filters.fecha_hasta) qs.set("fecha_hasta", filters.fecha_hasta);
+  if (filters.empresa_salida) qs.set("empresa_salida", filters.empresa_salida);
+  if (filters.moneda) qs.set("moneda", filters.moneda);
+  return qs;
+}
+
+async function downloadCierresCSV() {
+  const btn = document.getElementById("btnDownloadCierresCSV");
+  const prevText = btn?.textContent || "Descargar CSV";
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Descargando...";
+    }
+
+    const token = getToken();
+    if (!token) {
+      throw new Error("Sesion expirada. Volve a iniciar sesion.");
+    }
+
+    const qs = buildCierresQueryParams(getKpiFilters());
+    const url = `${API_BASE}/api/egresos/cierres/csv${qs.toString() ? `?${qs.toString()}` : ""}`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json().catch(() => null)
+        : await res.text().catch(() => null);
+      const msg = (data && data.message) ? data.message : (typeof data === "string" && data ? data : `Error ${res.status}`);
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const disposition = res.headers.get("content-disposition") || "";
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = (match && match[1]) ? match[1] : "cierres_caja.csv";
+
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+
+    toast("Descarga lista", "CSV de cierres descargado correctamente.", "success", 4500);
+  } catch (err) {
+    toast("Error", err.message || "No se pudo descargar el CSV", "error", 9000);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+  }
+}
+
 async function refreshKPI() {
-  const fechaDesde = document.getElementById("kpi_fecha_desde")?.value || "";
-  const fechaHasta = document.getElementById("kpi_fecha_hasta")?.value || "";
-  const empresa = document.getElementById("kpi_empresa_salida")?.value || "";
-  const moneda = document.getElementById("kpi_moneda")?.value || "";
+  const filtros = getKpiFilters();
 
   const list = document.getElementById("cierresKPIList");
   if (list) list.innerHTML = '<div class="kpi-loading">Cargando estado de cierres...</div>';
 
   try {
-    const qs = new URLSearchParams();
-    if (fechaDesde) qs.set("fecha_desde", fechaDesde);
-    if (fechaHasta) qs.set("fecha_hasta", fechaHasta);
-    if (empresa) qs.set("empresa_salida", empresa);
-    if (moneda) qs.set("moneda", moneda);
+    const qs = buildCierresQueryParams(filtros);
 
-    const data = await api(`/api/egresos/cierres/kpi?${qs.toString()}`);
+    const data = await api(`/api/egresos/cierres/kpi${qs.toString() ? `?${qs.toString()}` : ""}`);
     cierreKpiRowsCache = Array.isArray(data?.rows) ? data.rows : [];
 
     const pendientes = Number(data?.summary?.pendientes || 0);
@@ -485,6 +555,7 @@ function wireEvents() {
   document.getElementById("cierreForm")?.addEventListener("submit", handleSubmitCierre);
 
   document.getElementById("btnRefreshCierresKPI")?.addEventListener("click", refreshKPI);
+  document.getElementById("btnDownloadCierresCSV")?.addEventListener("click", downloadCierresCSV);
 
   ["kpi_fecha_desde", "kpi_fecha_hasta", "kpi_empresa_salida", "kpi_moneda"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", refreshKPI);

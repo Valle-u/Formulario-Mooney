@@ -219,6 +219,8 @@
 .cierre-kpi-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 8px;
 }
 
@@ -369,6 +371,14 @@ html[data-theme="light"] .cierre-resumen-live {
 
   .kpi-row-actions .btn {
     width: 100%;
+  }
+
+  .cierre-kpi-actions {
+    justify-content: stretch;
+  }
+
+  .cierre-kpi-actions .btn {
+    flex: 1 1 100%;
   }
 }
 

@@ -1263,6 +1263,148 @@ router.get("/cierres/kpi", auth, async (req, res) => {
   }
 });
 
+// GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados
+router.get("/cierres/csv", auth, async (req, res) => {
+  try {
+    const todayISO = localDateToISO(new Date());
+    const defaultDesde = shiftISODate(todayISO, -2);
+
+    const fechaDesde = parseFechaQueryFlexible(req.query.fecha_desde, defaultDesde, "fecha_desde");
+    const fechaHasta = parseFechaQueryFlexible(req.query.fecha_hasta, todayISO, "fecha_hasta");
+
+    if (fechaDesde > fechaHasta) {
+      return res.status(400).json({ message: "fecha_desde no puede ser mayor que fecha_hasta" });
+    }
+
+    const fromDate = new Date(`${fechaDesde}T00:00:00`);
+    const toDate = new Date(`${fechaHasta}T00:00:00`);
+    const totalDays = Math.floor((toDate - fromDate) / 86400000) + 1;
+    if (totalDays < 1 || totalDays > 62) {
+      return res.status(400).json({ message: "El rango de fechas para CSV debe estar entre 1 y 62 dias" });
+    }
+
+    const empresaSalida = String(req.query.empresa_salida || "").trim();
+    const moneda = String(req.query.moneda || "").trim().toUpperCase();
+    const turno = req.query.turno ? normalizeTurnoLabel(String(req.query.turno || "").trim()) : "";
+
+    if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
+      return res.status(400).json({ message: "empresa_salida inválida" });
+    }
+    if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
+    }
+    if (turno && !TURNOS_CIERRE.includes(turno)) {
+      return res.status(400).json({ message: "Turno inválido para cierre de caja" });
+    }
+
+    const where = [
+      "e.etiqueta = 'Cierre de Caja'",
+      "e.status <> 'anulado'",
+      "e.fecha >= $1::date",
+      "e.fecha <= $2::date"
+    ];
+    const params = [fechaDesde, fechaHasta];
+
+    if (empresaSalida) {
+      params.push(empresaSalida);
+      where.push(`e.empresa_salida = $${params.length}`);
+    }
+    if (moneda) {
+      params.push(moneda);
+      where.push(`e.moneda = $${params.length}`);
+    }
+    if (turno) {
+      params.push(turno);
+      where.push(`e.turno = $${params.length}`);
+    }
+
+    const r = await query(
+      `SELECT
+         e.id,
+         e.fecha,
+         to_char(e.hora, 'HH24:MI') AS hora,
+         e.turno,
+         e.empresa_salida,
+         e.cuenta_salida,
+         e.moneda,
+         e.monto,
+         e.monto_raw,
+         to_char((e.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'), 'DD/MM/YYYY HH24:MI:SS') AS created_at_ar,
+         u.username AS created_by_username
+       FROM egresos e
+       LEFT JOIN users u ON u.id = e.created_by
+       WHERE ${where.join(" AND ")}
+       ORDER BY e.fecha DESC,
+                CASE e.turno
+                  WHEN 'Turno mañana' THEN 1
+                  WHEN 'Turno tarde' THEN 2
+                  WHEN 'Turno noche' THEN 3
+                  ELSE 99
+                END,
+                e.created_at DESC,
+                e.id DESC`,
+      params
+    );
+
+    const columns = [
+      "id",
+      "fecha",
+      "turno",
+      "hora",
+      "empresa_salida",
+      "cuenta_salida",
+      "moneda",
+      "monto",
+      "monto_raw",
+      "created_by_username",
+      "created_at"
+    ];
+
+    const rows = r.rows.map((x) => ([
+      x.id,
+      formatFechaDDMMAAAA(x.fecha) || x.fecha,
+      x.turno || "",
+      x.hora || "",
+      x.empresa_salida || "",
+      x.cuenta_salida || "",
+      x.moneda || "ARS",
+      montoToCommaString(Number(x.monto)),
+      x.monto_raw || "",
+      x.created_by_username || "",
+      x.created_at_ar || ""
+    ]));
+
+    const csv = withBOM(toCSV({ columns, rows, delimiter: ";" }));
+
+    const safeFrom = fechaDesde.replace(/-/g, "");
+    const safeTo = fechaHasta.replace(/-/g, "");
+    const filename = `cierres_caja_${safeFrom}_${safeTo}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    await auditLog(req, {
+      action: "CIERRES_CSV_EXPORT",
+      entity: "egresos",
+      entity_id: null,
+      success: true,
+      status_code: 200,
+      details: {
+        rows: r.rowCount,
+        filters: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta, empresa_salida: empresaSalida || null, moneda: moneda || null, turno: turno || null }
+      }
+    });
+
+    return res.send(csv);
+  } catch (error) {
+    console.error("Error exportando cierres CSV:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Error exportando CSV de cierres" });
+  }
+});
+
 // GET /api/egresos - Listar con filtros y paginación
 router.get("/", auth, async (req, res) => {
   try {
