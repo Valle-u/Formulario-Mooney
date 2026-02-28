@@ -4,8 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Consulta de Retiros</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <!-- Build: 2026-01-02-23-03-19 -->
-  <link rel="stylesheet" href="styles.css?v=2026010522"/>
+  <link rel="stylesheet" href="styles.css?v=2026030104"/>
 </head>
 
 <body>
@@ -32,6 +41,7 @@
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item active">Historial</a>
       <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="nav-item">Cierres</a>
       <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -39,7 +49,7 @@
 
     <!-- Acciones desktop -->
     <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <span id="whoami" class="user-badge">—</span>
       <button id="logoutBtn" class="btn-logout">Salir</button>
     </div>
@@ -49,20 +59,21 @@
   <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
     <div class="mobile-drawer-head">
       <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
     </div>
 
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item active">Historial</a>
       <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="mobile-item">Cierres</a>
       <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <div id="whoamiMobile" class="user-badge">—</div>
       <button id="logoutBtnMobile" class="btn-logout">Salir</button>
     </div>
@@ -82,7 +93,7 @@
         <!-- FILTROS -->
         <section class="card">
           <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" id="filtrosHeader">
-            <span>🔍 Filtros de búsqueda</span>
+            <span>Filtros de busqueda</span>
             <button type="button" class="btn btn-ghost" id="btnToggleFiltros" style="margin: 0; padding: 4px 12px; font-size: 14px;" title="Mostrar/Ocultar filtros">
               <span id="filtrosToggleIcon">▼</span>
             </button>
@@ -119,10 +130,10 @@
                 <label>ESTADO</label>
                 <select id="status">
                   <option value="">Todos</option>
-                  <option value="activo">✓ Activo</option>
-                  <option value="editada">✏️ Editada</option>
+                  <option value="activo">Activo</option>
+                  <option value="editada">Editada</option>
                   <option value="pendiente">⏳ Pendiente</option>
-                  <option value="anulado">✗ Anulado</option>
+                  <option value="anulado">Anulado</option>
                 </select>
               </div>
 
@@ -130,8 +141,8 @@
                 <label>MONEDA</label>
                 <select id="moneda">
                   <option value="">Todas</option>
-                  <option value="ARS">💵 Pesos (ARS)</option>
-                  <option value="USD">💵 Dólares (USD)</option>
+                  <option value="ARS">Pesos (ARS)</option>
+                  <option value="USD">Dolares (USD)</option>
                   <option value="USDT">₮ Tether (USDT)</option>
                 </select>
               </div>
@@ -160,9 +171,9 @@
                 <label>TURNO</label>
                 <select id="turno">
                   <option value="">Todos</option>
-                  <option value="Turno mañana">🌅 Turno mañana</option>
-                  <option value="Turno tarde">🌆 Turno tarde</option>
-                  <option value="Turno noche">🌙 Turno noche</option>
+                  <option value="Turno mañana">Turno manana</option>
+                  <option value="Turno tarde">Turno tarde</option>
+                  <option value="Turno noche">Turno noche</option>
                 </select>
               </div>
 
@@ -191,12 +202,12 @@
         <section class="card" style="margin-top: 20px;">
           <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div>
-              📋 Resultados
+              Resultados
               <span id="resultadosInfo" class="note" style="margin-left: 16px; font-weight: normal;">—</span>
               <span id="sumaTotal" class="note" style="margin-left: 24px; font-weight: 600; color: var(--blue);">—</span>
             </div>
             <button id="btnDescargarCsvFiltrado" class="btn btn-ghost" data-admin-only="1" style="margin: 0;">
-              ⬇ Descargar CSV
+              Descargar CSV
             </button>
           </div>
 
@@ -241,7 +252,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3>Detalle de transferencia</h3>
-          <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">✕</button>
+          <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">X</button>
         </div>
         <div id="detalleBody" style="padding: 20px 24px;">
           <!-- Contenido dinámico -->
@@ -251,6 +262,7 @@
 
   </div>
 
-  <script src="app.js?v=2026010522"></script>
+  <script src="app-shared.js?v=20260227"></script>
+  <script src="app-historial.js?v=20260227"></script>
 </body>
 </html>

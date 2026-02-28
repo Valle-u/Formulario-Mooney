@@ -4,8 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Usuarios</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <!-- Build: 2026-01-02-23-03-19 -->
-  <link rel="stylesheet" href="styles.css?v=2026010522"/>
+  <link rel="stylesheet" href="styles.css?v=2026030104"/>
 </head>
 
 <body>
@@ -32,6 +41,7 @@
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
       <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="nav-item">Cierres</a>
       <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="nav-item active" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -39,7 +49,7 @@
 
     <!-- Acciones desktop -->
     <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <span id="whoami" class="user-badge">—</span>
       <button id="logoutBtn" class="btn-logout">Salir</button>
     </div>
@@ -49,20 +59,21 @@
   <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
     <div class="mobile-drawer-head">
       <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
     </div>
 
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
       <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="mobile-item">Cierres</a>
       <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="mobile-item active" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <div id="whoamiMobile" class="user-badge">—</div>
       <button id="logoutBtnMobile" class="btn-logout">Salir</button>
     </div>
@@ -85,7 +96,7 @@
             <!-- Crear -->
             <div class="section span12">
               <div class="section-head">
-                <div class="section-title">➕ Crear usuario</div>
+                <div class="section-title">Crear usuario</div>
                 <div class="section-subtitle">Solo admin.</div>
               </div>
 
@@ -98,8 +109,8 @@
                 <div class="field span3" style="position: relative;">
                   <label>PASSWORD *</label>
                   <input id="u_password" type="password" placeholder="Contraseña segura" style="padding-right: 40px;">
-                  <button type="button" class="password-toggle" data-target="u_password" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
-                    👁️
+                  <button type="button" class="password-toggle" data-target="u_password" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 11px; padding: 4px; opacity: 0.6; transition: opacity 0.2s; font-weight: 700; letter-spacing: .3px;">
+                    VER
                   </button>
                   <small class="note" style="display:block; margin-top:4px; font-size:11px;">
                     Mín 8 caracteres, mayúscula, minúscula, número y carácter especial
@@ -109,8 +120,8 @@
                 <div class="field span3" style="position: relative;">
                   <label>CONFIRMAR PASSWORD *</label>
                   <input id="u_password_confirm" type="password" placeholder="Repetir contraseña" style="padding-right: 40px;">
-                  <button type="button" class="password-toggle" data-target="u_password_confirm" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
-                    👁️
+                  <button type="button" class="password-toggle" data-target="u_password_confirm" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 11px; padding: 4px; opacity: 0.6; transition: opacity 0.2s; font-weight: 700; letter-spacing: .3px;">
+                    VER
                   </button>
                   <small id="password_match_indicator" class="note" style="display:block; margin-top:4px; font-size:11px; color:var(--muted);">
                     Las contraseñas deben coincidir
@@ -141,7 +152,7 @@
             <!-- Lista -->
             <div class="section span12" style="margin-top:12px">
               <div class="section-head">
-                <div class="section-title">📋 Usuarios</div>
+                <div class="section-title">Usuarios</div>
                 <div class="section-subtitle">Editar rol, nombre, activar/desactivar, reset password.</div>
               </div>
 
@@ -186,15 +197,15 @@
     <div id="resetPasswordModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
       <div class="modal-content" style="max-width: 420px; width: 90%; margin: 0;">
         <div class="modal-header">
-          <h3 style="font-size: 18px;">🔑 Resetear Contraseña</h3>
-          <button id="btnCloseResetModal" class="btn-close">✕</button>
+          <h3 style="font-size: 18px;">Resetear contrasena</h3>
+          <button id="btnCloseResetModal" class="btn-close">X</button>
         </div>
         <div class="modal-body" style="padding: 20px;">
           <div class="field" style="position: relative;">
             <label>Nueva Contraseña *</label>
             <input id="reset_password" type="password" placeholder="Mínimo 8 caracteres" style="padding-right: 40px;">
-            <button type="button" class="password-toggle" data-target="reset_password" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; opacity: 0.6; transition: opacity 0.2s;">
-              👁️
+            <button type="button" class="password-toggle" data-target="reset_password" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 11px; padding: 4px; opacity: 0.6; transition: opacity 0.2s; font-weight: 700; letter-spacing: .3px;">
+              VER
             </button>
             <small class="note" style="display:block; margin-top:4px; font-size:11px;">
               Mín 8 caracteres, mayúscula, minúscula, número y carácter especial
@@ -209,6 +220,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=2026010522"></script>
+  <script src="app-shared.js?v=20260227"></script>
+  <script src="app-usuarios.js?v=20260227"></script>
 </body>
 </html>

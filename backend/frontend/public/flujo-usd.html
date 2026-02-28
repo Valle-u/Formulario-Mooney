@@ -4,8 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Flujo USD/USDT/USDT</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <!-- Build: 2026-01-25 -->
-  <link rel="stylesheet" href="styles.css?v=2026010522"/>
+  <link rel="stylesheet" href="styles.css?v=2026030104"/>
 </head>
 
 <body>
@@ -32,6 +41,7 @@
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
       <a href="flujo-usd.html" class="nav-item active">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="nav-item">Cierres</a>
       <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -39,7 +49,7 @@
 
     <!-- Acciones desktop -->
     <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <span id="whoami" class="user-badge">—</span>
       <button id="logoutBtn" class="btn-logout">Salir</button>
     </div>
@@ -49,20 +59,21 @@
   <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
     <div class="mobile-drawer-head">
       <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
     </div>
 
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
       <a href="flujo-usd.html" class="mobile-item active">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="mobile-item">Cierres</a>
       <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <div id="whoamiMobile" class="user-badge">—</div>
       <button id="logoutBtnMobile" class="btn-logout">Salir</button>
     </div>
@@ -76,7 +87,7 @@
 <div id="notificationPanel" class="notification-panel" style="display: none;">
   <div class="notification-panel-header">
     <h3>Notificaciones</h3>
-    <button id="closeNotificationPanel" class="close-notification-panel">✕</button>
+    <button id="closeNotificationPanel" class="close-notification-panel">X</button>
   </div>
   <div id="notificationList" class="notification-list">
     <div class="notification-empty">No hay notificaciones</div>
@@ -111,7 +122,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">📋 Concepto de la Transferencia</div>
+                  <div class="section-title">Concepto de la transferencia</div>
                   <div class="section-subtitle">Seleccioná primero el motivo para ver los campos necesarios.</div>
                 </div>
 
@@ -121,7 +132,7 @@
                     <label>MONEDA *</label>
                     <select id="moneda_usd_page" required>
                       <option value="USDT">₮ USDT (Tether)</option>
-                      <option value="USD">💵 USD (Dólares)</option>
+                      <option value="USD">USD (Dólares)</option>
                     </select>
                     <div class="note">Elegí la moneda de la transacción</div>
                   </div>
@@ -131,8 +142,8 @@
                     <label>TIPO DE TRANSACCIÓN *</label>
                     <select id="tipo_transaccion" required>
                       <option value="">-- Seleccionar --</option>
-                      <option value="ENTRADA">📥 Entrada</option>
-                      <option value="SALIDA">📤 Salida</option>
+                      <option value="ENTRADA">Entrada</option>
+                      <option value="SALIDA">Salida</option>
                     </select>
                     <div class="note">Elegí si es un ingreso o egreso</div>
                   </div>
@@ -147,6 +158,7 @@
                     </label>
                     <select id="etiqueta" required></select>
                     <div class="note">Elegí el motivo de la transferencia</div>
+                    <div class="note">Si necesitas cargar un cierre, usa <a href="cierres-caja.html">Cierres de Caja</a>.</div>
                   </div>
 
                   <div class="field span4 hidden" id="wrap_otro">
@@ -167,7 +179,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">🕒 Fecha y Hora</div>
+                  <div class="section-title">Fecha y hora</div>
                   <div class="section-subtitle">Cuándo se registra esta transferencia.</div>
                 </div>
 
@@ -221,7 +233,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">💵 Datos de la Transferencia en Dólares</div>
+                  <div class="section-title">Datos de la transferencia en dolares</div>
                   <div class="section-subtitle">Monto e identificación.</div>
                 </div>
 
@@ -258,7 +270,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">🏦 Cuentas</div>
+                  <div class="section-title">Cuentas</div>
                   <div class="section-subtitle">Origen y destino del dinero.</div>
                 </div>
 
@@ -300,7 +312,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">📎 Comprobante & Notas</div>
+                  <div class="section-title">Comprobante y notas</div>
                   <div class="section-subtitle">Adjunto obligatorio + observaciones.</div>
                 </div>
 
@@ -310,7 +322,7 @@
                     <div class="dropzone" id="dropzone_comprobante">
                       <input id="comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
                       <div class="dropzone-content">
-                        <span class="dropzone-icon">📎</span>
+                        <span class="dropzone-icon">DOC</span>
                         <span class="dropzone-text">Arrastrá un archivo acá o hacé clic para seleccionar</span>
                       </div>
                     </div>
@@ -345,7 +357,7 @@
       <div class="modal-backdrop" id="modalBackdrop"></div>
       <div class="modal-content">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <span id="modalTitle">⚠️ Confirmar Transacción USD/USDT</span>
+          <span id="modalTitle">Confirmar transaccion USD/USDT</span>
           <button type="button" id="btnCerrarModal" style="background:none; border:none; color:var(--text); font-size:24px; cursor:pointer; padding:0; line-height:1;" aria-label="Cerrar modal">&times;</button>
         </div>
         <div class="card-body" id="confirmacionBody" style="max-height:70vh; overflow-y:auto;">
@@ -353,13 +365,14 @@
         </div>
         <div style="padding:16px; border-top:1px solid var(--border); display:flex; gap:12px; justify-content:flex-end;">
           <button type="button" id="btnCancelarEgreso" class="btn btn-ghost">Cancelar</button>
-          <button type="button" id="btnConfirmarEgreso" class="btn btn-primary">✓ Confirmar y Guardar</button>
+          <button type="button" id="btnConfirmarEgreso" class="btn btn-primary">Confirmar y guardar</button>
         </div>
       </div>
     </div>
 
   </div>
 
-  <script src="app.js?v=2026010522"></script>
+  <script src="app-shared.js?v=20260301"></script>
+  <script src="app-egreso.js?v=20260301"></script>
 </body>
 </html>

@@ -4,8 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Logs</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <!-- Build: 2026-01-02-23-03-19 -->
-  <link rel="stylesheet" href="styles.css?v=2026010522"/>
+  <link rel="stylesheet" href="styles.css?v=2026030104"/>
 </head>
 
 <body>
@@ -31,6 +40,7 @@
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
       <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="nav-item">Cierres</a>
       <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item active" data-requires-encargado="1">Logs</a>
@@ -38,7 +48,7 @@
 
     <!-- Acciones desktop -->
     <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <span id="whoami" class="user-badge">—</span>
       <button id="logoutBtn" class="btn-logout">Salir</button>
     </div>
@@ -48,20 +58,21 @@
   <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
     <div class="mobile-drawer-head">
       <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
     </div>
 
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
       <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="mobile-item">Cierres</a>
       <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
     </nav>
 
     <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <div id="whoamiMobile" class="user-badge">—</div>
       <button id="logoutBtnMobile" class="btn-logout">Salir</button>
     </div>
@@ -86,7 +97,7 @@
               <input id="logAction" class="users-search" placeholder="Acción (ej: EGRESO_CREATE)">
               <input id="logFrom" class="users-search" type="date" placeholder="Desde">
               <input id="logTo" class="users-search" type="date" placeholder="Hasta">
-              <button id="btnLoadLogs" class="btn btn-primary" type="button">🔍 Buscar</button>
+              <button id="btnLoadLogs" class="btn btn-primary" type="button">Buscar</button>
               <button id="btnClearLogsFilters" class="btn btn-ghost" type="button">Limpiar</button>
             </div>
 
@@ -125,6 +136,7 @@
 
   </div>
 
-  <script src="app.js?v=2026010522"></script>
+  <script src="app-shared.js?v=20260227"></script>
+  <script src="app-logs.js?v=20260227"></script>
 </body>
 </html>

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Cierres de Caja</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css?v=2026030104"/>
+</head>
+
+<body>
+  <div class="app-nosidebar">
+
+    <header class="topbar">
+      <div class="topbar-inner">
+
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menu" aria-expanded="false">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+          <a href="cierres-caja.html" class="nav-item active">Cierres</a>
+          <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+        </nav>
+
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+          <span id="whoami" class="user-badge">-</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
+      </div>
+
+      <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <span class="brand">MooneyMaker</span>
+          <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menu">X</button>
+        </div>
+
+        <nav class="mobile-nav">
+          <a href="egreso.html" class="mobile-item">Retiros</a>
+          <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+          <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+          <a href="cierres-caja.html" class="mobile-item active">Cierres</a>
+          <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+        </nav>
+
+        <div class="mobile-actions">
+          <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+          <div id="whoamiMobile" class="user-badge">-</div>
+          <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+        </div>
+      </div>
+
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+    </header>
+
+    <div id="notificationPanel" class="notification-panel" style="display: none;">
+      <div class="notification-panel-header">
+        <h3>Notificaciones</h3>
+        <button id="closeNotificationPanel" class="close-notification-panel">X</button>
+      </div>
+      <div id="notificationList" class="notification-list">
+        <div class="notification-empty">No hay notificaciones</div>
+      </div>
+      <div class="notification-panel-footer">
+        <button id="clearAllNotifications" class="btn-clear-notifications">Limpiar todas</button>
+      </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <main class="content-wrap">
+      <div class="page">
+        <section class="card cierres-page-card">
+          <div class="card-header">Cierres de Caja Guiados</div>
+          <div class="card-body">
+            <div class="cierre-layout">
+              <section class="cierre-panel cierre-form-panel">
+                <div class="cierre-panel-head">
+                  <h2>Carga asistida</h2>
+                  <p>Segui estos pasos. El sistema te ayuda para no cargar turnos incorrectos ni duplicados.</p>
+                </div>
+
+                <form id="cierreForm" class="grid" enctype="multipart/form-data">
+                  <div class="cierre-step span12">
+                    <div class="cierre-step-title">1) Cual es tu turno laboral</div>
+                    <div class="turno-picker" id="turnoPicker">
+                      <button type="button" class="turno-btn" data-turno="Turno mañana" aria-pressed="false" aria-label="Turno manana, de 08:00 a 15:59">
+                        <span class="turno-name">Turno manana</span>
+                        <span class="turno-time">08:00 a 15:59</span>
+                      </button>
+                      <button type="button" class="turno-btn" data-turno="Turno tarde" aria-pressed="false" aria-label="Turno tarde, de 16:00 a 00:00">
+                        <span class="turno-name">Turno tarde</span>
+                        <span class="turno-time">16:00 a 00:00</span>
+                      </button>
+                      <button type="button" class="turno-btn" data-turno="Turno noche" aria-pressed="false" aria-label="Turno noche, de 00:00 a 07:59">
+                        <span class="turno-name">Turno noche</span>
+                        <span class="turno-time">00:00 a 07:59</span>
+                      </button>
+                    </div>
+                    <input type="hidden" id="cierre_turno" required>
+                    <div class="note" id="turnoAyuda">Primero elegi tu turno para que el sistema te sugiera la fecha correcta.</div>
+                  </div>
+
+                  <div class="cierre-step cierre-step-fecha span12">
+                    <div class="cierre-step-title">2) Que dia estas cerrando</div>
+                    <div class="grid">
+                      <div class="field span6">
+                        <label for="cierre_fecha_operativa">FECHA OPERATIVA *</label>
+                        <input id="cierre_fecha_operativa" type="date" required>
+                        <div class="note" id="fechaAyuda">Si cerras Turno tarde pasada la medianoche, suele corresponder al dia anterior.</div>
+                      </div>
+                      <div class="field span6">
+                        <label for="cierre_hora_detectada">HORA DETECTADA POR SISTEMA</label>
+                        <input id="cierre_hora_detectada" type="text" readonly>
+                        <div class="note">No se edita. Se usa para auditoria y control.</div>
+                      </div>
+                    </div>
+                    <div class="cierre-quick-actions">
+                      <button type="button" id="btnFechaHoy" class="btn btn-ghost">Usar hoy</button>
+                      <button type="button" id="btnFechaAyer" class="btn btn-ghost">Usar ayer</button>
+                    </div>
+                  </div>
+
+                  <div class="cierre-step span12">
+                    <div class="cierre-step-title">3) De que cuenta es este cierre</div>
+                    <div class="grid">
+                      <div class="field span4">
+                        <label for="cierre_empresa_salida">EMPRESA *</label>
+                        <select id="cierre_empresa_salida" required></select>
+                      </div>
+                      <div class="field span4">
+                        <label for="cierre_cuenta_salida">TITULAR CUENTA *</label>
+                        <input id="cierre_cuenta_salida" list="cierre_cuentas_sugeridas" required placeholder="Nombre del titular">
+                        <datalist id="cierre_cuentas_sugeridas"></datalist>
+                      </div>
+                      <div class="field span4">
+                        <label for="cierre_moneda">MONEDA *</label>
+                        <select id="cierre_moneda" required>
+                          <option value="ARS">ARS</option>
+                          <option value="USD">USD</option>
+                          <option value="USDT">USDT</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="cierre-step span12">
+                    <div class="cierre-step-title">4) Monto final y comprobante</div>
+                    <div class="grid">
+                      <div class="field span6">
+                        <label for="cierre_monto">MONTO DE CIERRE *</label>
+                        <input id="cierre_monto" placeholder="Ej: 120000 o 120000,50" required>
+                        <div class="note">Este es el monto final con el que cerras el turno.</div>
+                      </div>
+                      <div class="field span6">
+                        <label for="cierre_comprobante">COMPROBANTE *</label>
+                        <input id="cierre_comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
+                        <div class="note">JPG / PNG / PDF - maximo 10MB</div>
+                      </div>
+                      <div class="field span12">
+                        <label for="cierre_notas">NOTAS</label>
+                        <textarea id="cierre_notas" placeholder="Opcional"></textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="cierre-resumen-live span12" id="cierreResumenLive" aria-live="polite"></div>
+
+                  <div class="actions-right span12">
+                    <button type="submit" class="btn btn-primary" id="btnGuardarCierre">Guardar cierre de caja</button>
+                  </div>
+                </form>
+              </section>
+
+              <section class="cierre-panel cierre-kpi-panel">
+                <div class="cierre-panel-head">
+                  <h2>Estado de cierres</h2>
+                  <p>Lista clara por dia y turno. Siempre son 3 cierres por dia: manana, tarde y noche.</p>
+                </div>
+
+                <div class="cierre-kpi-summary">
+                  <div class="kpi-chip pendiente">
+                    <span>Pendientes</span>
+                    <strong id="kpiPendientes">0</strong>
+                  </div>
+                  <div class="kpi-chip ok">
+                    <span>Correctos</span>
+                    <strong id="kpiOk">0</strong>
+                  </div>
+                  <div class="kpi-chip duplicado">
+                    <span>Duplicados</span>
+                    <strong id="kpiDuplicados">0</strong>
+                  </div>
+                </div>
+
+                <div class="grid cierre-kpi-filters">
+                  <div class="field span4">
+                    <label for="kpi_fecha_desde">DESDE</label>
+                    <input id="kpi_fecha_desde" type="date">
+                  </div>
+                  <div class="field span4">
+                    <label for="kpi_fecha_hasta">HASTA</label>
+                    <input id="kpi_fecha_hasta" type="date">
+                  </div>
+                  <div class="field span4">
+                    <label for="kpi_moneda">MONEDA</label>
+                    <select id="kpi_moneda">
+                      <option value="">Todas</option>
+                      <option value="ARS">ARS</option>
+                      <option value="USD">USD</option>
+                      <option value="USDT">USDT</option>
+                    </select>
+                  </div>
+                  <div class="field span12">
+                    <label for="kpi_empresa_salida">EMPRESA</label>
+                    <select id="kpi_empresa_salida"></select>
+                  </div>
+                </div>
+
+                <div class="cierre-kpi-actions">
+                  <button type="button" class="btn btn-ghost" id="btnDownloadCierresCSV" aria-label="Descargar CSV de cierres filtrados">Descargar CSV</button>
+                  <button type="button" class="btn btn-ghost" id="btnRefreshCierresKPI">Actualizar lista</button>
+                </div>
+
+                <div id="cierresKPIList" class="cierre-kpi-list" aria-live="polite"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="app-shared.js?v=20260301"></script>
+  <script src="app-cierres-caja.js?v=2026030103"></script>
+</body>
+</html>

@@ -30,6 +30,110 @@ import { sendNotification } from "./notifications.js";
 
  const router = express.Router();
 
+const SALDOS_CACHE_TTL_MS = Number(process.env.SALDOS_CACHE_TTL_MS || 15000);
+const SALDOS_CACHE_MAX_ENTRIES = Number(process.env.SALDOS_CACHE_MAX_ENTRIES || 100);
+const saldosCache = new Map();
+
+function buildSaldosCacheKey({ empresa, moneda, cuenta, mes, anio }) {
+  return [empresa || "*", moneda || "*", cuenta || "*", String(mes), String(anio)].join("|");
+}
+
+function getSaldosCache(cacheKey) {
+  const item = saldosCache.get(cacheKey);
+  if (!item) return null;
+  if ((Date.now() - item.ts) > SALDOS_CACHE_TTL_MS) {
+    saldosCache.delete(cacheKey);
+    return null;
+  }
+  return item.payload;
+}
+
+function setSaldosCache(cacheKey, payload) {
+  if (saldosCache.size >= SALDOS_CACHE_MAX_ENTRIES) {
+    const firstKey = saldosCache.keys().next().value;
+    if (firstKey) saldosCache.delete(firstKey);
+  }
+  saldosCache.set(cacheKey, { ts: Date.now(), payload });
+}
+
+function clearSaldosCache() {
+  if (saldosCache.size) saldosCache.clear();
+}
+
+const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
+const TURNOS_CIERRE_ORDER = {
+  "Turno mañana": 1,
+  "Turno tarde": 2,
+  "Turno noche": 3
+};
+
+function normalizeTurnoLabel(turnoValue) {
+  const raw = String(turnoValue || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === "turno manana" || lower === "turno mañana") return "Turno mañana";
+  if (lower === "turno tarde") return "Turno tarde";
+  if (lower === "turno noche") return "Turno noche";
+
+  return raw;
+}
+
+function localDateToISO(dateObj) {
+  if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return null;
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function toISODateOnly(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) return localDateToISO(value);
+
+  const text = String(value).trim();
+  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+
+  const parsed = normalizeFecha(text, { enforceCurrentYear: false });
+  if (parsed.valid) return parsed.fecha;
+
+  return null;
+}
+
+function shiftISODate(isoDate, deltaDays) {
+  const dateObj = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(dateObj.getTime())) return isoDate;
+  dateObj.setDate(dateObj.getDate() + deltaDays);
+  return localDateToISO(dateObj);
+}
+
+async function findDuplicateCierreSlot({ fecha, turno, empresaSalida, cuentaSalida, moneda, excludeId = null }) {
+  const params = [fecha, turno, empresaSalida, cuentaSalida, moneda];
+  let excludeSql = "";
+
+  if (excludeId !== null && excludeId !== undefined) {
+    params.push(excludeId);
+    excludeSql = ` AND id <> $${params.length}`;
+  }
+
+  return query(
+    `SELECT id, fecha, turno, empresa_salida, cuenta_salida, moneda, monto, created_at
+       FROM egresos
+      WHERE etiqueta = 'Cierre de Caja'
+        AND status <> 'anulado'
+        AND fecha = $1::date
+        AND turno = $2
+        AND empresa_salida = $3
+        AND cuenta_salida = $4
+        AND moneda = $5
+        ${excludeSql}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1`,
+    params
+  );
+}
+
 // GET distinct empresas (for saldos filter)
 router.get("/distinct-empresas", auth, async (req, res) => {
   try {
@@ -116,11 +220,12 @@ function normalizeHoraOptional(hora){
 }
 
 /**
- * Normaliza fecha de formato dd/mm/aaaa a ISO aaaa-mm-dd
- * Valida año actual, fecha no futura, y que sea una fecha válida
+ * Normaliza fecha de formato dd/mm/aaaa a ISO aaaa-mm-dd.
+ * Valida fecha real y no futura.
+ * Por defecto exige año actual (alta de egresos), pero puede relajarse en edición.
  * @returns {object} { valid: boolean, fecha: string|null, error: string|null }
  */
-function normalizeFecha(fechaStr) {
+function normalizeFecha(fechaStr, { enforceCurrentYear = true, allowFuture = false } = {}) {
   const v = String(fechaStr || "").trim();
 
   // Intentar formato dd/mm/aaaa primero
@@ -133,9 +238,9 @@ function normalizeFecha(fechaStr) {
     const mesNum = parseInt(mes, 10);
     const anioNum = parseInt(anio, 10);
 
-    // Validar año actual
+    // Validar año actual (solo cuando corresponde)
     const anioActual = new Date().getFullYear();
-    if (anioNum !== anioActual) {
+    if (enforceCurrentYear && anioNum !== anioActual) {
       return { valid: false, fecha: null, error: `La fecha debe ser del año ${anioActual}` };
     }
 
@@ -154,7 +259,7 @@ function normalizeFecha(fechaStr) {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     fecha.setHours(0, 0, 0, 0);
-    if (fecha > hoy) {
+    if (!allowFuture && fecha > hoy) {
       return { valid: false, fecha: null, error: "No se permiten fechas futuras" };
     }
 
@@ -173,9 +278,9 @@ function normalizeFecha(fechaStr) {
     const mesNum = parseInt(mes, 10);
     const diaNum = parseInt(dia, 10);
 
-    // Validar año actual
+    // Validar año actual (solo cuando corresponde)
     const anioActual = new Date().getFullYear();
-    if (anioNum !== anioActual) {
+    if (enforceCurrentYear && anioNum !== anioActual) {
       return { valid: false, fecha: null, error: `La fecha debe ser del año ${anioActual}` };
     }
 
@@ -189,7 +294,7 @@ function normalizeFecha(fechaStr) {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     fecha.setHours(0, 0, 0, 0);
-    if (fecha > hoy) {
+    if (!allowFuture && fecha > hoy) {
       return { valid: false, fecha: null, error: "No se permiten fechas futuras" };
     }
 
@@ -323,7 +428,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
 
     // Validar turno (ahora siempre obligatorio)
-    const turnoNorm = String(turno || "").trim();
+    const turnoNorm = normalizeTurnoLabel(String(turno || "").trim());
     if (!turnoNorm) {
       return res.status(400).json({ message: "Turno es obligatorio" });
     }
@@ -371,6 +476,33 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     if (monedaNorm === "ARS" && tipoTransaccion === "ENTRADA") {
       if (etiqueta !== "[Unidad M] Deposito de cliente") {
         return res.status(400).json({ message: "Transacciones ARS solo pueden ser ENTRADA para 'Deposito de cliente'" });
+      }
+    }
+
+    // Evitar doble carga para el mismo slot de cierre
+    if (esCierreCaja) {
+      if (!TURNOS_CIERRE.includes(turnoNorm)) {
+        return res.status(400).json({ message: "Turno inválido para cierre de caja" });
+      }
+
+      const duplicate = await findDuplicateCierreSlot({
+        fecha: fechaNorm,
+        turno: turnoNorm,
+        empresaSalida: empresa_cuenta_salida,
+        cuentaSalida: String(cuenta_salida || "").trim(),
+        moneda: monedaNorm
+      });
+
+      if (duplicate.rowCount > 0) {
+        const existing = duplicate.rows[0];
+        return res.status(409).json({
+          message: "Ya existe un cierre para esa fecha, turno, empresa, titular y moneda. Revisá el modulo Cierres.",
+          duplicate: {
+            id: existing.id,
+            created_at: existing.created_at,
+            monto: Number(existing.monto || 0)
+          }
+        });
       }
     }
 
@@ -570,6 +702,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       // No fallar la creación del egreso si falla la notificación
     }
 
+    clearSaldosCache();
     return res.status(201).json({ id: egresoId, message: "ok" });
   } catch (e) {
     console.error("🔥 POST /api/egresos ERROR:", e);
@@ -599,12 +732,18 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 // ═══════════════════════════════════════════════════
 // HELPER: Calcular saldos de un mes dado
 // ═══════════════════════════════════════════════════
-async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
+async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown = true }) {
   // Robustly derive month/year for filtering
   const mm = Number.isFinite(Number(mes)) ? Number(mes) : (new Date()).getMonth() + 1;
   const aa = Number.isFinite(Number(anio)) ? Number(anio) : new Date().getFullYear();
   const mesStr = String(mm).padStart(2, "0");
   const anioStr = String(aa);
+  const primerDiaMesISO = `${anioStr}-${mesStr}-01`;
+
+  const next = new Date(aa, mm, 1);
+  const nextMesStr = String(next.getMonth() + 1).padStart(2, "0");
+  const nextAnioStr = String(next.getFullYear());
+  const primerDiaMesSiguienteISO = `${nextAnioStr}-${nextMesStr}-01`;
 
   // Construir filtros comunes
   const baseParams = [];
@@ -632,44 +771,101 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
 
   // 1) Cierre de Caja anterior al mes seleccionado
   const cierreSql = `
+    WITH base AS (
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        monto,
+        ${PARSE_FECHA} AS fecha_parsed
+      FROM egresos
+      WHERE status <> 'anulado'
+        AND etiqueta = 'Cierre de Caja'
+        AND ${FECHA_VALIDA}
+        ${commonFilter}
+    )
     SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
-      empresa_salida, cuenta_salida, moneda, monto
-    FROM egresos
-    WHERE status NOT IN ('anulado')
-      AND etiqueta = 'Cierre de Caja'
-      AND ${FECHA_VALIDA}
-      AND ${PARSE_FECHA} < TO_DATE($${nextIdx}, 'DD/MM/YYYY')
-      ${commonFilter}
-    ORDER BY empresa_salida, cuenta_salida, moneda,
-             ${PARSE_FECHA} DESC
+      empresa_salida,
+      cuenta_salida,
+      moneda,
+      monto
+    FROM base
+    WHERE fecha_parsed < $${nextIdx}::date
+    ORDER BY empresa_salida, cuenta_salida, moneda, fecha_parsed DESC
   `;
-  const primerDiaMes = `01/${mesStr}/${anioStr}`;
-  const cierreResult = await query(cierreSql, [...baseParams, primerDiaMes]);
+  const cierreResult = await query(cierreSql, [...baseParams, primerDiaMesISO]);
 
   const cierreMap = {};
   cierreResult.rows.forEach(r => {
     cierreMap[`${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`] = Number(r.monto);
   });
 
-  // 2) Movimientos del mes con desglose por etiqueta (query fusionada)
-  const movSql = `
-    SELECT
-      empresa_salida, cuenta_salida, moneda, etiqueta,
-      COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
-      COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
-      MAX(created_at) AS ultima_transaccion,
-      COUNT(*) AS cnt
-    FROM egresos
-    WHERE status NOT IN ('anulado')
-      AND etiqueta != 'Cierre de Caja'
-      AND ${FECHA_VALIDA}
-      AND EXTRACT(MONTH FROM ${PARSE_FECHA}) = $${nextIdx}
-      AND EXTRACT(YEAR FROM ${PARSE_FECHA}) = $${nextIdx + 1}
-      ${commonFilter}
-    GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
-    ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
-  `;
-  const movResult = await query(movSql, [...baseParams, mm, aa]);
+  // 2) Movimientos del mes (con o sin desglose por etiqueta)
+  const movSql = includeBreakdown
+    ? `
+      WITH base AS (
+        SELECT
+          empresa_salida,
+          cuenta_salida,
+          moneda,
+          etiqueta,
+          tipo_transaccion,
+          monto,
+          created_at,
+          ${PARSE_FECHA} AS fecha_parsed
+        FROM egresos
+        WHERE status <> 'anulado'
+          AND etiqueta != 'Cierre de Caja'
+          AND ${FECHA_VALIDA}
+          ${commonFilter}
+      )
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        etiqueta,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
+        MAX(created_at) AS ultima_transaccion,
+        COUNT(*) AS cnt
+      FROM base
+      WHERE fecha_parsed >= $${nextIdx}::date
+        AND fecha_parsed < $${nextIdx + 1}::date
+      GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
+      ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
+    `
+    : `
+      WITH base AS (
+        SELECT
+          empresa_salida,
+          cuenta_salida,
+          moneda,
+          tipo_transaccion,
+          monto,
+          created_at,
+          ${PARSE_FECHA} AS fecha_parsed
+        FROM egresos
+        WHERE status <> 'anulado'
+          AND etiqueta != 'Cierre de Caja'
+          AND ${FECHA_VALIDA}
+          ${commonFilter}
+      )
+      SELECT
+        empresa_salida,
+        cuenta_salida,
+        moneda,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
+        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
+        MAX(created_at) AS ultima_transaccion,
+        COUNT(*) AS cnt
+      FROM base
+      WHERE fecha_parsed >= $${nextIdx}::date
+        AND fecha_parsed < $${nextIdx + 1}::date
+      GROUP BY empresa_salida, cuenta_salida, moneda
+      ORDER BY empresa_salida, cuenta_salida, moneda
+    `;
+
+  const movResult = await query(movSql, [...baseParams, primerDiaMesISO, primerDiaMesSiguienteISO]);
 
   // 3) Combinar: construir cuentasMap con desglose
   const cuentasMap = {};
@@ -724,20 +920,24 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio }) {
       c.ultima_transaccion = r.ultima_transaccion;
     }
 
-    // Desglose por etiqueta
-    c.desglose_etiquetas.push({
-      etiqueta: r.etiqueta,
-      entradas,
-      salidas,
-      total: entradas + salidas,
-      count: cnt
-    });
+    // Desglose por etiqueta (solo si fue solicitado)
+    if (includeBreakdown) {
+      c.desglose_etiquetas.push({
+        etiqueta: r.etiqueta,
+        entradas,
+        salidas,
+        total: entradas + salidas,
+        count: cnt
+      });
+    }
   });
 
   // Calcular saldo final y ordenar desglose
   for (const c of Object.values(cuentasMap)) {
     c.saldo = c.inicio_caja + c.total_entradas - c.total_salidas;
-    c.desglose_etiquetas.sort((a, b) => b.total - a.total);
+    if (includeBreakdown) {
+      c.desglose_etiquetas.sort((a, b) => b.total - a.total);
+    }
   }
 
   const saldos = Object.values(cuentasMap).sort((a, b) => {
@@ -774,13 +974,48 @@ function parsePeriodoQuery(req) {
   return { mes, anio };
 }
 
+function parseFechaQueryFlexible(rawValue, fallbackISO, fieldName) {
+  if (!rawValue) return fallbackISO;
+
+  const parsed = normalizeFecha(String(rawValue), { enforceCurrentYear: false, allowFuture: true });
+  if (!parsed.valid) {
+    const err = new Error(`${fieldName} inválida: ${parsed.error}`);
+    err.status = 400;
+    throw err;
+  }
+
+  return parsed.fecha;
+}
+
+function buildISODateRange(fechaDesdeISO, fechaHastaISO) {
+  const from = new Date(`${fechaDesdeISO}T00:00:00`);
+  const to = new Date(`${fechaHastaISO}T00:00:00`);
+  const out = [];
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return out;
+
+  const cursor = new Date(from.getTime());
+  while (cursor <= to) {
+    out.push(localDateToISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
 // GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
 // Solo Admin puede ver saldos
 // Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
 router.get("/saldos", auth, requireAdmin, async (req, res) => {
   try {
+    const routeStart = Date.now();
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
+
+    const cacheKey = buildSaldosCacheKey({ empresa, moneda, cuenta, mes, anio });
+    const cached = getSaldosCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
 
     // Calcular saldos del mes actual y anterior en paralelo
     let prevMes = mes - 1;
@@ -788,8 +1023,8 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
     if (prevMes < 1) { prevMes = 12; prevAnio--; }
 
     const [current, prev] = await Promise.all([
-      computeSaldos({ empresa, moneda, cuenta, mes, anio }),
-      computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio })
+      computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown: true }),
+      computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio, includeBreakdown: false })
     ]);
 
     // Mapear saldos anteriores por clave
@@ -815,22 +1050,28 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
       }
     });
 
-    // Separar por moneda
-    const saldosARS = current.saldos.filter(r => r.moneda === 'ARS');
-    const saldosUSD = current.saldos.filter(r => r.moneda === 'USD');
-    const saldosUSDT = current.saldos.filter(r => r.moneda === 'USDT');
-    const totalARS = saldosARS.reduce((sum, r) => sum + r.saldo, 0);
-    const totalUSD = saldosUSD.reduce((sum, r) => sum + r.saldo, 0);
-    const totalUSDT = saldosUSDT.reduce((sum, r) => sum + r.saldo, 0);
+    // Totales por moneda (sin duplicar payload)
+    const totales = current.saldos.reduce((acc, r) => {
+      const key = String(r.moneda || "").toUpperCase();
+      if (!acc[key]) acc[key] = 0;
+      acc[key] += Number(r.saldo || 0);
+      return acc;
+    }, { ARS: 0, USD: 0, USDT: 0 });
 
-    return res.json({
+    const payload = {
       saldos: current.saldos,
-      saldosARS,
-      saldosUSD,
-      saldosUSDT,
-      totales: { ARS: totalARS, USD: totalUSD, USDT: totalUSDT },
+      totales,
       periodo: current.periodo
-    });
+    };
+
+    setSaldosCache(cacheKey, payload);
+
+    const durationMs = Date.now() - routeStart;
+    if (durationMs > 700) {
+      console.log(`Query saldos lenta (${durationMs}ms)`, { empresa, moneda, cuenta, mes, anio, cuentas: current.saldos.length });
+    }
+
+    return res.json(payload);
   } catch (error) {
     console.error("Error obteniendo saldos:", error);
     if (error?.status === 400) {
@@ -851,7 +1092,7 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
 
-    const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio });
+    const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown: false });
 
     const columns = ["Empresa", "Cuenta", "Moneda", "Inicio Caja", "Entradas", "Salidas", "Balance", "Cant. Operaciones"];
     const rows = saldos.map(s => [
@@ -879,6 +1120,291 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/egresos/cierres/kpi - Cobertura de cierres por dia/turno (3 slots por dia)
+router.get("/cierres/kpi", auth, async (req, res) => {
+  try {
+    const todayISO = localDateToISO(new Date());
+    const defaultDesde = shiftISODate(todayISO, -2);
+
+    const fechaDesde = parseFechaQueryFlexible(req.query.fecha_desde, defaultDesde, "fecha_desde");
+    const fechaHasta = parseFechaQueryFlexible(req.query.fecha_hasta, todayISO, "fecha_hasta");
+
+    if (fechaDesde > fechaHasta) {
+      return res.status(400).json({ message: "fecha_desde no puede ser mayor que fecha_hasta" });
+    }
+
+    const fromDate = new Date(`${fechaDesde}T00:00:00`);
+    const toDate = new Date(`${fechaHasta}T00:00:00`);
+    const totalDays = Math.floor((toDate - fromDate) / 86400000) + 1;
+    if (totalDays < 1 || totalDays > 31) {
+      return res.status(400).json({ message: "El rango de fechas debe estar entre 1 y 31 dias" });
+    }
+
+    const empresaSalida = String(req.query.empresa_salida || "").trim();
+    const moneda = String(req.query.moneda || "").trim().toUpperCase();
+
+    if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
+      return res.status(400).json({ message: "empresa_salida inválida" });
+    }
+    if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
+    }
+
+    const cierreWhere = [
+      "e.etiqueta = 'Cierre de Caja'",
+      "e.status <> 'anulado'",
+      "e.fecha >= $1::date",
+      "e.fecha <= $2::date"
+    ];
+    const cierreParams = [fechaDesde, fechaHasta];
+
+    if (empresaSalida) {
+      cierreParams.push(empresaSalida);
+      cierreWhere.push(`e.empresa_salida = $${cierreParams.length}`);
+    }
+    if (moneda) {
+      cierreParams.push(moneda);
+      cierreWhere.push(`e.moneda = $${cierreParams.length}`);
+    }
+
+    const cierresResult = await query(
+      `SELECT
+          e.id,
+          e.fecha,
+          e.turno,
+          e.empresa_salida,
+          e.cuenta_salida,
+          e.moneda,
+          e.monto,
+          e.monto_raw,
+          e.hora,
+          e.created_at,
+          e.created_by,
+          u.username AS created_by_username
+       FROM egresos e
+       LEFT JOIN users u ON u.id = e.created_by
+       WHERE ${cierreWhere.join(" AND ")}
+       ORDER BY e.created_at DESC, e.id DESC`,
+      cierreParams
+    );
+
+    const grouped = new Map();
+    for (const c of cierresResult.rows) {
+      const fechaISO = toISODateOnly(c.fecha);
+      const turnoNorm = normalizeTurnoLabel(c.turno);
+      if (!fechaISO || !TURNOS_CIERRE.includes(turnoNorm)) continue;
+
+      const key = [fechaISO, turnoNorm].join("|");
+
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push({
+        id: c.id,
+        monto: Number(c.monto || 0),
+        monto_raw: c.monto_raw,
+        hora: c.hora,
+        empresa_salida: c.empresa_salida || null,
+        cuenta_salida: c.cuenta_salida || null,
+        moneda: String(c.moneda || "").toUpperCase() || null,
+        created_at: c.created_at,
+        created_by: c.created_by,
+        created_by_username: c.created_by_username || null
+      });
+    }
+
+    const fechas = buildISODateRange(fechaDesde, fechaHasta).reverse();
+    const rows = [];
+    const summary = { total: 0, pendientes: 0, ok: 0, duplicados: 0 };
+
+    for (const fechaISO of fechas) {
+      for (const turno of TURNOS_CIERRE) {
+        const key = [fechaISO, turno].join("|");
+        const hits = grouped.get(key) || [];
+
+        let status = "PENDIENTE";
+        if (hits.length === 1) status = "OK";
+        if (hits.length > 1) status = "DUPLICADO";
+
+        summary.total += 1;
+        if (status === "PENDIENTE") summary.pendientes += 1;
+        if (status === "OK") summary.ok += 1;
+        if (status === "DUPLICADO") summary.duplicados += 1;
+
+        rows.push({
+          fecha: fechaISO,
+          turno,
+          status,
+          count: hits.length,
+          cierre: hits.length > 0 ? hits[0] : null,
+          cierres: hits.slice(0, 3)
+        });
+      }
+    }
+
+    rows.sort((a, b) => {
+      if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
+      return (TURNOS_CIERRE_ORDER[a.turno] || 99) - (TURNOS_CIERRE_ORDER[b.turno] || 99);
+    });
+
+    return res.json({
+      periodo: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta, total_dias: totalDays },
+      filtros: {
+        empresa_salida: empresaSalida || null,
+        moneda: moneda || null
+      },
+      summary,
+      rows
+    });
+  } catch (error) {
+    console.error("Error obteniendo KPI de cierres:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Error obteniendo KPI de cierres" });
+  }
+});
+
+// GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados (incluye legacy)
+router.get("/cierres/csv", auth, async (req, res) => {
+  try {
+    const todayISO = localDateToISO(new Date());
+    const defaultDesde = shiftISODate(todayISO, -2);
+
+    const fechaDesde = parseFechaQueryFlexible(req.query.fecha_desde, defaultDesde, "fecha_desde");
+    const fechaHasta = parseFechaQueryFlexible(req.query.fecha_hasta, todayISO, "fecha_hasta");
+
+    if (fechaDesde > fechaHasta) {
+      return res.status(400).json({ message: "fecha_desde no puede ser mayor que fecha_hasta" });
+    }
+
+    const fromDate = new Date(`${fechaDesde}T00:00:00`);
+    const toDate = new Date(`${fechaHasta}T00:00:00`);
+    const totalDays = Math.floor((toDate - fromDate) / 86400000) + 1;
+    if (totalDays < 1 || totalDays > 62) {
+      return res.status(400).json({ message: "El rango de fechas para CSV debe estar entre 1 y 62 dias" });
+    }
+
+    const empresaSalida = String(req.query.empresa_salida || "").trim();
+    const moneda = String(req.query.moneda || "").trim().toUpperCase();
+    const turno = req.query.turno ? normalizeTurnoLabel(String(req.query.turno || "").trim()) : "";
+
+    if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
+      return res.status(400).json({ message: "empresa_salida inválida" });
+    }
+    if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
+    }
+    if (turno && !TURNOS_CIERRE.includes(turno)) {
+      return res.status(400).json({ message: "Turno inválido para cierre de caja" });
+    }
+
+    const where = [
+      "LOWER(COALESCE(e.etiqueta, '')) LIKE '%cierre%caja%'",
+      "COALESCE(e.status, 'activo') <> 'anulado'",
+      "e.fecha >= $1::date",
+      "e.fecha <= $2::date"
+    ];
+    const params = [fechaDesde, fechaHasta];
+
+    if (empresaSalida) {
+      params.push(empresaSalida);
+      where.push(`e.empresa_salida = $${params.length}`);
+    }
+    if (moneda) {
+      params.push(moneda);
+      where.push(`e.moneda = $${params.length}`);
+    }
+    if (turno) {
+      params.push(turno);
+      where.push(`e.turno = $${params.length}`);
+    }
+
+    const r = await query(
+      `SELECT
+         e.id,
+         e.fecha,
+         to_char(e.hora, 'HH24:MI') AS hora,
+         e.turno,
+         e.empresa_salida,
+         e.cuenta_salida,
+         e.moneda,
+         e.monto,
+         e.monto_raw,
+         to_char((e.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'), 'DD/MM/YYYY HH24:MI:SS') AS created_at_ar,
+         u.username AS created_by_username
+       FROM egresos e
+       LEFT JOIN users u ON u.id = e.created_by
+       WHERE ${where.join(" AND ")}
+       ORDER BY e.fecha DESC,
+                CASE e.turno
+                  WHEN 'Turno mañana' THEN 1
+                  WHEN 'Turno tarde' THEN 2
+                  WHEN 'Turno noche' THEN 3
+                  ELSE 99
+                END,
+                e.created_at DESC,
+                e.id DESC`,
+      params
+    );
+
+    const columns = [
+      "id",
+      "fecha",
+      "turno",
+      "hora",
+      "empresa_salida",
+      "cuenta_salida",
+      "moneda",
+      "monto",
+      "monto_raw",
+      "created_by_username",
+      "created_at"
+    ];
+
+    const rows = r.rows.map((x) => ([
+      x.id,
+      formatFechaDDMMAAAA(x.fecha) || x.fecha,
+      x.turno || "",
+      x.hora || "",
+      x.empresa_salida || "",
+      x.cuenta_salida || "",
+      x.moneda || "ARS",
+      montoToCommaString(Number(x.monto)),
+      x.monto_raw || "",
+      x.created_by_username || "",
+      x.created_at_ar || ""
+    ]));
+
+    const csv = withBOM(toCSV({ columns, rows, delimiter: ";" }));
+
+    const safeFrom = fechaDesde.replace(/-/g, "");
+    const safeTo = fechaHasta.replace(/-/g, "");
+    const filename = `cierres_caja_${safeFrom}_${safeTo}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    await auditLog(req, {
+      action: "CIERRES_CSV_EXPORT",
+      entity: "egresos",
+      entity_id: null,
+      success: true,
+      status_code: 200,
+      details: {
+        rows: r.rowCount,
+        filters: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta, empresa_salida: empresaSalida || null, moneda: moneda || null, turno: turno || null }
+      }
+    });
+
+    return res.send(csv);
+  } catch (error) {
+    console.error("Error exportando cierres CSV:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Error exportando CSV de cierres" });
+  }
+});
+
 // GET /api/egresos - Listar con filtros y paginación
 router.get("/", auth, async (req, res) => {
   try {
@@ -895,6 +1421,7 @@ router.get("/", auth, async (req, res) => {
       monto_max,
       turno,
       cuenta_receptora,
+      cuenta_salida,
       created_by,
       limit,
       offset
@@ -977,6 +1504,11 @@ router.get("/", auth, async (req, res) => {
     if (cuenta_receptora) {
       params.push(`%${cuenta_receptora}%`);
       where.push(`e.cuenta_receptora ILIKE $${params.length}`);
+    }
+
+    if (cuenta_salida) {
+      params.push(cuenta_salida);
+      where.push(`e.cuenta_salida = $${params.length}`);
     }
 
     if (created_by) {
@@ -1487,6 +2019,7 @@ router.put("/:id", auth, async (req, res) => {
       etiqueta,
       etiqueta_otro,
       moneda,
+      tipo_transaccion,
       monto_raw,
       monto,
       cuenta_receptora,
@@ -1500,6 +2033,34 @@ router.put("/:id", auth, async (req, res) => {
       change_reason
     } = req.body;
 
+    const hasField = (key) => Object.prototype.hasOwnProperty.call(req.body, key);
+
+    const sendsFecha = hasField("fecha");
+    const sendsHora = hasField("hora");
+    const sendsTurno = hasField("turno");
+    const sendsEtiqueta = hasField("etiqueta");
+    const sendsEtiquetaOtro = hasField("etiqueta_otro");
+    const sendsMoneda = hasField("moneda");
+    const sendsTipoTransaccion = hasField("tipo_transaccion");
+    const sendsMontoRaw = hasField("monto_raw");
+    const sendsMonto = hasField("monto");
+    const sendsCuentaReceptora = hasField("cuenta_receptora");
+    const sendsUsuarioCasino = hasField("usuario_casino");
+    const sendsHoraSolicitud = hasField("hora_solicitud_cliente");
+    const sendsHoraQuema = hasField("hora_quema_fichas");
+    const sendsIdTransferencia = hasField("id_transferencia");
+    const sendsCuentaSalida = hasField("cuenta_salida");
+    const sendsEmpresaSalida = hasField("empresa_salida");
+    const sendsNotas = hasField("notas");
+
+    const changeReasonNorm = typeof change_reason === "string" ? change_reason.trim() : "";
+    if (!changeReasonNorm) {
+      return res.status(400).json({ message: "Debe indicar el motivo del cambio" });
+    }
+    if (changeReasonNorm.length > 500) {
+      return res.status(400).json({ message: "El motivo del cambio no puede superar 500 caracteres" });
+    }
+
     const normText = (v) => {
       if (v === undefined || v === null) return null;
       const t = String(v).trim();
@@ -1507,7 +2068,12 @@ router.put("/:id", auth, async (req, res) => {
     };
 
     const etiquetaFinal = normText(etiqueta) || oldEgreso.etiqueta;
+    if (!etiquetaFinal) {
+      return res.status(400).json({ message: "Etiqueta inválida" });
+    }
+
     const esCierreCajaFinal = ETIQUETAS_CIERRE_CAJA.has(etiquetaFinal);
+    const esPremioFinal = ETIQUETAS_CON_USUARIO_CASINO.has(etiquetaFinal);
 
     const monedaNorm = normText(moneda)
       ? String(moneda).trim().toUpperCase().replace(/\s*\(.+\)$/, "")
@@ -1516,32 +2082,122 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
     }
 
-    // id_transferencia puede ser null explícito (checkbox "Sin ID")
-    const idTransferenciaNorm = esCierreCajaFinal ? null
-      : (id_transferencia === null ? null : normText(id_transferencia));
-    const cuentaReceptoraNorm = esCierreCajaFinal ? null : normText(cuenta_receptora);
-    const etiquetaOtroNorm = normText(etiqueta_otro);
-    const usuarioCasinoNorm = normText(usuario_casino);
-    const notasNorm = normText(notas);
+    const monedaFinal = monedaNorm || oldEgreso.moneda || "ARS";
 
-    let montoNorm = null;
-    if (monto !== undefined && monto !== null && String(monto).trim() !== "") {
-      const n = Number(monto);
-      if (!Number.isFinite(n) || n <= 0) {
-        return res.status(400).json({ message: "Monto inválido. Debe ser mayor a 0" });
-      }
-      montoNorm = n;
+    const tipoTransaccionNorm = normText(tipo_transaccion)
+      ? String(tipo_transaccion).trim().toUpperCase()
+      : null;
+    if (tipoTransaccionNorm && !["ENTRADA", "SALIDA"].includes(tipoTransaccionNorm)) {
+      return res.status(400).json({ message: "tipo_transaccion inválido. Debe ser ENTRADA o SALIDA" });
+    }
+    const tipoTransaccionFinal = esCierreCajaFinal
+      ? "SALIDA"
+      : (tipoTransaccionNorm || oldEgreso.tipo_transaccion || "SALIDA");
+
+    // Mantener regla de negocio: ARS solo ENTRADA para Deposito de cliente
+    const touchedMonedaTipoEtiqueta = sendsMoneda || sendsTipoTransaccion || sendsEtiqueta;
+    if (
+      touchedMonedaTipoEtiqueta &&
+      monedaFinal === "ARS" &&
+      tipoTransaccionFinal === "ENTRADA" &&
+      etiquetaFinal !== "[Unidad M] Deposito de cliente"
+    ) {
+      return res.status(400).json({ message: "Transacciones ARS solo pueden ser ENTRADA para 'Deposito de cliente'" });
     }
 
-    // Para no cierre de caja, validar campos si se envían
-    const sendsIdTransferencia = Object.prototype.hasOwnProperty.call(req.body, "id_transferencia");
-    const sendsCuentaReceptora = Object.prototype.hasOwnProperty.call(req.body, "cuenta_receptora");
+    // id_transferencia puede ser null explícito (checkbox "Sin ID")
+    const idTransferenciaNorm = esCierreCajaFinal
+      ? null
+      : (
+          sendsIdTransferencia
+            ? (id_transferencia === null ? null : normText(id_transferencia))
+            : normText(oldEgreso.id_transferencia)
+        );
+
+    const cuentaReceptoraNorm = esCierreCajaFinal
+      ? null
+      : (sendsCuentaReceptora ? normText(cuenta_receptora) : normText(oldEgreso.cuenta_receptora));
+
+    // etiqueta_otro solo aplica cuando etiqueta = Otro
+    let etiquetaOtroNorm = sendsEtiquetaOtro ? normText(etiqueta_otro) : normText(oldEgreso.etiqueta_otro);
+    if (etiquetaFinal !== "Otro") {
+      etiquetaOtroNorm = null;
+    } else if ((sendsEtiqueta || sendsEtiquetaOtro) && !etiquetaOtroNorm) {
+      return res.status(400).json({ message: "Si etiqueta es 'Otro', etiqueta_otro es obligatorio" });
+    }
+
+    let usuarioCasinoNorm = sendsUsuarioCasino ? normText(usuario_casino) : normText(oldEgreso.usuario_casino);
+    const notasNorm = sendsNotas ? normText(notas) : normText(oldEgreso.notas);
+
+    // Horas opcionales con formato validado
+    let hsNorm = null;
+    const hsSource = sendsHoraSolicitud ? normText(hora_solicitud_cliente) : normText(oldEgreso.hora_solicitud_cliente);
+    if (hsSource) {
+      hsNorm = normalizeHoraOptional(hsSource);
+      if (!hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
+      }
+    }
+
+    let hqNorm = null;
+    const hqSource = sendsHoraQuema ? normText(hora_quema_fichas) : normText(oldEgreso.hora_quema_fichas);
+    if (hqSource) {
+      hqNorm = normalizeHoraOptional(hqSource);
+      if (!hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
+      }
+    }
+
+    // Para conceptos no-premio, estos campos deben quedar siempre en null
+    if (!esPremioFinal && (sendsEtiqueta || sendsUsuarioCasino || sendsHoraSolicitud || sendsHoraQuema)) {
+      usuarioCasinoNorm = null;
+      hsNorm = null;
+      hqNorm = null;
+    }
+
+    // Si está editando/creando un premio, exigir campos completos
+    const touchedPremioFields = sendsEtiqueta || sendsUsuarioCasino || sendsHoraSolicitud || sendsHoraQuema;
+    if (esPremioFinal && touchedPremioFields) {
+      if (!usuarioCasinoNorm) {
+        return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
+      }
+      if (!hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente es obligatoria para este concepto" });
+      }
+      if (!hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas es obligatoria para este concepto" });
+      }
+    }
+
+    let montoNorm = null;
+    let montoRawNorm = null;
+    if (sendsMontoRaw || sendsMonto) {
+      montoRawNorm = sendsMontoRaw ? String(monto_raw || "").trim() : String(oldEgreso.monto_raw || "").trim();
+      let parsedMonto = parseMontoARSStrict(montoRawNorm);
+
+      if ((parsedMonto === null || parsedMonto <= 0) && monto !== undefined && monto !== null && String(monto).trim() !== "") {
+        const n = Number(monto);
+        if (Number.isFinite(n) && n > 0) {
+          parsedMonto = Math.round(n * 100) / 100;
+          if (!montoRawNorm) montoRawNorm = montoToCommaString(parsedMonto);
+        }
+      }
+
+      if (parsedMonto === null || parsedMonto <= 0) {
+        return res.status(400).json({ message: "Monto inválido. Debe ser mayor a 0" });
+      }
+
+      montoNorm = parsedMonto;
+      if (!montoRawNorm) montoRawNorm = montoToCommaString(parsedMonto);
+    }
+
+    // Para no cierre de caja, validar campos si se envían/cambian
     if (!esCierreCajaFinal) {
-      // id_transferencia puede ser null (Sin ID) o alfanumérico válido
       if (idTransferenciaNorm !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido" });
       }
-      if (sendsCuentaReceptora && !cuentaReceptoraNorm) {
+
+      if ((sendsEtiqueta || sendsCuentaReceptora) && !cuentaReceptoraNorm) {
         return res.status(400).json({ message: "CUENTA RECEPTORA es obligatoria" });
       }
     }
@@ -1560,8 +2216,8 @@ router.put("/:id", auth, async (req, res) => {
 
     // Normalizar y validar fecha si viene en el body
     let fechaNormalizada = fecha;
-    if (fecha) {
-      const fechaResult = normalizeFecha(fecha);
+    if (sendsFecha) {
+      const fechaResult = normalizeFecha(fecha, { enforceCurrentYear: false });
       if (!fechaResult.valid) {
         return res.status(400).json({ message: `Error en fecha: ${fechaResult.error}` });
       }
@@ -1570,65 +2226,131 @@ router.put("/:id", auth, async (req, res) => {
 
     // Validar hora si viene en el body
     let horaNorm = null;
-    const horaRawNorm = normText(hora);
-    if (horaRawNorm) {
+    const horaRawNorm = sendsHora ? normText(hora) : null;
+    if (sendsHora) {
+      if (!horaRawNorm) {
+        return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
+      }
       horaNorm = normalizeHoraToTime(horaRawNorm);
       if (!horaNorm) {
         return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
       }
     }
 
-    // Validar horas opcionales si se envían
-    let hsNorm = null;
-    const hsRawNorm = normText(hora_solicitud_cliente);
-    if (hsRawNorm) {
-      hsNorm = normalizeHoraOptional(hsRawNorm);
-      if (!hsNorm) {
-        return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
+    const turnoNorm = sendsTurno ? normalizeTurnoLabel(normText(turno)) : null;
+    if (sendsTurno && !turnoNorm) {
+      return res.status(400).json({ message: "Turno es obligatorio" });
+    }
+
+    const cuentaSalidaNorm = sendsCuentaSalida ? normText(cuenta_salida) : normText(oldEgreso.cuenta_salida);
+    if (sendsCuentaSalida && !cuentaSalidaNorm) {
+      return res.status(400).json({ message: "CUENTA SALIDA es obligatoria" });
+    }
+
+    const empresaSalidaNorm = sendsEmpresaSalida ? normText(empresa_salida) : normText(oldEgreso.empresa_salida);
+    if (sendsEmpresaSalida) {
+      if (!empresaSalidaNorm) {
+        return res.status(400).json({ message: "EMPRESA SALIDA es obligatoria" });
+      }
+      if (!EMPRESAS_SALIDA.includes(empresaSalidaNorm)) {
+        return res.status(400).json({ message: "empresa_salida inválida" });
       }
     }
 
-    let hqNorm = null;
-    const hqRawNorm = normText(hora_quema_fichas);
-    if (hqRawNorm) {
-      hqNorm = normalizeHoraToTime(hqRawNorm);
-      if (!hqNorm) {
-        return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
+    const fechaFinal = sendsFecha ? fechaNormalizada : toISODateOnly(oldEgreso.fecha);
+    const turnoFinal = sendsTurno ? turnoNorm : normalizeTurnoLabel(normText(oldEgreso.turno));
+    const cuentaSalidaFinal = cuentaSalidaNorm;
+    const empresaSalidaFinal = empresaSalidaNorm;
+
+    if (esCierreCajaFinal) {
+      if (!fechaFinal) {
+        return res.status(400).json({ message: "Fecha inválida para cierre de caja" });
+      }
+      if (!turnoFinal || !TURNOS_CIERRE.includes(turnoFinal)) {
+        return res.status(400).json({ message: "Turno inválido para cierre de caja" });
+      }
+      if (!empresaSalidaFinal) {
+        return res.status(400).json({ message: "EMPRESA SALIDA es obligatoria para cierre de caja" });
+      }
+      if (!cuentaSalidaFinal) {
+        return res.status(400).json({ message: "CUENTA SALIDA es obligatoria para cierre de caja" });
+      }
+
+      const duplicate = await findDuplicateCierreSlot({
+        fecha: fechaFinal,
+        turno: turnoFinal,
+        empresaSalida: empresaSalidaFinal,
+        cuentaSalida: cuentaSalidaFinal,
+        moneda: monedaFinal,
+        excludeId: id
+      });
+
+      if (duplicate.rowCount > 0) {
+        const existing = duplicate.rows[0];
+        return res.status(409).json({
+          message: "Ya existe otro cierre para ese mismo dia, turno, empresa, titular y moneda.",
+          duplicate: {
+            id: existing.id,
+            created_at: existing.created_at,
+            monto: Number(existing.monto || 0)
+          }
+        });
       }
     }
 
-    // Actualizar egreso y cambiar status a 'editada'
+    const setClauses = [];
+    const params = [];
+    const setField = (column, value) => {
+      params.push(value);
+      setClauses.push(`${column} = $${params.length}`);
+    };
+
+    if (sendsFecha) setField("fecha", fechaNormalizada);
+    if (sendsHora) setField("hora", horaNorm);
+    if (sendsTurno) setField("turno", turnoNorm);
+    if (sendsEtiqueta) setField("etiqueta", etiquetaFinal);
+    if (sendsEtiqueta || sendsEtiquetaOtro) setField("etiqueta_otro", etiquetaOtroNorm);
+    if (sendsMoneda) setField("moneda", monedaFinal);
+    if (sendsTipoTransaccion || sendsEtiqueta) setField("tipo_transaccion", tipoTransaccionFinal);
+
+    if (sendsMontoRaw || sendsMonto) {
+      setField("monto_raw", montoRawNorm);
+      setField("monto", montoNorm);
+    }
+
+    if (sendsEtiqueta || sendsCuentaReceptora || sendsIdTransferencia) {
+      setField("cuenta_receptora", cuentaReceptoraNorm);
+      setField("id_transferencia", idTransferenciaNorm);
+    }
+
+    if (sendsEtiqueta || sendsUsuarioCasino || sendsHoraSolicitud || sendsHoraQuema) {
+      setField("usuario_casino", usuarioCasinoNorm);
+      setField("hora_solicitud_cliente", hsNorm);
+      setField("hora_quema_fichas", hqNorm);
+    }
+
+    if (sendsCuentaSalida) setField("cuenta_salida", cuentaSalidaNorm);
+    if (sendsEmpresaSalida) setField("empresa_salida", empresaSalidaNorm);
+    if (sendsNotas) setField("notas", notasNorm);
+
+    // Marcar siempre como editado y registrar auditoría de quién editó
+    setClauses.push("status = 'editada'");
+    params.push(req.user.id);
+    setClauses.push(`updated_by = $${params.length}`);
+    setClauses.push("updated_at = CURRENT_TIMESTAMP");
+
+    // Actualizar egreso
+    params.push(id);
     await query(
-      `UPDATE egresos
-       SET fecha = COALESCE($1, fecha),
-           hora = COALESCE($2, hora),
-           turno = COALESCE($3, turno),
-           etiqueta = COALESCE($4, etiqueta),
-           etiqueta_otro = COALESCE($5, etiqueta_otro),
-           moneda = COALESCE($6, moneda),
-           monto_raw = COALESCE($7, monto_raw),
-           monto = COALESCE($8, monto),
-           cuenta_receptora = COALESCE($9, cuenta_receptora),
-           usuario_casino = COALESCE($10, usuario_casino),
-           hora_solicitud_cliente = COALESCE($11, hora_solicitud_cliente),
-           hora_quema_fichas = COALESCE($12, hora_quema_fichas),
-           id_transferencia = COALESCE($13, id_transferencia),
-           cuenta_salida = COALESCE($14, cuenta_salida),
-           empresa_salida = COALESCE($15, empresa_salida),
-           notas = COALESCE($16, notas),
-           status = 'editada',
-           updated_by = $17,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $18`,
-      [
-        fechaNormalizada, horaNorm, normText(turno), etiquetaFinal, etiquetaOtroNorm,
-        monedaNorm, normText(monto_raw), montoNorm, cuentaReceptoraNorm, usuarioCasinoNorm,
-        hsNorm, hqNorm, idTransferenciaNorm,
-        normText(cuenta_salida), normText(empresa_salida), notasNorm,
-        req.user.id,
-        id
-      ]
+      `UPDATE egresos SET ${setClauses.join(", ")} WHERE id = $${params.length}`,
+      params
     );
+
+    // Si no hay campos explícitos para cambio, al menos dejar trazabilidad por estado/updated_by
+    if (setClauses.length === 3) {
+      // status + updated_by + updated_at
+      // no-op: ya quedó trazabilidad
+    }
 
     // Registrar en audit logs
     await auditLog(req, {
@@ -1638,11 +2360,12 @@ router.put("/:id", auth, async (req, res) => {
       success: true,
       status_code: 200,
       details: {
-        change_reason: change_reason || "Sin motivo especificado",
+        change_reason: changeReasonNorm,
         fields_changed: Object.keys(req.body).filter(k => k !== 'change_reason')
       }
     });
 
+    clearSaldosCache();
     return res.json({ message: "Egreso actualizado correctamente" });
 
   } catch (error) {
@@ -1723,6 +2446,7 @@ router.post("/:id/anular", auth, async (req, res) => {
       }
     });
 
+    clearSaldosCache();
     return res.json({ message: "Egreso anulado correctamente" });
 
   } catch (error) {
@@ -1816,6 +2540,7 @@ router.delete("/:id", auth, async (req, res) => {
       }
     });
 
+    clearSaldosCache();
     return res.json({ message: "Egreso eliminado correctamente" });
 
   } catch (error) {
