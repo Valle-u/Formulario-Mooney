@@ -2090,9 +2090,9 @@ body {
     width: 46px;
     height: 46px;
     min-height: 46px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    place-items: center;
+    gap: 0;
     padding: 0;
     font-size: 0;
     line-height: 0;
@@ -2103,6 +2103,10 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item::before {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     margin: 0;
   }
 
