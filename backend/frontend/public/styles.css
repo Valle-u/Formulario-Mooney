@@ -2045,21 +2045,23 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar {
-    --sidebar-width: 92px;
+    --sidebar-width: 94px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar {
-    padding: 14px 10px;
+    padding: 12px 0;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-inner {
+    width: 100%;
     align-items: center;
     gap: 12px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-left {
+    display: grid;
+    place-items: center;
     width: 100%;
-    justify-content: center;
     padding: 2px 0 12px;
   }
 
@@ -2078,10 +2080,13 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop {
+    display: grid;
+    justify-items: center;
+    align-content: start;
     width: 100%;
-    align-items: center;
     gap: 10px;
     padding: 2px 0;
+    overflow-y: visible;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item.active {
@@ -2101,10 +2106,19 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop {
+    display: grid;
     width: 100%;
     justify-items: center;
     padding: 12px 0 0;
     gap: 10px;
+  }
+
+  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item,
+  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
+  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
+  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge,
+  body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
+    margin-inline: auto;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme::before,
