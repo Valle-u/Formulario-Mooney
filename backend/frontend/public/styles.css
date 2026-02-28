@@ -2045,24 +2045,28 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar {
-    --sidebar-width: 94px;
+    --sidebar-width: 96px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar {
-    padding: 12px 0;
+    padding: 10px 0;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-inner {
     width: 100%;
-    align-items: center;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    justify-items: center;
+    align-items: start;
     gap: 12px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-left {
-    display: grid;
-    place-items: center;
     width: 100%;
-    padding: 2px 0 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 0 10px;
   }
 
   body.sidebar-collapsed .app-nosidebar .brand {
@@ -2070,23 +2074,33 @@ body {
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item {
-    width: 44px;
-    min-height: 44px;
-    padding: 0;
+    width: 46px;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
     justify-content: center;
+    padding: 0;
+    text-indent: -9999px;
+    overflow: hidden;
+    white-space: nowrap;
     font-size: 0;
     line-height: 0;
-    border-radius: 10px;
+    border-radius: 12px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop {
-    display: grid;
-    justify-items: center;
-    align-content: start;
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
     gap: 10px;
     padding: 2px 0;
-    overflow-y: visible;
+    overflow-y: auto;
+  }
+
+  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item::before {
+    margin: 0;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item.active {
@@ -2097,18 +2111,22 @@ body {
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge {
-    width: 44px;
+    width: 46px;
     min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 0;
     min-width: 0;
     padding: 0;
-    border-radius: 10px;
+    border-radius: 12px;
   }
 
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop {
-    display: grid;
     width: 100%;
-    justify-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     padding: 12px 0 0;
     gap: 10px;
   }
@@ -2134,8 +2152,8 @@ body {
   body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge::before { content: 'USR'; }
 
   body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
-    min-width: 36px;
-    width: 36px;
+    min-width: 40px;
+    width: 40px;
     height: 36px;
     font-size: 0;
     border-radius: 10px;
