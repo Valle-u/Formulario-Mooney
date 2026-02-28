@@ -69,6 +69,16 @@
   align-items: end;
 }
 
+.cierre-step-fecha .grid {
+  align-items: start;
+}
+
+.cierre-step-fecha .field input {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
 .cierre-step-title {
   font-size: 13px;
   font-weight: 700;
@@ -121,6 +131,29 @@
   display: flex;
   gap: 8px;
   margin-top: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cierre-page-card :focus-visible {
+  outline: 2px solid #9fd0ff;
+  outline-offset: 2px;
+}
+
+.turno-btn,
+.btn-kpi-usar,
+.cierre-kpi-actions .btn,
+.cierre-quick-actions .btn,
+.actions-right .btn {
+  min-height: 42px;
+}
+
+#cierreForm .field input,
+#cierreForm .field select,
+#cierreForm .field textarea,
+.cierre-kpi-filters .field input,
+.cierre-kpi-filters .field select {
+  min-height: 44px;
 }
 
 .cierre-resumen-live {
@@ -261,6 +294,13 @@
   color: var(--muted);
 }
 
+.kpi-row-subdetail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 600;
+}
+
 .kpi-dup {
   color: #ef4444;
   font-size: 11px;
@@ -298,8 +338,21 @@ html[data-theme="light"] .cierre-resumen-live {
 }
 
 @media (max-width: 700px) {
+  .cierre-panel {
+    padding: 12px;
+  }
+
+  .cierre-step {
+    padding: 10px;
+  }
+
   .turno-picker {
     grid-template-columns: 1fr;
+  }
+
+  .cierre-step-fecha .grid .field,
+  .cierre-kpi-filters .field {
+    grid-column: span 12;
   }
 
   .cierre-kpi-summary {
@@ -312,6 +365,10 @@ html[data-theme="light"] .cierre-resumen-live {
 
   .kpi-row-actions {
     justify-self: start;
+  }
+
+  .kpi-row-actions .btn {
+    width: 100%;
   }
 }
 

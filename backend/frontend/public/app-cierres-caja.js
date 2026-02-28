@@ -95,7 +95,9 @@ function markTurnoSelected(turno) {
   if (hidden) hidden.value = turno || "";
 
   document.querySelectorAll("#turnoPicker .turno-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.turno === turno);
+    const isActive = btn.dataset.turno === turno;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 
   const turnoAyuda = document.getElementById("turnoAyuda");
@@ -301,14 +303,17 @@ function renderKPIRows(rows) {
 
     const cierre = row.cierre;
     const detail = cierre
-      ? `${formatMoney(cierre.monto, row.moneda)} | cargado: ${formatCreatedAt(cierre.created_at)}${cierre.created_by_username ? ` | usuario: ${escapeHtml(cierre.created_by_username)}` : ""}`
-      : "Sin cierre cargado";
+      ? `${formatMoney(cierre.monto, cierre.moneda || "ARS")} | ${escapeHtml(cierre.empresa_salida || "-")} | ${escapeHtml(cierre.cuenta_salida || "-")} | cargado: ${formatCreatedAt(cierre.created_at)}${cierre.created_by_username ? ` | usuario: ${escapeHtml(cierre.created_by_username)}` : ""}`
+      : "Sin cierre cargado para este turno.";
 
     const action = row.status === "PENDIENTE"
       ? `<button type="button" class="btn btn-ghost btn-kpi-usar" data-row-index="${idx}">Usar este slot</button>`
       : "";
 
     const dupText = row.status === "DUPLICADO" ? `<span class="kpi-dup">${row.count} cierres</span>` : "";
+    const subDetail = (row.status === "DUPLICADO" && Array.isArray(row.cierres) && row.cierres.length > 1)
+      ? `<div class="kpi-row-subdetail">Ultimo: ${formatMoney(row.cierres[0].monto, row.cierres[0].moneda || "ARS")} | ${escapeHtml(row.cierres[0].empresa_salida || "-")} | ${escapeHtml(row.cierres[0].cuenta_salida || "-")}</div>`
+      : "";
 
     return `
       <article class="kpi-row ${statusClass}">
@@ -319,8 +324,8 @@ function renderKPIRows(rows) {
             <span class="kpi-status ${statusClass}">${escapeHtml(row.status)}</span>
             ${dupText}
           </div>
-          <div class="kpi-row-meta">${escapeHtml(row.empresa_salida)} | ${escapeHtml(row.cuenta_salida)} | ${escapeHtml(row.moneda)}</div>
           <div class="kpi-row-detail">${detail}</div>
+          ${subDetail}
         </div>
         <div class="kpi-row-actions">${action}</div>
       </article>
@@ -343,9 +348,11 @@ function aplicarSlotAlFormulario(row) {
   const moneda = document.getElementById("cierre_moneda");
   const fecha = document.getElementById("cierre_fecha_operativa");
 
-  if (empresa) empresa.value = row.empresa_salida || "";
-  if (cuenta) cuenta.value = row.cuenta_salida || "";
-  if (moneda) moneda.value = row.moneda || "ARS";
+  const cierreData = row?.cierre || null;
+
+  if (empresa && cierreData?.empresa_salida) empresa.value = cierreData.empresa_salida;
+  if (cuenta && cierreData?.cuenta_salida) cuenta.value = cierreData.cuenta_salida;
+  if (moneda && cierreData?.moneda) moneda.value = cierreData.moneda;
   if (fecha) {
     fecha.value = row.fecha || "";
     fecha.dataset.autoSuggested = "0";
@@ -363,7 +370,6 @@ async function refreshKPI() {
   const fechaDesde = document.getElementById("kpi_fecha_desde")?.value || "";
   const fechaHasta = document.getElementById("kpi_fecha_hasta")?.value || "";
   const empresa = document.getElementById("kpi_empresa_salida")?.value || "";
-  const cuenta = document.getElementById("kpi_cuenta_salida")?.value?.trim() || "";
   const moneda = document.getElementById("kpi_moneda")?.value || "";
 
   const list = document.getElementById("cierresKPIList");
@@ -374,7 +380,6 @@ async function refreshKPI() {
     if (fechaDesde) qs.set("fecha_desde", fechaDesde);
     if (fechaHasta) qs.set("fecha_hasta", fechaHasta);
     if (empresa) qs.set("empresa_salida", empresa);
-    if (cuenta) qs.set("cuenta_salida", cuenta);
     if (moneda) qs.set("moneda", moneda);
 
     const data = await api(`/api/egresos/cierres/kpi?${qs.toString()}`);
@@ -471,14 +476,10 @@ function wireEvents() {
 
   let formCuentaTimer = null;
   document.getElementById("cierre_cuenta_salida")?.addEventListener("input", () => {
-    const cuentaVal = document.getElementById("cierre_cuenta_salida")?.value || "";
-    const kpiCuenta = document.getElementById("kpi_cuenta_salida");
-    if (kpiCuenta) kpiCuenta.value = cuentaVal;
-
     updateLiveResumen();
 
     if (formCuentaTimer) clearTimeout(formCuentaTimer);
-    formCuentaTimer = setTimeout(refreshKPI, 320);
+    formCuentaTimer = setTimeout(cargarCuentasSugeridas, 320);
   });
 
   document.getElementById("cierreForm")?.addEventListener("submit", handleSubmitCierre);
@@ -487,12 +488,6 @@ function wireEvents() {
 
   ["kpi_fecha_desde", "kpi_fecha_hasta", "kpi_empresa_salida", "kpi_moneda"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", refreshKPI);
-  });
-
-  let cuentaTimer = null;
-  document.getElementById("kpi_cuenta_salida")?.addEventListener("input", () => {
-    if (cuentaTimer) clearTimeout(cuentaTimer);
-    cuentaTimer = setTimeout(refreshKPI, 320);
   });
 }
 

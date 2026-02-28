@@ -1120,7 +1120,7 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/egresos/cierres/kpi - Cobertura de cierres por dia/turno/cuenta
+// GET /api/egresos/cierres/kpi - Cobertura de cierres por dia/turno (3 slots por dia)
 router.get("/cierres/kpi", auth, async (req, res) => {
   try {
     const todayISO = localDateToISO(new Date());
@@ -1141,7 +1141,6 @@ router.get("/cierres/kpi", auth, async (req, res) => {
     }
 
     const empresaSalida = String(req.query.empresa_salida || "").trim();
-    const cuentaSalida = String(req.query.cuenta_salida || "").trim();
     const moneda = String(req.query.moneda || "").trim().toUpperCase();
 
     if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
@@ -1149,52 +1148,6 @@ router.get("/cierres/kpi", auth, async (req, res) => {
     }
     if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
       return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
-    }
-
-    let slots = [];
-
-    if (empresaSalida && cuentaSalida && moneda) {
-      slots = [{ empresa_salida: empresaSalida, cuenta_salida: cuentaSalida, moneda }];
-    } else {
-      const lookbackDesde = shiftISODate(fechaHasta, -45);
-      const slotWhere = [
-        "status <> 'anulado'",
-        "fecha >= $1::date",
-        "fecha <= $2::date",
-        "moneda IN ('ARS','USD','USDT')",
-        "empresa_salida IS NOT NULL",
-        "cuenta_salida IS NOT NULL",
-        "btrim(empresa_salida) <> ''",
-        "btrim(cuenta_salida) <> ''"
-      ];
-      const slotParams = [lookbackDesde, fechaHasta];
-
-      if (empresaSalida) {
-        slotParams.push(empresaSalida);
-        slotWhere.push(`empresa_salida = $${slotParams.length}`);
-      }
-      if (cuentaSalida) {
-        slotParams.push(cuentaSalida);
-        slotWhere.push(`cuenta_salida = $${slotParams.length}`);
-      }
-      if (moneda) {
-        slotParams.push(moneda);
-        slotWhere.push(`moneda = $${slotParams.length}`);
-      }
-
-      const slotResult = await query(
-        `SELECT DISTINCT empresa_salida, cuenta_salida, moneda
-           FROM egresos
-          WHERE ${slotWhere.join(" AND ")}
-          ORDER BY empresa_salida, cuenta_salida, moneda`,
-        slotParams
-      );
-
-      slots = slotResult.rows.map((r) => ({
-        empresa_salida: r.empresa_salida,
-        cuenta_salida: r.cuenta_salida,
-        moneda: String(r.moneda || "").toUpperCase()
-      }));
     }
 
     const cierreWhere = [
@@ -1208,10 +1161,6 @@ router.get("/cierres/kpi", auth, async (req, res) => {
     if (empresaSalida) {
       cierreParams.push(empresaSalida);
       cierreWhere.push(`e.empresa_salida = $${cierreParams.length}`);
-    }
-    if (cuentaSalida) {
-      cierreParams.push(cuentaSalida);
-      cierreWhere.push(`e.cuenta_salida = $${cierreParams.length}`);
     }
     if (moneda) {
       cierreParams.push(moneda);
@@ -1245,13 +1194,7 @@ router.get("/cierres/kpi", auth, async (req, res) => {
       const turnoNorm = normalizeTurnoLabel(c.turno);
       if (!fechaISO || !TURNOS_CIERRE.includes(turnoNorm)) continue;
 
-      const key = [
-        fechaISO,
-        c.empresa_salida,
-        c.cuenta_salida,
-        String(c.moneda || "").toUpperCase(),
-        turnoNorm
-      ].join("|");
+      const key = [fechaISO, turnoNorm].join("|");
 
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push({
@@ -1259,6 +1202,9 @@ router.get("/cierres/kpi", auth, async (req, res) => {
         monto: Number(c.monto || 0),
         monto_raw: c.monto_raw,
         hora: c.hora,
+        empresa_salida: c.empresa_salida || null,
+        cuenta_salida: c.cuenta_salida || null,
+        moneda: String(c.moneda || "").toUpperCase() || null,
         created_at: c.created_at,
         created_by: c.created_by,
         created_by_username: c.created_by_username || null
@@ -1270,39 +1216,32 @@ router.get("/cierres/kpi", auth, async (req, res) => {
     const summary = { total: 0, pendientes: 0, ok: 0, duplicados: 0 };
 
     for (const fechaISO of fechas) {
-      for (const slot of slots) {
-        for (const turno of TURNOS_CIERRE) {
-          const key = [fechaISO, slot.empresa_salida, slot.cuenta_salida, slot.moneda, turno].join("|");
-          const hits = grouped.get(key) || [];
+      for (const turno of TURNOS_CIERRE) {
+        const key = [fechaISO, turno].join("|");
+        const hits = grouped.get(key) || [];
 
-          let status = "PENDIENTE";
-          if (hits.length === 1) status = "OK";
-          if (hits.length > 1) status = "DUPLICADO";
+        let status = "PENDIENTE";
+        if (hits.length === 1) status = "OK";
+        if (hits.length > 1) status = "DUPLICADO";
 
-          summary.total += 1;
-          if (status === "PENDIENTE") summary.pendientes += 1;
-          if (status === "OK") summary.ok += 1;
-          if (status === "DUPLICADO") summary.duplicados += 1;
+        summary.total += 1;
+        if (status === "PENDIENTE") summary.pendientes += 1;
+        if (status === "OK") summary.ok += 1;
+        if (status === "DUPLICADO") summary.duplicados += 1;
 
-          rows.push({
-            fecha: fechaISO,
-            turno,
-            empresa_salida: slot.empresa_salida,
-            cuenta_salida: slot.cuenta_salida,
-            moneda: slot.moneda,
-            status,
-            count: hits.length,
-            cierre: hits.length > 0 ? hits[0] : null
-          });
-        }
+        rows.push({
+          fecha: fechaISO,
+          turno,
+          status,
+          count: hits.length,
+          cierre: hits.length > 0 ? hits[0] : null,
+          cierres: hits.slice(0, 3)
+        });
       }
     }
 
     rows.sort((a, b) => {
       if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
-      if (a.empresa_salida !== b.empresa_salida) return a.empresa_salida.localeCompare(b.empresa_salida);
-      if (a.cuenta_salida !== b.cuenta_salida) return a.cuenta_salida.localeCompare(b.cuenta_salida);
-      if (a.moneda !== b.moneda) return a.moneda.localeCompare(b.moneda);
       return (TURNOS_CIERRE_ORDER[a.turno] || 99) - (TURNOS_CIERRE_ORDER[b.turno] || 99);
     });
 
@@ -1310,10 +1249,8 @@ router.get("/cierres/kpi", auth, async (req, res) => {
       periodo: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta, total_dias: totalDays },
       filtros: {
         empresa_salida: empresaSalida || null,
-        cuenta_salida: cuentaSalida || null,
         moneda: moneda || null
       },
-      slots,
       summary,
       rows
     });

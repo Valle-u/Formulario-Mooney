@@ -13,7 +13,7 @@
       } catch (_) {}
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=2026030102"/>
+  <link rel="stylesheet" href="styles.css?v=2026030103"/>
 </head>
 
 <body>
@@ -106,15 +106,15 @@
                   <div class="cierre-step span12">
                     <div class="cierre-step-title">1) Cual es tu turno laboral</div>
                     <div class="turno-picker" id="turnoPicker">
-                      <button type="button" class="turno-btn" data-turno="Turno mañana">
+                      <button type="button" class="turno-btn" data-turno="Turno mañana" aria-pressed="false" aria-label="Turno manana, de 08:00 a 15:59">
                         <span class="turno-name">Turno manana</span>
                         <span class="turno-time">08:00 a 15:59</span>
                       </button>
-                      <button type="button" class="turno-btn" data-turno="Turno tarde">
+                      <button type="button" class="turno-btn" data-turno="Turno tarde" aria-pressed="false" aria-label="Turno tarde, de 16:00 a 00:00">
                         <span class="turno-name">Turno tarde</span>
                         <span class="turno-time">16:00 a 00:00</span>
                       </button>
-                      <button type="button" class="turno-btn" data-turno="Turno noche">
+                      <button type="button" class="turno-btn" data-turno="Turno noche" aria-pressed="false" aria-label="Turno noche, de 00:00 a 07:59">
                         <span class="turno-name">Turno noche</span>
                         <span class="turno-time">00:00 a 07:59</span>
                       </button>
@@ -123,16 +123,16 @@
                     <div class="note" id="turnoAyuda">Primero elegi tu turno para que el sistema te sugiera la fecha correcta.</div>
                   </div>
 
-                  <div class="cierre-step span12">
+                  <div class="cierre-step cierre-step-fecha span12">
                     <div class="cierre-step-title">2) Que dia estas cerrando</div>
                     <div class="grid">
                       <div class="field span6">
-                        <label>FECHA OPERATIVA *</label>
+                        <label for="cierre_fecha_operativa">FECHA OPERATIVA *</label>
                         <input id="cierre_fecha_operativa" type="date" required>
                         <div class="note" id="fechaAyuda">Si cerras Turno tarde pasada la medianoche, suele corresponder al dia anterior.</div>
                       </div>
                       <div class="field span6">
-                        <label>HORA DETECTADA POR SISTEMA</label>
+                        <label for="cierre_hora_detectada">HORA DETECTADA POR SISTEMA</label>
                         <input id="cierre_hora_detectada" type="text" readonly>
                         <div class="note">No se edita. Se usa para auditoria y control.</div>
                       </div>
@@ -147,16 +147,16 @@
                     <div class="cierre-step-title">3) De que cuenta es este cierre</div>
                     <div class="grid">
                       <div class="field span4">
-                        <label>EMPRESA *</label>
+                        <label for="cierre_empresa_salida">EMPRESA *</label>
                         <select id="cierre_empresa_salida" required></select>
                       </div>
                       <div class="field span4">
-                        <label>TITULAR CUENTA *</label>
+                        <label for="cierre_cuenta_salida">TITULAR CUENTA *</label>
                         <input id="cierre_cuenta_salida" list="cierre_cuentas_sugeridas" required placeholder="Nombre del titular">
                         <datalist id="cierre_cuentas_sugeridas"></datalist>
                       </div>
                       <div class="field span4">
-                        <label>MONEDA *</label>
+                        <label for="cierre_moneda">MONEDA *</label>
                         <select id="cierre_moneda" required>
                           <option value="ARS">ARS</option>
                           <option value="USD">USD</option>
@@ -170,23 +170,23 @@
                     <div class="cierre-step-title">4) Monto final y comprobante</div>
                     <div class="grid">
                       <div class="field span6">
-                        <label>MONTO DE CIERRE *</label>
+                        <label for="cierre_monto">MONTO DE CIERRE *</label>
                         <input id="cierre_monto" placeholder="Ej: 120000 o 120000,50" required>
                         <div class="note">Este es el monto final con el que cerras el turno.</div>
                       </div>
                       <div class="field span6">
-                        <label>COMPROBANTE *</label>
+                        <label for="cierre_comprobante">COMPROBANTE *</label>
                         <input id="cierre_comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
                         <div class="note">JPG / PNG / PDF - maximo 10MB</div>
                       </div>
                       <div class="field span12">
-                        <label>NOTAS</label>
+                        <label for="cierre_notas">NOTAS</label>
                         <textarea id="cierre_notas" placeholder="Opcional"></textarea>
                       </div>
                     </div>
                   </div>
 
-                  <div class="cierre-resumen-live span12" id="cierreResumenLive"></div>
+                  <div class="cierre-resumen-live span12" id="cierreResumenLive" aria-live="polite"></div>
 
                   <div class="actions-right span12">
                     <button type="submit" class="btn btn-primary" id="btnGuardarCierre">Guardar cierre de caja</button>
@@ -197,7 +197,7 @@
               <section class="cierre-panel cierre-kpi-panel">
                 <div class="cierre-panel-head">
                   <h2>Estado de cierres</h2>
-                  <p>Lista clara por dia y turno. Marca faltantes y detecta duplicados.</p>
+                  <p>Lista clara por dia y turno. Siempre son 3 cierres por dia: manana, tarde y noche.</p>
                 </div>
 
                 <div class="cierre-kpi-summary">
@@ -217,15 +217,15 @@
 
                 <div class="grid cierre-kpi-filters">
                   <div class="field span4">
-                    <label>DESDE</label>
+                    <label for="kpi_fecha_desde">DESDE</label>
                     <input id="kpi_fecha_desde" type="date">
                   </div>
                   <div class="field span4">
-                    <label>HASTA</label>
+                    <label for="kpi_fecha_hasta">HASTA</label>
                     <input id="kpi_fecha_hasta" type="date">
                   </div>
                   <div class="field span4">
-                    <label>MONEDA</label>
+                    <label for="kpi_moneda">MONEDA</label>
                     <select id="kpi_moneda">
                       <option value="">Todas</option>
                       <option value="ARS">ARS</option>
@@ -233,13 +233,9 @@
                       <option value="USDT">USDT</option>
                     </select>
                   </div>
-                  <div class="field span6">
-                    <label>EMPRESA</label>
+                  <div class="field span12">
+                    <label for="kpi_empresa_salida">EMPRESA</label>
                     <select id="kpi_empresa_salida"></select>
-                  </div>
-                  <div class="field span6">
-                    <label>TITULAR CUENTA</label>
-                    <input id="kpi_cuenta_salida" placeholder="Filtrar por titular (opcional)">
                   </div>
                 </div>
 
@@ -247,7 +243,7 @@
                   <button type="button" class="btn btn-ghost" id="btnRefreshCierresKPI">Actualizar lista</button>
                 </div>
 
-                <div id="cierresKPIList" class="cierre-kpi-list"></div>
+                <div id="cierresKPIList" class="cierre-kpi-list" aria-live="polite"></div>
               </section>
             </div>
           </div>
@@ -257,6 +253,6 @@
   </div>
 
   <script src="app-shared.js?v=20260301"></script>
-  <script src="app-cierres-caja.js?v=20260301"></script>
+  <script src="app-cierres-caja.js?v=2026030102"></script>
 </body>
 </html>
