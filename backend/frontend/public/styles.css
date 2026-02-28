@@ -2044,15 +2044,15 @@ body {
     border-color: #ffffff;
   }
 
-  body.sidebar-collapsed .app-nosidebar {
+  html.sidebar-collapsed .app-nosidebar {
     --sidebar-width: 80px;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar {
+  html.sidebar-collapsed .app-nosidebar .topbar {
     padding: 8px 0;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-inner {
+  html.sidebar-collapsed .app-nosidebar .topbar-inner {
     width: 100%;
     height: 100%;
     display: flex;
@@ -2061,7 +2061,7 @@ body {
     gap: 12px;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-left {
+  html.sidebar-collapsed .app-nosidebar .topbar-left {
     width: 100%;
     display: flex;
     justify-content: center;
@@ -2069,11 +2069,11 @@ body {
     padding: 2px 0 10px;
   }
 
-  body.sidebar-collapsed .app-nosidebar .brand {
+  html.sidebar-collapsed .app-nosidebar .brand {
     display: none;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop {
+  html.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop {
     width: 100%;
     flex: 1;
     display: flex;
@@ -2086,7 +2086,7 @@ body {
     overflow-x: hidden;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item {
+  html.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item {
     width: 42px;
     height: 42px;
     min-height: 42px;
@@ -2102,7 +2102,7 @@ body {
     overflow: hidden;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item::before {
+  html.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item::before {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -2110,12 +2110,12 @@ body {
     margin: 0;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item.active {
+  html.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item.active {
     box-shadow: none;
     border-color: rgba(255,255,255,.45);
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop {
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop {
     width: 100%;
     margin-top: auto;
     display: flex;
@@ -2125,9 +2125,9 @@ body {
     padding: 12px 0 0;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge {
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge {
     width: 42px;
     min-height: 34px;
     display: flex;
@@ -2139,27 +2139,27 @@ body {
     border-radius: 10px;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge,
-  body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
+  html.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge,
+  html.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
     margin-inline: auto;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme::before,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout::before,
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge::before {
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme::before,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout::before,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge::before {
     font-size: 10px;
     font-weight: 800;
     letter-spacing: .25px;
   }
 
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme::before { content: 'TM'; }
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout::before { content: 'OUT'; }
-  body.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge::before { content: 'USR'; }
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme::before { content: 'TM'; }
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout::before { content: 'OUT'; }
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge::before { content: 'USR'; }
 
-  body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
+  html.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn {
     min-width: 34px;
     width: 34px;
     height: 32px;
@@ -2167,14 +2167,14 @@ body {
     border-radius: 9px;
   }
 
-  body.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn::before {
+  html.sidebar-collapsed .app-nosidebar .sidebar-collapse-btn::before {
     content: 'EXP';
     font-size: 9px;
     font-weight: 800;
     letter-spacing: .2px;
   }
 
-  [data-theme="light"] body.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item.active {
+  html[data-theme="light"].sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item.active {
     box-shadow: none;
     border-color: #111111;
   }

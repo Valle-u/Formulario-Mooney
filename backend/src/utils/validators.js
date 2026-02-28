@@ -62,12 +62,60 @@ export function isFutureDateISO(yyyyMmDd) {
   return d > today;
 }
 
-// Formato estricto AR: 12000 o 12000,50 (sin puntos, sin $)
+// Parseo robusto de monto.
+// Acepta:
+// - 12000
+// - 12000,50
+// - 12000.50
+// - 12.000,50
+// - 12,000.50
 export function parseMontoARSStrict(raw) {
-  const v = (raw || "").trim();
-  const re = /^\d+(,\d{1,2})?$/;
-  if (!re.test(v)) return null;
-  const num = Number(v.replace(",", "."));
+  let v = String(raw || "").trim();
+  if (!v) return null;
+
+  v = v.replace(/\s+/g, "").replace(/^\$/, "");
+  if (!/^[0-9.,]+$/.test(v)) return null;
+
+  const hasComma = v.includes(",");
+  const hasDot = v.includes(".");
+  let normalized = v;
+
+  if (hasComma && hasDot) {
+    const lastComma = v.lastIndexOf(",");
+    const lastDot = v.lastIndexOf(".");
+
+    // 12.000,50 => decimal con coma
+    if (lastComma > lastDot) {
+      normalized = v.replace(/\./g, "").replace(",", ".");
+    } else {
+      // 12,000.50 => decimal con punto
+      normalized = v.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    const parts = v.split(",");
+    if (parts.length > 2) {
+      if (!/^\d{1,3}(,\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/,/g, "");
+    } else if (parts[1] && parts[1].length > 2) {
+      if (!/^\d{1,3}(,\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/,/g, "");
+    } else {
+      normalized = v.replace(",", ".");
+    }
+  } else if (hasDot) {
+    const parts = v.split(".");
+    if (parts.length > 2) {
+      if (!/^\d{1,3}(\.\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/\./g, "");
+    } else if (parts[1] && parts[1].length > 2) {
+      if (!/^\d{1,3}(\.\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/\./g, "");
+    }
+  }
+
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+
+  const num = Number(normalized);
   if (!Number.isFinite(num)) return null;
   return Math.round(num * 100) / 100;
 }

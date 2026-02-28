@@ -766,11 +766,25 @@ function editarEgresoModal(){
       }
 
       const [_, dia, mes, anio] = fechaMatch;
+      const diaNum = parseInt(dia, 10);
+      const mesNum = parseInt(mes, 10);
       const anioNum = parseInt(anio, 10);
-      const anioActual = new Date().getFullYear();
+      const fechaObj = new Date(anioNum, mesNum - 1, diaNum);
 
-      if(anioNum !== anioActual){
-        toast("Ano invalido", `La fecha debe ser del ano ${anioActual}`, "warning");
+      if(
+        fechaObj.getFullYear() !== anioNum ||
+        (fechaObj.getMonth() + 1) !== mesNum ||
+        fechaObj.getDate() !== diaNum
+      ){
+        toast("Fecha invalida", "La fecha ingresada no existe", "warning");
+        return;
+      }
+
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      fechaObj.setHours(0, 0, 0, 0);
+      if(fechaObj > hoy){
+        toast("Fecha invalida", "No se permiten fechas futuras", "warning");
         return;
       }
 

@@ -146,11 +146,12 @@ function normalizeHoraOptional(hora){
 }
 
 /**
- * Normaliza fecha de formato dd/mm/aaaa a ISO aaaa-mm-dd
- * Valida año actual, fecha no futura, y que sea una fecha válida
+ * Normaliza fecha de formato dd/mm/aaaa a ISO aaaa-mm-dd.
+ * Valida fecha real y no futura.
+ * Por defecto exige año actual (alta de egresos), pero puede relajarse en edición.
  * @returns {object} { valid: boolean, fecha: string|null, error: string|null }
  */
-function normalizeFecha(fechaStr) {
+function normalizeFecha(fechaStr, { enforceCurrentYear = true } = {}) {
   const v = String(fechaStr || "").trim();
 
   // Intentar formato dd/mm/aaaa primero
@@ -163,9 +164,9 @@ function normalizeFecha(fechaStr) {
     const mesNum = parseInt(mes, 10);
     const anioNum = parseInt(anio, 10);
 
-    // Validar año actual
+    // Validar año actual (solo cuando corresponde)
     const anioActual = new Date().getFullYear();
-    if (anioNum !== anioActual) {
+    if (enforceCurrentYear && anioNum !== anioActual) {
       return { valid: false, fecha: null, error: `La fecha debe ser del año ${anioActual}` };
     }
 
@@ -203,9 +204,9 @@ function normalizeFecha(fechaStr) {
     const mesNum = parseInt(mes, 10);
     const diaNum = parseInt(dia, 10);
 
-    // Validar año actual
+    // Validar año actual (solo cuando corresponde)
     const anioActual = new Date().getFullYear();
-    if (anioNum !== anioActual) {
+    if (enforceCurrentYear && anioNum !== anioActual) {
       return { valid: false, fecha: null, error: `La fecha debe ser del año ${anioActual}` };
     }
 
@@ -1604,6 +1605,7 @@ router.put("/:id", auth, async (req, res) => {
       etiqueta,
       etiqueta_otro,
       moneda,
+      tipo_transaccion,
       monto_raw,
       monto,
       cuenta_receptora,
@@ -1617,6 +1619,34 @@ router.put("/:id", auth, async (req, res) => {
       change_reason
     } = req.body;
 
+    const hasField = (key) => Object.prototype.hasOwnProperty.call(req.body, key);
+
+    const sendsFecha = hasField("fecha");
+    const sendsHora = hasField("hora");
+    const sendsTurno = hasField("turno");
+    const sendsEtiqueta = hasField("etiqueta");
+    const sendsEtiquetaOtro = hasField("etiqueta_otro");
+    const sendsMoneda = hasField("moneda");
+    const sendsTipoTransaccion = hasField("tipo_transaccion");
+    const sendsMontoRaw = hasField("monto_raw");
+    const sendsMonto = hasField("monto");
+    const sendsCuentaReceptora = hasField("cuenta_receptora");
+    const sendsUsuarioCasino = hasField("usuario_casino");
+    const sendsHoraSolicitud = hasField("hora_solicitud_cliente");
+    const sendsHoraQuema = hasField("hora_quema_fichas");
+    const sendsIdTransferencia = hasField("id_transferencia");
+    const sendsCuentaSalida = hasField("cuenta_salida");
+    const sendsEmpresaSalida = hasField("empresa_salida");
+    const sendsNotas = hasField("notas");
+
+    const changeReasonNorm = typeof change_reason === "string" ? change_reason.trim() : "";
+    if (!changeReasonNorm) {
+      return res.status(400).json({ message: "Debe indicar el motivo del cambio" });
+    }
+    if (changeReasonNorm.length > 500) {
+      return res.status(400).json({ message: "El motivo del cambio no puede superar 500 caracteres" });
+    }
+
     const normText = (v) => {
       if (v === undefined || v === null) return null;
       const t = String(v).trim();
@@ -1624,7 +1654,12 @@ router.put("/:id", auth, async (req, res) => {
     };
 
     const etiquetaFinal = normText(etiqueta) || oldEgreso.etiqueta;
+    if (!etiquetaFinal) {
+      return res.status(400).json({ message: "Etiqueta inválida" });
+    }
+
     const esCierreCajaFinal = ETIQUETAS_CIERRE_CAJA.has(etiquetaFinal);
+    const esPremioFinal = ETIQUETAS_CON_USUARIO_CASINO.has(etiquetaFinal);
 
     const monedaNorm = normText(moneda)
       ? String(moneda).trim().toUpperCase().replace(/\s*\(.+\)$/, "")
@@ -1633,32 +1668,122 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
     }
 
-    // id_transferencia puede ser null explícito (checkbox "Sin ID")
-    const idTransferenciaNorm = esCierreCajaFinal ? null
-      : (id_transferencia === null ? null : normText(id_transferencia));
-    const cuentaReceptoraNorm = esCierreCajaFinal ? null : normText(cuenta_receptora);
-    const etiquetaOtroNorm = normText(etiqueta_otro);
-    const usuarioCasinoNorm = normText(usuario_casino);
-    const notasNorm = normText(notas);
+    const monedaFinal = monedaNorm || oldEgreso.moneda || "ARS";
 
-    let montoNorm = null;
-    if (monto !== undefined && monto !== null && String(monto).trim() !== "") {
-      const n = Number(monto);
-      if (!Number.isFinite(n) || n <= 0) {
-        return res.status(400).json({ message: "Monto inválido. Debe ser mayor a 0" });
-      }
-      montoNorm = n;
+    const tipoTransaccionNorm = normText(tipo_transaccion)
+      ? String(tipo_transaccion).trim().toUpperCase()
+      : null;
+    if (tipoTransaccionNorm && !["ENTRADA", "SALIDA"].includes(tipoTransaccionNorm)) {
+      return res.status(400).json({ message: "tipo_transaccion inválido. Debe ser ENTRADA o SALIDA" });
+    }
+    const tipoTransaccionFinal = esCierreCajaFinal
+      ? "SALIDA"
+      : (tipoTransaccionNorm || oldEgreso.tipo_transaccion || "SALIDA");
+
+    // Mantener regla de negocio: ARS solo ENTRADA para Deposito de cliente
+    const touchedMonedaTipoEtiqueta = sendsMoneda || sendsTipoTransaccion || sendsEtiqueta;
+    if (
+      touchedMonedaTipoEtiqueta &&
+      monedaFinal === "ARS" &&
+      tipoTransaccionFinal === "ENTRADA" &&
+      etiquetaFinal !== "[Unidad M] Deposito de cliente"
+    ) {
+      return res.status(400).json({ message: "Transacciones ARS solo pueden ser ENTRADA para 'Deposito de cliente'" });
     }
 
-    // Para no cierre de caja, validar campos si se envían
-    const sendsIdTransferencia = Object.prototype.hasOwnProperty.call(req.body, "id_transferencia");
-    const sendsCuentaReceptora = Object.prototype.hasOwnProperty.call(req.body, "cuenta_receptora");
+    // id_transferencia puede ser null explícito (checkbox "Sin ID")
+    const idTransferenciaNorm = esCierreCajaFinal
+      ? null
+      : (
+          sendsIdTransferencia
+            ? (id_transferencia === null ? null : normText(id_transferencia))
+            : normText(oldEgreso.id_transferencia)
+        );
+
+    const cuentaReceptoraNorm = esCierreCajaFinal
+      ? null
+      : (sendsCuentaReceptora ? normText(cuenta_receptora) : normText(oldEgreso.cuenta_receptora));
+
+    // etiqueta_otro solo aplica cuando etiqueta = Otro
+    let etiquetaOtroNorm = sendsEtiquetaOtro ? normText(etiqueta_otro) : normText(oldEgreso.etiqueta_otro);
+    if (etiquetaFinal !== "Otro") {
+      etiquetaOtroNorm = null;
+    } else if ((sendsEtiqueta || sendsEtiquetaOtro) && !etiquetaOtroNorm) {
+      return res.status(400).json({ message: "Si etiqueta es 'Otro', etiqueta_otro es obligatorio" });
+    }
+
+    let usuarioCasinoNorm = sendsUsuarioCasino ? normText(usuario_casino) : normText(oldEgreso.usuario_casino);
+    const notasNorm = sendsNotas ? normText(notas) : normText(oldEgreso.notas);
+
+    // Horas opcionales con formato validado
+    let hsNorm = null;
+    const hsSource = sendsHoraSolicitud ? normText(hora_solicitud_cliente) : normText(oldEgreso.hora_solicitud_cliente);
+    if (hsSource) {
+      hsNorm = normalizeHoraOptional(hsSource);
+      if (!hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
+      }
+    }
+
+    let hqNorm = null;
+    const hqSource = sendsHoraQuema ? normText(hora_quema_fichas) : normText(oldEgreso.hora_quema_fichas);
+    if (hqSource) {
+      hqNorm = normalizeHoraOptional(hqSource);
+      if (!hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
+      }
+    }
+
+    // Para conceptos no-premio, estos campos deben quedar siempre en null
+    if (!esPremioFinal && (sendsEtiqueta || sendsUsuarioCasino || sendsHoraSolicitud || sendsHoraQuema)) {
+      usuarioCasinoNorm = null;
+      hsNorm = null;
+      hqNorm = null;
+    }
+
+    // Si está editando/creando un premio, exigir campos completos
+    const touchedPremioFields = sendsEtiqueta || sendsUsuarioCasino || sendsHoraSolicitud || sendsHoraQuema;
+    if (esPremioFinal && touchedPremioFields) {
+      if (!usuarioCasinoNorm) {
+        return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
+      }
+      if (!hsNorm) {
+        return res.status(400).json({ message: "Hora solicitud cliente es obligatoria para este concepto" });
+      }
+      if (!hqNorm) {
+        return res.status(400).json({ message: "Hora quema de fichas es obligatoria para este concepto" });
+      }
+    }
+
+    let montoNorm = null;
+    let montoRawNorm = null;
+    if (sendsMontoRaw || sendsMonto) {
+      montoRawNorm = sendsMontoRaw ? String(monto_raw || "").trim() : String(oldEgreso.monto_raw || "").trim();
+      let parsedMonto = parseMontoARSStrict(montoRawNorm);
+
+      if ((parsedMonto === null || parsedMonto <= 0) && monto !== undefined && monto !== null && String(monto).trim() !== "") {
+        const n = Number(monto);
+        if (Number.isFinite(n) && n > 0) {
+          parsedMonto = Math.round(n * 100) / 100;
+          if (!montoRawNorm) montoRawNorm = montoToCommaString(parsedMonto);
+        }
+      }
+
+      if (parsedMonto === null || parsedMonto <= 0) {
+        return res.status(400).json({ message: "Monto inválido. Debe ser mayor a 0" });
+      }
+
+      montoNorm = parsedMonto;
+      if (!montoRawNorm) montoRawNorm = montoToCommaString(parsedMonto);
+    }
+
+    // Para no cierre de caja, validar campos si se envían/cambian
     if (!esCierreCajaFinal) {
-      // id_transferencia puede ser null (Sin ID) o alfanumérico válido
       if (idTransferenciaNorm !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido" });
       }
-      if (sendsCuentaReceptora && !cuentaReceptoraNorm) {
+
+      if ((sendsEtiqueta || sendsCuentaReceptora) && !cuentaReceptoraNorm) {
         return res.status(400).json({ message: "CUENTA RECEPTORA es obligatoria" });
       }
     }
@@ -1677,8 +1802,8 @@ router.put("/:id", auth, async (req, res) => {
 
     // Normalizar y validar fecha si viene en el body
     let fechaNormalizada = fecha;
-    if (fecha) {
-      const fechaResult = normalizeFecha(fecha);
+    if (sendsFecha) {
+      const fechaResult = normalizeFecha(fecha, { enforceCurrentYear: false });
       if (!fechaResult.valid) {
         return res.status(400).json({ message: `Error en fecha: ${fechaResult.error}` });
       }
@@ -1687,65 +1812,90 @@ router.put("/:id", auth, async (req, res) => {
 
     // Validar hora si viene en el body
     let horaNorm = null;
-    const horaRawNorm = normText(hora);
-    if (horaRawNorm) {
+    const horaRawNorm = sendsHora ? normText(hora) : null;
+    if (sendsHora) {
+      if (!horaRawNorm) {
+        return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
+      }
       horaNorm = normalizeHoraToTime(horaRawNorm);
       if (!horaNorm) {
         return res.status(400).json({ message: "Hora inválida. Formato debe ser HH:MM" });
       }
     }
 
-    // Validar horas opcionales si se envían
-    let hsNorm = null;
-    const hsRawNorm = normText(hora_solicitud_cliente);
-    if (hsRawNorm) {
-      hsNorm = normalizeHoraOptional(hsRawNorm);
-      if (!hsNorm) {
-        return res.status(400).json({ message: "Hora solicitud cliente inválida. Formato: HH:MM" });
+    const turnoNorm = sendsTurno ? normText(turno) : null;
+    if (sendsTurno && !turnoNorm) {
+      return res.status(400).json({ message: "Turno es obligatorio" });
+    }
+
+    const cuentaSalidaNorm = sendsCuentaSalida ? normText(cuenta_salida) : normText(oldEgreso.cuenta_salida);
+    if (sendsCuentaSalida && !cuentaSalidaNorm) {
+      return res.status(400).json({ message: "CUENTA SALIDA es obligatoria" });
+    }
+
+    const empresaSalidaNorm = sendsEmpresaSalida ? normText(empresa_salida) : normText(oldEgreso.empresa_salida);
+    if (sendsEmpresaSalida) {
+      if (!empresaSalidaNorm) {
+        return res.status(400).json({ message: "EMPRESA SALIDA es obligatoria" });
+      }
+      if (!EMPRESAS_SALIDA.includes(empresaSalidaNorm)) {
+        return res.status(400).json({ message: "empresa_salida inválida" });
       }
     }
 
-    let hqNorm = null;
-    const hqRawNorm = normText(hora_quema_fichas);
-    if (hqRawNorm) {
-      hqNorm = normalizeHoraToTime(hqRawNorm);
-      if (!hqNorm) {
-        return res.status(400).json({ message: "Hora quema de fichas inválida. Formato: HH:MM" });
-      }
+    const setClauses = [];
+    const params = [];
+    const setField = (column, value) => {
+      params.push(value);
+      setClauses.push(`${column} = $${params.length}`);
+    };
+
+    if (sendsFecha) setField("fecha", fechaNormalizada);
+    if (sendsHora) setField("hora", horaNorm);
+    if (sendsTurno) setField("turno", turnoNorm);
+    if (sendsEtiqueta) setField("etiqueta", etiquetaFinal);
+    if (sendsEtiqueta || sendsEtiquetaOtro) setField("etiqueta_otro", etiquetaOtroNorm);
+    if (sendsMoneda) setField("moneda", monedaFinal);
+    if (sendsTipoTransaccion || sendsEtiqueta) setField("tipo_transaccion", tipoTransaccionFinal);
+
+    if (sendsMontoRaw || sendsMonto) {
+      setField("monto_raw", montoRawNorm);
+      setField("monto", montoNorm);
     }
 
-    // Actualizar egreso y cambiar status a 'editada'
+    if (sendsEtiqueta || sendsCuentaReceptora || sendsIdTransferencia) {
+      setField("cuenta_receptora", cuentaReceptoraNorm);
+      setField("id_transferencia", idTransferenciaNorm);
+    }
+
+    if (sendsEtiqueta || sendsUsuarioCasino || sendsHoraSolicitud || sendsHoraQuema) {
+      setField("usuario_casino", usuarioCasinoNorm);
+      setField("hora_solicitud_cliente", hsNorm);
+      setField("hora_quema_fichas", hqNorm);
+    }
+
+    if (sendsCuentaSalida) setField("cuenta_salida", cuentaSalidaNorm);
+    if (sendsEmpresaSalida) setField("empresa_salida", empresaSalidaNorm);
+    if (sendsNotas) setField("notas", notasNorm);
+
+    // Marcar siempre como editado y registrar auditoría de quién editó
+    setClauses.push("status = 'editada'");
+    params.push(req.user.id);
+    setClauses.push(`updated_by = $${params.length}`);
+    setClauses.push("updated_at = CURRENT_TIMESTAMP");
+
+    // Actualizar egreso
+    params.push(id);
     await query(
-      `UPDATE egresos
-       SET fecha = COALESCE($1, fecha),
-           hora = COALESCE($2, hora),
-           turno = COALESCE($3, turno),
-           etiqueta = COALESCE($4, etiqueta),
-           etiqueta_otro = COALESCE($5, etiqueta_otro),
-           moneda = COALESCE($6, moneda),
-           monto_raw = COALESCE($7, monto_raw),
-           monto = COALESCE($8, monto),
-           cuenta_receptora = COALESCE($9, cuenta_receptora),
-           usuario_casino = COALESCE($10, usuario_casino),
-           hora_solicitud_cliente = COALESCE($11, hora_solicitud_cliente),
-           hora_quema_fichas = COALESCE($12, hora_quema_fichas),
-           id_transferencia = COALESCE($13, id_transferencia),
-           cuenta_salida = COALESCE($14, cuenta_salida),
-           empresa_salida = COALESCE($15, empresa_salida),
-           notas = COALESCE($16, notas),
-           status = 'editada',
-           updated_by = $17,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $18`,
-      [
-        fechaNormalizada, horaNorm, normText(turno), etiquetaFinal, etiquetaOtroNorm,
-        monedaNorm, normText(monto_raw), montoNorm, cuentaReceptoraNorm, usuarioCasinoNorm,
-        hsNorm, hqNorm, idTransferenciaNorm,
-        normText(cuenta_salida), normText(empresa_salida), notasNorm,
-        req.user.id,
-        id
-      ]
+      `UPDATE egresos SET ${setClauses.join(", ")} WHERE id = $${params.length}`,
+      params
     );
+
+    // Si no hay campos explícitos para cambio, al menos dejar trazabilidad por estado/updated_by
+    if (setClauses.length === 3) {
+      // status + updated_by + updated_at
+      // no-op: ya quedó trazabilidad
+    }
 
     // Registrar en audit logs
     await auditLog(req, {
@@ -1755,7 +1905,7 @@ router.put("/:id", auth, async (req, res) => {
       success: true,
       status_code: 200,
       details: {
-        change_reason: change_reason || "Sin motivo especificado",
+        change_reason: changeReasonNorm,
         fields_changed: Object.keys(req.body).filter(k => k !== 'change_reason')
       }
     });

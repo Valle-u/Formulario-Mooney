@@ -27,6 +27,7 @@ const API_BASE = (() => {
 
 const STORAGE_KEY_TOKEN = "mm_token";
 const STORAGE_KEY_USER = "mm_user";
+const STORAGE_KEY_SIDEBAR_COLLAPSED = "mm_sidebar_collapsed";
 
 console.log('API_BASE:', API_BASE);
 
@@ -244,10 +245,47 @@ function initPasswordToggles() {
    PARSEO Y NORMALIZACIÓN
    ========================= */
 function parseMontoARSStrict(raw){
-  const v = (raw || "").trim();
-  const re = /^\d+(,\d{1,2})?$/;
-  if(!re.test(v)) return null;
-  const num = Number(v.replace(",", "."));
+  let v = String(raw || "").trim();
+  if(!v) return null;
+
+  v = v.replace(/\s+/g, "").replace(/^\$/, "");
+  if(!/^[0-9.,]+$/.test(v)) return null;
+
+  const hasComma = v.includes(",");
+  const hasDot = v.includes(".");
+  let normalized = v;
+
+  if(hasComma && hasDot){
+    const lastComma = v.lastIndexOf(",");
+    const lastDot = v.lastIndexOf(".");
+    normalized = (lastComma > lastDot)
+      ? v.replace(/\./g, "").replace(",", ".")
+      : v.replace(/,/g, "");
+  } else if(hasComma){
+    const parts = v.split(",");
+    if(parts.length > 2){
+      if(!/^\d{1,3}(,\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/,/g, "");
+    } else if(parts[1] && parts[1].length > 2){
+      if(!/^\d{1,3}(,\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/,/g, "");
+    } else {
+      normalized = v.replace(",", ".");
+    }
+  } else if(hasDot){
+    const parts = v.split(".");
+    if(parts.length > 2){
+      if(!/^\d{1,3}(\.\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/\./g, "");
+    } else if(parts[1] && parts[1].length > 2){
+      if(!/^\d{1,3}(\.\d{3})+$/.test(v)) return null;
+      normalized = v.replace(/\./g, "");
+    }
+  }
+
+  if(!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+
+  const num = Number(normalized);
   if(!Number.isFinite(num)) return null;
   return Math.round(num * 100) / 100;
 }
@@ -844,14 +882,15 @@ function initSidebarCollapse() {
   const topbarLeft = document.querySelector('.app-nosidebar .topbar-left');
   if (!appShell || !topbarLeft) return;
 
-  const STORAGE_KEY = 'mm_sidebar_collapsed';
+  const root = document.documentElement;
   const isDesktop = window.matchMedia('(min-width: 901px)').matches;
 
   const applyState = (collapsed) => {
+    root.classList.toggle('sidebar-collapsed', !!collapsed);
     document.body.classList.toggle('sidebar-collapsed', !!collapsed);
   };
 
-  const saved = localStorage.getItem(STORAGE_KEY) === '1';
+  const saved = localStorage.getItem(STORAGE_KEY_SIDEBAR_COLLAPSED) === '1';
   if (isDesktop) applyState(saved);
 
   let btn = document.getElementById('sidebarCollapseBtn');
@@ -866,17 +905,18 @@ function initSidebarCollapse() {
   }
 
   btn.addEventListener('click', () => {
-    const collapsed = !document.body.classList.contains('sidebar-collapsed');
+    const collapsed = !root.classList.contains('sidebar-collapsed');
     applyState(collapsed);
-    localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+    localStorage.setItem(STORAGE_KEY_SIDEBAR_COLLAPSED, collapsed ? '1' : '0');
   });
 
   const mq = window.matchMedia('(max-width: 900px)');
   const onMobileChange = (e) => {
     if (e.matches) {
+      root.classList.remove('sidebar-collapsed');
       document.body.classList.remove('sidebar-collapsed');
     } else {
-      const persisted = localStorage.getItem(STORAGE_KEY) === '1';
+      const persisted = localStorage.getItem(STORAGE_KEY_SIDEBAR_COLLAPSED) === '1';
       applyState(persisted);
     }
   };
