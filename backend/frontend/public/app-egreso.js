@@ -589,11 +589,11 @@ async function checkIdTransferenciaDuplicado() {
 
     if (data.exists && feedbackDiv) {
       feedbackDiv.className = "validation-error";
-      feedbackDiv.textContent = `⚠️ Este ID ya existe en ${empresaValue} (Egreso #${data.egreso.id} - ${data.egreso.etiqueta} - $${data.egreso.monto} ${data.egreso.moneda})`;
+      feedbackDiv.textContent = `Este ID ya existe en ${empresaValue} (Egreso #${data.egreso.id} - ${data.egreso.etiqueta} - $${data.egreso.monto} ${data.egreso.moneda})`;
       idInput.style.borderColor = "#dc3545";
     } else if (feedbackDiv) {
       feedbackDiv.className = "validation-success";
-      feedbackDiv.textContent = "✓ ID disponible";
+      feedbackDiv.textContent = "ID disponible";
       idInput.style.borderColor = "#28a745";
     }
 
@@ -896,7 +896,7 @@ function autoCalcularTurno() {
   if (turno) {
     turnoSelect.value = turno;
     if (turnoSugerido) {
-      turnoSugerido.textContent = `✓ ${turno} (${hora})`;
+      turnoSugerido.textContent = `${turno} (${hora})`;
       turnoSugerido.style.color = "#28a745";
     }
   } else {
@@ -1097,7 +1097,7 @@ async function handleEgresoSubmit(e){
     mostrarModalConfirmacion(payload, montoNum, file);
 
   }catch(err){
-    toast("❌ Error", err.message, "error");
+    toast("Error", err.message, "error");
   }finally{
     if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = prevText || "Guardar"; }
     // Restaurar estado disabled del select de turno
@@ -1196,9 +1196,9 @@ function mostrarModalConfirmacion(payload, montoNum, file){
       <div class="field span12">
         <label>COMPROBANTE</label>
         <div class="note" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <span>📎 ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</span>
+          <span>Archivo: ${escapeHtml(file.name)} (${escapeHtml(fileSizeMB)} MB)</span>
           <button type="button" class="btn-ver-comprobante-preview" style="padding: 6px 12px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
-            👁️ Ver Comprobante
+            Ver comprobante
           </button>
         </div>
       </div>
@@ -1222,7 +1222,7 @@ function mostrarModalConfirmacion(payload, montoNum, file){
     const btnVerComprobante = document.querySelector('.btn-ver-comprobante-preview');
     if(btnVerComprobante){
       btnVerComprobante.addEventListener('click', verComprobantePreview);
-      console.log('✅ Event listener agregado al botón Ver Comprobante');
+      console.log('Event listener agregado al boton Ver Comprobante');
     }
   }, 100);
 }
@@ -1240,7 +1240,7 @@ function cerrarModalConfirmacion(){
 // Ver comprobante en preview antes de confirmar
 function verComprobantePreview(){
   if(!datosEgresoValidados || !datosEgresoValidados.file){
-    toast("⚠️ Error", "No hay comprobante para visualizar", "error", 3000);
+    toast("Error", "No hay comprobante para visualizar", "error", 3000);
     return;
   }
 
@@ -1253,7 +1253,7 @@ function verComprobantePreview(){
   const newWindow = window.open(fileURL, '_blank');
 
   if(!newWindow){
-    toast("⚠️ Popups Bloqueados", "Por favor permite popups para ver el comprobante", "warning", 4000);
+    toast("Popups bloqueados", "Por favor permite popups para ver el comprobante", "warning", 4000);
   } else {
     // Liberar el objeto URL después de un tiempo para evitar memory leaks
     // La nueva ventana ya tiene acceso al blob, así que es seguro liberarlo
@@ -1290,7 +1290,7 @@ async function confirmarYEnviarEgreso(){
 
     if(btnConfirmar){
       btnConfirmar.disabled = false;
-      btnConfirmar.textContent = "✓ Confirmar y Guardar";
+      btnConfirmar.textContent = "Confirmar y guardar";
     }
     if(btnCancelar){
       btnCancelar.disabled = false;
@@ -1336,7 +1336,7 @@ async function confirmarYEnviarEgreso(){
     rehabilitarBotones();
 
     // Mostrar mensaje de éxito con duración extendida (8 segundos)
-    toast("✅ Guardado", "Egreso registrado correctamente.", "success", 8000);
+    toast("Guardado", "Egreso registrado correctamente.", "success", 8000);
 
     // Cerrar modal después de un delay para que se vea el mensaje
     setTimeout(() => {
@@ -1351,7 +1351,7 @@ async function confirmarYEnviarEgreso(){
     // Rehabilitar botones inmediatamente en caso de error
     rehabilitarBotones();
 
-    toast("❌ Error", err.message, "error", 10000);
+    toast("Error", err.message, "error", 10000);
   }
 }
 

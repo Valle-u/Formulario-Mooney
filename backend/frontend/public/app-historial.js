@@ -142,17 +142,17 @@ function renderEgresos(egresos, pagination, sumas){
     const monedaBadge = moneda === 'USDT'
       ? '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">₮ USDT</span>'
       : moneda === 'USD'
-      ? '<span style="background: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">💵 USD</span>'
-      : '<span style="background: #0891b2; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">💵 ARS</span>';
+      ? '<span style="background: #3a3a3a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">USD</span>'
+      : '<span style="background: #5a5a5a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ARS</span>';
 
     const status = e.status || 'activo';
     const statusBadge = status === 'activo'
-      ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✓ ACTIVO</span>'
+      ? '<span style="background: #444444; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ACTIVO</span>'
       : status === 'anulado'
-      ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✗ ANULADO</span>'
+      ? '<span style="background: #2a2a2a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ANULADO</span>'
       : status === 'editada'
-      ? '<span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">✏️ EDITADA</span>'
-      : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">⏳ PENDIENTE</span>';
+      ? '<span style="background: #666666; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">EDITADA</span>'
+      : '<span style="background: #7a7a7a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">PENDIENTE</span>';
 
     return `
       <tr>
@@ -167,7 +167,7 @@ function renderEgresos(egresos, pagination, sumas){
         <td>${statusBadge}</td>
         <td>${e.created_by_username}</td>
         <td>
-          <button class="btn btn-small btn-primary" data-ver-detalle="${e.id}">👁️ Ver</button>
+          <button class="btn btn-small btn-primary" data-ver-detalle="${e.id}">Ver</button>
         </td>
       </tr>
     `;
@@ -189,7 +189,7 @@ function renderEgresos(egresos, pagination, sumas){
     if(sumaARS > 0) partes.push(`ARS $${sumaARS.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
     if(sumaUSD > 0) partes.push(`USD $${sumaUSD.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
     if(sumaUSDT > 0) partes.push(`USDT $${sumaUSDT.toLocaleString("es-AR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
-    sumaTotalEl.textContent = partes.length > 0 ? `💰 ${partes.join(" | ")}` : "—";
+    sumaTotalEl.textContent = partes.length > 0 ? partes.join(" | ") : "—";
   }
 
   document.getElementById("btnPrev").disabled = pagination.offset === 0;
@@ -204,25 +204,25 @@ function renderEgresos(egresos, pagination, sumas){
 }
 
 function bindVerDetalleButtons(egresos){
-  console.log('🔍 bindVerDetalleButtons llamada con', egresos.length, 'egresos');
+  console.log('bindVerDetalleButtons llamada con', egresos.length, 'egresos');
   const buttons = document.querySelectorAll("[data-ver-detalle]");
-  console.log('🔍 Botones encontrados:', buttons.length);
+  console.log('Botones encontrados:', buttons.length);
 
   buttons.forEach(btn => {
     btn.addEventListener("click", () => {
-      console.log('👁️ Click en botón Ver detectado');
+      console.log('Click en boton Ver detectado');
       const id = Number(btn.dataset.verDetalle);
-      console.log('🔍 ID del egreso:', id, 'tipo:', typeof id);
-      console.log('🔍 Primer egreso del array:', egresos[0]);
+      console.log('ID del egreso:', id, 'tipo:', typeof id);
+      console.log('Primer egreso del array:', egresos[0]);
       // Buscar comparando flexiblemente (número o string)
       const egreso = egresos.find(e => Number(e.id) === id);
-      console.log('🔍 Egreso encontrado:', egreso);
+      console.log('Egreso encontrado:', egreso);
       if(egreso) {
-        console.log('✅ Llamando a mostrarDetalle...');
+        console.log('Llamando a mostrarDetalle...');
         mostrarDetalle(egreso);
       } else {
-        console.error('❌ No se encontró el egreso con ID:', id);
-        console.error('❌ Todos los IDs en array:', egresos.map(e => e.id));
+        console.error('No se encontro el egreso con ID:', id);
+        console.error('Todos los IDs en array:', egresos.map(e => e.id));
       }
     });
   });
@@ -233,14 +233,14 @@ let currentEgreso = null;
 
 function mostrarDetalle(e){
   currentEgreso = e; // Guardar egreso en variable global
-  console.log('📋 mostrarDetalle llamada con egreso:', e);
+  console.log('mostrarDetalle llamada con egreso:', e);
   const modal = document.getElementById("detalleModal");
   const body = document.getElementById("detalleBody");
-  console.log('🔍 Modal element:', modal);
-  console.log('🔍 Body element:', body);
+  console.log('Modal element:', modal);
+  console.log('Body element:', body);
 
   if(!modal || !body) {
-    console.error('❌ ERROR: Modal o body no encontrado!', { modal, body });
+    console.error('ERROR: Modal o body no encontrado!', { modal, body });
     return;
   }
 
@@ -257,18 +257,18 @@ function mostrarDetalle(e){
     : `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`; // Fallback al endpoint del backend
 
   const comprobantePreview = isPdf
-    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">📄 Ver PDF en nueva ventana</a>`
-    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='❌ Error cargando imagen'"></a>`;
+    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Ver PDF en nueva ventana</a>`
+    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='Error cargando imagen'"></a>`;
 
   // Estado visual
   const status = e.status || 'activo';
   const statusBadge = status === 'activo'
-    ? '<span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✓ ACTIVO</span>'
+    ? '<span style="background: #444444; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ACTIVO</span>'
     : status === 'anulado'
-    ? '<span style="background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✗ ANULADO</span>'
+    ? '<span style="background: #2a2a2a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ANULADO</span>'
     : status === 'editada'
-    ? '<span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✏️ EDITADA</span>'
-    : '<span style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⏳ PENDIENTE</span>';
+    ? '<span style="background: #666666; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">EDITADA</span>'
+    : '<span style="background: #7a7a7a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">PENDIENTE</span>';
 
   const user = getUser();
   // Admin/Direccion pueden editar cualquier egreso, otros usuarios solo los propios
@@ -375,27 +375,27 @@ function mostrarDetalle(e){
         <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start;">
           ${status !== 'anulado' ? `
             <button class="btn btn-primary btn-editar-egreso" style="flex: 1; min-width: 140px;">
-              ✏️ Editar
+              Editar
             </button>
             ${canDelete ? `
               <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
-                🗑️ Eliminar
+                Eliminar
               </button>
             ` : ''}
           ` : ''}
           <button class="btn btn-ghost btn-ver-historial" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px;">
-            📜 Ver Historial
+            Ver historial
           </button>
         </div>
       </div>` : ''}
     </div>
   `;
 
-  console.log('✅ HTML generado, mostrando modal...');
-  console.log('🔍 Estado actual del modal:', modal.style.display);
+  console.log('HTML generado, mostrando modal...');
+  console.log('Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
 
-  console.log('✅ Modal mostrado con display:', modal.style.display);
+  console.log('Modal mostrado con display:', modal.style.display);
 
   // Agregar event listeners a los botones de acción
   setTimeout(() => {
@@ -405,7 +405,7 @@ function mostrarDetalle(e){
 
     if (btnEditar) {
       btnEditar.addEventListener('click', () => {
-        console.log('🖊️ Botón Editar clickeado');
+        console.log('Boton Editar clickeado');
         editarEgresoModal();
       });
     }
@@ -413,7 +413,7 @@ function mostrarDetalle(e){
     if (btnEliminar) {
       btnEliminar.addEventListener('click', () => {
         const egresoId = btnEliminar.dataset.egresoId;
-        console.log('🗑️ Botón Eliminar clickeado, ID:', egresoId);
+        console.log('Boton Eliminar clickeado, ID:', egresoId);
         mostrarModalEliminar(egresoId);
       });
     }
@@ -421,7 +421,7 @@ function mostrarDetalle(e){
     if (btnHistorial) {
       btnHistorial.addEventListener('click', () => {
         const egresoId = btnHistorial.dataset.egresoId;
-        console.log('📜 Botón Historial clickeado, ID:', egresoId);
+        console.log('Boton Historial clickeado, ID:', egresoId);
         verHistorial(egresoId);
       });
     }
@@ -509,8 +509,8 @@ async function downloadCSVFiltrado(){
       ? `${API_BASE}/api/egresos/csv?${queryString}`
       : `${API_BASE}/api/egresos/csv`;
 
-    console.log("🔍 URL CSV:", url);
-    console.log("🔍 Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, moneda, usuario_casino, id_transferencia, monto_min, monto_max, turno, cuenta_receptora, created_by });
+    console.log("URL CSV:", url);
+    console.log("Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, moneda, usuario_casino, id_transferencia, monto_min, monto_max, turno, cuenta_receptora, created_by });
 
     const res = await fetch(url,{
       method:"GET",
@@ -532,7 +532,7 @@ async function downloadCSVFiltrado(){
     a.remove();
     window.URL.revokeObjectURL(downloadUrl);
 
-    toast("✅ CSV descargado", "Archivo exportado exitosamente", "success", 5000);
+    toast("CSV descargado", "Archivo exportado exitosamente", "success", 5000);
   }catch(err){
     toast("Error CSV", err.message);
   }
@@ -555,7 +555,7 @@ function editarEgresoModal(){
   // Formulario de edición con TODOS los campos
   body.innerHTML = `
     <div style="margin-bottom: 16px;">
-      <h3 style="margin: 0 0 8px 0;">✏️ Editar Transferencia</h3>
+      <h3 style="margin: 0 0 8px 0;">Editar transferencia</h3>
       <div class="note">Egreso #${egreso.id} - Modificá todos los campos necesarios</div>
     </div>
 
@@ -666,7 +666,7 @@ function editarEgresoModal(){
       <!-- BOTONES -->
       <div class="actions span12" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
         <button type="button" class="btn btn-ghost" id="btnCancelarEdicion">Cancelar</button>
-        <button type="submit" class="btn btn-primary" id="btnGuardarEdicion">✓ Guardar Cambios</button>
+        <button type="submit" class="btn btn-primary" id="btnGuardarEdicion">Guardar cambios</button>
       </div>
     </form>
   `;
@@ -740,7 +740,7 @@ function editarEgresoModal(){
     e.preventDefault();
 
     const submitBtn = document.getElementById('btnGuardarEdicion');
-    const originalText = submitBtn?.textContent || '✓ Guardar Cambios';
+    const originalText = submitBtn?.textContent || 'Guardar cambios';
 
     // Deshabilitar botón y mostrar loading
     if(submitBtn){
@@ -751,7 +751,7 @@ function editarEgresoModal(){
     try {
       const motivo = document.getElementById('edit_motivo').value.trim();
       if(!motivo){
-        toast("⚠️ Falta motivo", "Debés especificar el motivo del cambio", "warning");
+        toast("Falta motivo", "Debes especificar el motivo del cambio", "warning");
         return;
       }
 
@@ -761,7 +761,7 @@ function editarEgresoModal(){
       const fechaMatch = fechaValue.match(fechaRegex);
 
       if(!fechaMatch){
-        toast("⚠️ Fecha inválida", "Formato debe ser dd/mm/aaaa", "warning");
+        toast("Fecha invalida", "Formato debe ser dd/mm/aaaa", "warning");
         return;
       }
 
@@ -770,7 +770,7 @@ function editarEgresoModal(){
       const anioActual = new Date().getFullYear();
 
       if(anioNum !== anioActual){
-        toast("⚠️ Año inválido", `La fecha debe ser del año ${anioActual}`, "warning");
+        toast("Ano invalido", `La fecha debe ser del ano ${anioActual}`, "warning");
         return;
       }
 
@@ -779,7 +779,7 @@ function editarEgresoModal(){
 
       // Validar monto
       if(!montoParsed || montoParsed <= 0){
-        toast("⚠️ Monto inválido", "Ingresá un monto válido (ej: 12000 o 12000,50)", "warning");
+        toast("Monto invalido", "Ingresa un monto valido (ej: 12000 o 12000,50)", "warning");
         return;
       }
 
@@ -792,11 +792,11 @@ function editarEgresoModal(){
       const cuentaReceptoraEdit = document.getElementById('edit_cuenta_receptora')?.value?.trim() || null;
 
       if(!esCierreCajaEdit && !cuentaReceptoraEdit){
-        toast("⚠️ Faltan datos", "Completá CUENTA RECEPTORA", "warning");
+        toast("Faltan datos", "Completa CUENTA RECEPTORA", "warning");
         return;
       }
       if(!esCierreCajaEdit && !sinIdEdit && !idTransferenciaEdit){
-        toast("⚠️ Faltan datos", "Completá ID TRANSFERENCIA o marcá 'Sin ID de transferencia'", "warning");
+        toast("Faltan datos", "Completa ID TRANSFERENCIA o marca 'Sin ID de transferencia'", "warning");
         return;
       }
 
@@ -821,11 +821,11 @@ function editarEgresoModal(){
       };
 
       await api(`/api/egresos/${egreso.id}`, { method: 'PUT', body: updates });
-      toast("✅ Actualizado", "Egreso modificado correctamente. Estado cambiado a EDITADA.", "success");
+      toast("Actualizado", "Egreso modificado correctamente. Estado cambiado a EDITADA.", "success");
       cerrarModal();
       buscarEgresos(); // Recargar listado
     } catch(err) {
-      toast("❌ Error", err.message, "error");
+      toast("Error", err.message, "error");
       console.error('Error editando egreso:', err);
     } finally {
       // Rehabilitar botón
@@ -846,7 +846,7 @@ function editarEgresoModal(){
 }
 
 function mostrarModalEliminar(id){
-  const confirmacion = confirm(`⚠️ ¿Estás seguro que querés ELIMINAR el egreso #${id}?\n\nEsta acción NO se puede deshacer.\nEl egreso será eliminado permanentemente de la base de datos.`);
+  const confirmacion = confirm(`Estas seguro que queres ELIMINAR el egreso #${id}?\n\nEsta accion NO se puede deshacer.\nEl egreso sera eliminado permanentemente de la base de datos.`);
 
   if(!confirmacion) return;
 
@@ -856,11 +856,11 @@ function mostrarModalEliminar(id){
 async function eliminarEgreso(id){
   try{
     await api(`/api/egresos/${id}`, { method: 'DELETE' });
-    toast("✅ Eliminado", "Egreso eliminado correctamente", "success", 5000);
+    toast("Eliminado", "Egreso eliminado correctamente", "success", 5000);
     cerrarModal();
     buscarEgresos(); // Recargar listado
   }catch(err){
-    toast("❌ Error", err.message, "error");
+    toast("Error", err.message, "error");
   }
 }
 
@@ -869,14 +869,14 @@ async function verHistorial(id){
     const data = await api(`/api/egresos/${id}/history`);
 
     if(!data.changes || data.changes.length === 0){
-      toast("ℹ️ Sin cambios", "Este egreso no tiene historial de modificaciones", "info");
+      toast("Sin cambios", "Este egreso no tiene historial de modificaciones", "info");
       return;
     }
 
     mostrarHistorialModal(id, data.changes);
 
   }catch(err){
-    toast("❌ Error", err.message, "error");
+    toast("Error", err.message, "error");
   }
 }
 
@@ -887,11 +887,11 @@ function mostrarHistorialModal(egresoId, changes){
 
   const rows = changes.map(c => {
     const changeTypeLabel = {
-      'CREATE': '🆕 Creado',
-      'UPDATE': '✏️ Modificado',
-      'ANULAR': '✗ Anulado',
-      'REACTIVAR': '↻ Reactivado',
-      'DELETE': '🗑️ Eliminado'
+      'CREATE': 'Creado',
+      'UPDATE': 'Modificado',
+      'ANULAR': 'Anulado',
+      'REACTIVAR': 'Reactivado',
+      'DELETE': 'Eliminado'
     }[c.change_type] || c.change_type;
 
     const fieldLabel = {
@@ -939,7 +939,7 @@ function mostrarHistorialModal(egresoId, changes){
 
   body.innerHTML = `
     <div style="margin-bottom: 16px;">
-      <h3 style="margin: 0 0 8px 0;">📜 Historial de Cambios</h3>
+      <h3 style="margin: 0 0 8px 0;">Historial de cambios</h3>
       <div class="note">Egreso #${egresoId} - ${changes.length} cambio(s) registrado(s)</div>
     </div>
     <div style="max-height: 500px; overflow-y: auto;">

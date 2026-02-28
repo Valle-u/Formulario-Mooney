@@ -28,7 +28,7 @@ async function loadLogs(){
 
     const rows = logs.map(l => {
       const dt = l.created_at ? new Date(l.created_at).toLocaleString() : "";
-      const ok = l.success ? "✅" : "❌";
+      const ok = l.success ? "SI" : "NO";
       const detail = l.details ? JSON.stringify(l.details) : "";
       return `
         <tr>

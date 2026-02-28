@@ -39,7 +39,7 @@
 
     <!-- Acciones desktop -->
     <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <span id="whoami" class="user-badge">—</span>
       <button id="logoutBtn" class="btn-logout">Salir</button>
     </div>
@@ -49,7 +49,7 @@
   <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
     <div class="mobile-drawer-head">
       <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
     </div>
 
     <nav class="mobile-nav">
@@ -62,7 +62,7 @@
     </nav>
 
     <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <div id="whoamiMobile" class="user-badge">—</div>
       <button id="logoutBtnMobile" class="btn-logout">Salir</button>
     </div>
@@ -82,7 +82,7 @@
         <!-- FILTROS -->
         <section class="card">
           <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" id="filtrosHeader">
-            <span>🔍 Filtros de búsqueda</span>
+            <span>Filtros de busqueda</span>
             <button type="button" class="btn btn-ghost" id="btnToggleFiltros" style="margin: 0; padding: 4px 12px; font-size: 14px;" title="Mostrar/Ocultar filtros">
               <span id="filtrosToggleIcon">▼</span>
             </button>
@@ -119,10 +119,10 @@
                 <label>ESTADO</label>
                 <select id="status">
                   <option value="">Todos</option>
-                  <option value="activo">✓ Activo</option>
-                  <option value="editada">✏️ Editada</option>
+                  <option value="activo">Activo</option>
+                  <option value="editada">Editada</option>
                   <option value="pendiente">⏳ Pendiente</option>
-                  <option value="anulado">✗ Anulado</option>
+                  <option value="anulado">Anulado</option>
                 </select>
               </div>
 
@@ -130,8 +130,8 @@
                 <label>MONEDA</label>
                 <select id="moneda">
                   <option value="">Todas</option>
-                  <option value="ARS">💵 Pesos (ARS)</option>
-                  <option value="USD">💵 Dólares (USD)</option>
+                  <option value="ARS">Pesos (ARS)</option>
+                  <option value="USD">Dolares (USD)</option>
                   <option value="USDT">₮ Tether (USDT)</option>
                 </select>
               </div>
@@ -160,9 +160,9 @@
                 <label>TURNO</label>
                 <select id="turno">
                   <option value="">Todos</option>
-                  <option value="Turno mañana">🌅 Turno mañana</option>
-                  <option value="Turno tarde">🌆 Turno tarde</option>
-                  <option value="Turno noche">🌙 Turno noche</option>
+                  <option value="Turno mañana">Turno manana</option>
+                  <option value="Turno tarde">Turno tarde</option>
+                  <option value="Turno noche">Turno noche</option>
                 </select>
               </div>
 
@@ -191,12 +191,12 @@
         <section class="card" style="margin-top: 20px;">
           <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div>
-              📋 Resultados
+              Resultados
               <span id="resultadosInfo" class="note" style="margin-left: 16px; font-weight: normal;">—</span>
               <span id="sumaTotal" class="note" style="margin-left: 24px; font-weight: 600; color: var(--blue);">—</span>
             </div>
             <button id="btnDescargarCsvFiltrado" class="btn btn-ghost" data-admin-only="1" style="margin: 0;">
-              ⬇ Descargar CSV
+              Descargar CSV
             </button>
           </div>
 
@@ -241,7 +241,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3>Detalle de transferencia</h3>
-          <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">✕</button>
+          <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">X</button>
         </div>
         <div id="detalleBody" style="padding: 20px 24px;">
           <!-- Contenido dinámico -->

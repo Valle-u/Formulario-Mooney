@@ -39,7 +39,7 @@
 
     <!-- Acciones desktop -->
     <div class="topbar-right nav-desktop">
-      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <span id="whoami" class="user-badge">—</span>
       <button id="logoutBtn" class="btn-logout">Salir</button>
     </div>
@@ -49,7 +49,7 @@
   <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
     <div class="mobile-drawer-head">
       <span class="brand">MooneyMaker</span>
-      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">✕</button>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
     </div>
 
     <nav class="mobile-nav">
@@ -62,7 +62,7 @@
     </nav>
 
     <div class="mobile-actions">
-      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
       <div id="whoamiMobile" class="user-badge">—</div>
       <button id="logoutBtnMobile" class="btn-logout">Salir</button>
     </div>
@@ -76,7 +76,7 @@
 <div id="notificationPanel" class="notification-panel" style="display: none;">
   <div class="notification-panel-header">
     <h3>Notificaciones</h3>
-    <button id="closeNotificationPanel" class="close-notification-panel">✕</button>
+    <button id="closeNotificationPanel" class="close-notification-panel">X</button>
   </div>
   <div id="notificationList" class="notification-list">
     <div class="notification-empty">No hay notificaciones</div>
@@ -110,7 +110,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">📋 Concepto de la Transferencia</div>
+                  <div class="section-title">Concepto de la transferencia</div>
                   <div class="section-subtitle">Seleccioná primero el motivo para ver los campos necesarios.</div>
                 </div>
 
@@ -145,7 +145,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">🕒 Fecha y Hora</div>
+                  <div class="section-title">Fecha y hora</div>
                   <div class="section-subtitle">Cuándo se registra esta transferencia.</div>
                 </div>
 
@@ -200,7 +200,7 @@
               <!-- Formulario ARS-only. Para USD usar flujo-usd.html -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">💸 Datos de la Transferencia</div>
+                  <div class="section-title">Datos de la transferencia</div>
                   <div class="section-subtitle">Monto e identificación.</div>
                 </div>
 
@@ -238,7 +238,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">🏦 Cuentas</div>
+                  <div class="section-title">Cuentas</div>
                   <div class="section-subtitle">Origen y destino del dinero.</div>
                 </div>
 
@@ -280,7 +280,7 @@
                    ========================= -->
               <div class="section span12">
                 <div class="section-head">
-                  <div class="section-title">📎 Comprobante & Notas</div>
+                  <div class="section-title">Comprobante y notas</div>
                   <div class="section-subtitle">Adjunto obligatorio + observaciones.</div>
                 </div>
 
@@ -290,7 +290,7 @@
                     <div class="dropzone" id="dropzone_comprobante">
                       <input id="comprobante" type="file" accept=".jpg,.jpeg,.png,.pdf" required>
                       <div class="dropzone-content">
-                        <span class="dropzone-icon">📎</span>
+                        <span class="dropzone-icon">DOC</span>
                         <span class="dropzone-text">Arrastrá un archivo acá o hacé clic para seleccionar</span>
                       </div>
                     </div>
@@ -325,7 +325,7 @@
       <div class="modal-backdrop" id="modalBackdrop"></div>
       <div class="modal-content">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-          <span id="modalTitle">⚠️ Confirmar Egreso</span>
+          <span id="modalTitle">Confirmar egreso</span>
           <button type="button" id="btnCerrarModal" style="background:none; border:none; color:var(--text); font-size:24px; cursor:pointer; padding:0; line-height:1;" aria-label="Cerrar modal">&times;</button>
         </div>
         <div class="card-body" id="confirmacionBody" style="max-height:70vh; overflow-y:auto;">
@@ -333,7 +333,7 @@
         </div>
         <div style="padding:16px; border-top:1px solid var(--border); display:flex; gap:12px; justify-content:flex-end;">
           <button type="button" id="btnCancelarEgreso" class="btn btn-ghost">Cancelar</button>
-          <button type="button" id="btnConfirmarEgreso" class="btn btn-primary">✓ Confirmar y Guardar</button>
+          <button type="button" id="btnConfirmarEgreso" class="btn btn-primary">Confirmar y guardar</button>
         </div>
       </div>
     </div>

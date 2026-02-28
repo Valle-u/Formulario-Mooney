@@ -28,7 +28,7 @@ const API_BASE = (() => {
 const STORAGE_KEY_TOKEN = "mm_token";
 const STORAGE_KEY_USER = "mm_user";
 
-console.log('🔌 API_BASE:', API_BASE);
+console.log('API_BASE:', API_BASE);
 
 /* =========================
    DATOS (selects)
@@ -149,10 +149,10 @@ function toast(title, msg, type = "error", duration = null){
   if (!container) return;
 
   const icons = {
-    success: "✅",
-    warning: "⚠️",
-    error: "❌",
-    info: "ℹ️"
+    success: "OK",
+    warning: "AVISO",
+    error: "ERROR",
+    info: "INFO"
   };
 
   const toastEl = document.createElement("div");
@@ -220,11 +220,11 @@ function togglePasswordVisibility(inputId, button) {
   if (input.type === "password") {
     input.type = "text";
     button.style.opacity = "1";
-    button.textContent = "🙈"; // Cambia a "ocultar"
+    button.textContent = "OCUL";
   } else {
     input.type = "password";
     button.style.opacity = "0.6";
-    button.textContent = "👁️"; // Cambia a "mostrar"
+    button.textContent = "VER";
   }
 }
 
@@ -326,13 +326,13 @@ function resetInactivityTimer(){
   warningTimer = setTimeout(() => {
     if(!warningShown){
       warningShown = true;
-      toast("⚠️ Inactividad", "Tu sesión expirará en 2 minutos por inactividad", "warning");
+      toast("Inactividad", "Tu sesion expirara en 2 minutos por inactividad", "warning");
     }
   }, INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_LOGOUT_MS);
 
   // Timer para logout automático
   inactivityTimer = setTimeout(() => {
-    toast("⏱️ Sesión expirada", "Tu sesión ha expirado por inactividad", "error");
+    toast("Sesion expirada", "Tu sesion ha expirado por inactividad", "error");
     setTimeout(() => {
       clearToken();
       clearUser();
@@ -359,12 +359,12 @@ function setupInactivityMonitor(){
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState === 'visible' && isTokenExpired()){
       clearToken(); clearUser();
-      toast("⏱️ Sesión expirada", "Tu sesión expiró. Volvé a iniciar sesión.", "error");
+      toast("Sesion expirada", "Tu sesion expiro. Volve a iniciar sesion.", "error");
       setTimeout(() => { window.location.href = "index.html"; }, 1500);
     }
   });
 
-  console.log('🔒 Monitor de inactividad activado (timeout: 30 min)');
+  console.log('Monitor de inactividad activado (timeout: 30 min)');
 }
 
 /* =========================
@@ -374,7 +374,7 @@ async function api(path, {method="GET", body=null, auth=true, timeout=60000} = {
   // Verificar token antes de hacer la request (evita perder datos en formularios)
   if(auth && isTokenExpired()){
     clearToken(); clearUser();
-    toast("⏱️ Sesión expirada", "Tu sesión expiró. Volvé a iniciar sesión.", "error");
+    toast("Sesion expirada", "Tu sesion expiro. Volve a iniciar sesion.", "error");
     setTimeout(() => { window.location.href = "index.html"; }, 1500);
     throw new Error("Sesión expirada");
   }
@@ -434,7 +434,7 @@ async function handleLogin(e){
   const password = document.getElementById("password")?.value || "";
 
   if(!username || !password){
-    toast("⚠ Faltan datos", "Usuario y contraseña son obligatorios.", "warning");
+    toast("Faltan datos", "Usuario y contrasena son obligatorios.", "warning");
     return;
   }
 
@@ -442,10 +442,10 @@ async function handleLogin(e){
     const data = await api("/api/auth/login", { method:"POST", body:{ username, password }, auth:false });
     setToken(data.token);
     setUser(data.user);
-    toast("✅ Sesión iniciada", "Redirigiendo...", "success");
+    toast("Sesion iniciada", "Redirigiendo...", "success");
     setTimeout(()=> window.location.href = "egreso.html", 250);
   }catch(err){
-    toast("❌ Login fallido", err.message, "error");
+    toast("Login fallido", err.message, "error");
   }
 }
 
@@ -525,10 +525,10 @@ function toggleTheme() {
 function applyTheme(theme) {
   if (theme === "light") {
     document.documentElement.setAttribute("data-theme", "light");
-    updateThemeIcon("☀️");
+    updateThemeIcon("CLARO");
   } else {
     document.documentElement.removeAttribute("data-theme");
-    updateThemeIcon("🌙");
+    updateThemeIcon("OSCURO");
   }
 }
 
@@ -562,16 +562,16 @@ function connectToNotifications() {
   notificationEventSource = new EventSource(url + `?token=${encodeURIComponent(token)}`);
 
   notificationEventSource.onopen = () => {
-    console.log("📡 Conectado a notificaciones en tiempo real");
+    console.log("Conectado a notificaciones en tiempo real");
   };
 
   notificationEventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log("📨 Notificación recibida:", data);
+      console.log("Notificacion recibida:", data);
 
       if (data.type === "connected") {
-        console.log("✅ Conexión SSE establecida");
+        console.log("Conexion SSE establecida");
         return;
       }
 
@@ -589,7 +589,7 @@ function connectToNotifications() {
 
     // Reconectar después de 5 segundos
     setTimeout(() => {
-      console.log("🔄 Reintentando conexión a notificaciones...");
+      console.log("Reintentando conexion a notificaciones...");
       connectToNotifications();
     }, 5000);
   };
@@ -626,10 +626,10 @@ function showToast(notification) {
   if (!container) return;
 
   const icons = {
-    success: "✅",
-    warning: "⚠️",
-    error: "❌",
-    info: "ℹ️"
+    success: "OK",
+    warning: "AVISO",
+    error: "ERROR",
+    info: "INFO"
   };
 
   const toastEl = document.createElement("div");

@@ -68,7 +68,7 @@ function bindUserRowActions(){
       if (usernameInput) {
         const username = usernameInput.value.trim();
         if (!username) {
-          toast("⚠️ Username vacío", "El username no puede estar vacío", "warning");
+          toast("Username vacio", "El username no puede estar vacio", "warning");
           return;
         }
         body.username = username;
@@ -76,11 +76,11 @@ function bindUserRowActions(){
 
       try{
         await api(`/api/users/${id}`, { method:"PUT", body });
-        toast("✅ Guardado","Usuario actualizado correctamente", "success");
+        toast("Guardado","Usuario actualizado correctamente", "success");
         // Recargar la lista de usuarios para mostrar los cambios
         loadUsers();
       }catch(err){
-        toast("❌ Error", err.message, "error");
+        toast("Error", err.message, "error");
       }
     });
   });
@@ -121,10 +121,10 @@ function bindUserRowActions(){
 
     try{
       await api(`/api/users/${resetUserId}/reset-password`, { method:"POST", body:{ password: pass } });
-      toast("✅ Guardado","Contraseña actualizada correctamente", "success");
+      toast("Guardado","Contrasena actualizada correctamente", "success");
       closeResetModal();
     }catch(err){
-      toast("❌ Error", err.message, "error");
+      toast("Error", err.message, "error");
     }
   });
 
@@ -142,25 +142,25 @@ async function createUser(){
   const n = document.getElementById("u_fullname")?.value?.trim() || "";
 
   if(!u || !p){
-    toast("⚠ Faltan datos","Username y contraseña son obligatorios", "warning");
+    toast("Faltan datos","Username y contrasena son obligatorios", "warning");
     return;
   }
 
   if(p !== pConfirm){
-    toast("⚠ Contraseñas no coinciden","Las contraseñas deben ser idénticas", "warning");
+    toast("Contrasenas no coinciden","Las contrasenas deben ser identicas", "warning");
     return;
   }
 
   try{
     await api("/api/users", { method:"POST", body:{ username:u, password:p, role:r, full_name:n } });
-    toast("✅ Usuario creado","El nuevo usuario ya puede iniciar sesión", "success");
+    toast("Usuario creado","El nuevo usuario ya puede iniciar sesion", "success");
     document.getElementById("u_username").value = "";
     document.getElementById("u_password").value = "";
     document.getElementById("u_password_confirm").value = "";
     document.getElementById("u_fullname").value = "";
     loadUsers();
   }catch(err){
-    toast("❌ Error", err.message, "error");
+    toast("Error", err.message, "error");
   }
 }
 
@@ -183,10 +183,10 @@ function setupPasswordMatchValidation(){
     }
 
     if(pass === passConfirm){
-      indicator.textContent = "✓ Las contraseñas coinciden";
+      indicator.textContent = "Contrasenas coinciden";
       indicator.style.color = "#10b981";
     } else {
-      indicator.textContent = "✗ Las contraseñas NO coinciden";
+      indicator.textContent = "Contrasenas no coinciden";
       indicator.style.color = "#ef4444";
     }
   }

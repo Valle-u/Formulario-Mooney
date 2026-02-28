@@ -192,10 +192,10 @@ async function downloadSaldosCSV() {
     a.remove();
     window.URL.revokeObjectURL(url);
 
-    toast("✅ CSV descargado", "Saldos exportados correctamente", "success");
+    toast("CSV descargado", "Saldos exportados correctamente", "success");
   } catch (err) {
     console.error("Error descargando CSV de saldos:", err);
-    toast("❌ Error", err.message || "No se pudo descargar el CSV", "error");
+    toast("Error", err.message || "No se pudo descargar el CSV", "error");
   }
 }
 
@@ -232,7 +232,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
   if (saldos.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: 60px 20px; color: var(--muted);">
-        <div style="font-size: 3rem; margin-bottom: 16px;">📭</div>
+        <div style="font-size: 3rem; margin-bottom: 16px;">--</div>
         <div>No hay cuentas registradas con los filtros seleccionados</div>
       </div>`;
     return;
@@ -333,19 +333,19 @@ function renderSaldosTarjetas(data, empresaFiltro) {
           </div>
           <div class="titular-stats">
             <div class="stat-row" style="border-bottom: 1px dashed var(--border); padding-bottom: 6px; margin-bottom: 6px;">
-              <span class="stat-label">🏦 Inicio de Caja</span>
+              <span class="stat-label">Inicio de caja</span>
               <span class="stat-value ${inicioCajaClass}" style="font-weight: 700;">${inicioCaja >= 0 ? '' : '-'}$${fmtNum(inicioCaja)}</span>
             </div>
             <div class="stat-row">
-              <span class="stat-label">📥 Entradas</span>
+              <span class="stat-label">Entradas</span>
               <span class="stat-value entrada">+$${fmtNum(entradas)}</span>
             </div>
             <div class="stat-row">
-              <span class="stat-label">📤 Salidas</span>
+              <span class="stat-label">Salidas</span>
               <span class="stat-value salida">-$${fmtNum(salidas)}</span>
             </div>
             <div class="stat-row" style="border-top: 1px solid var(--border); padding-top: 6px; margin-top: 6px;">
-              <span class="stat-label">💰 Balance</span>
+              <span class="stat-label">Balance</span>
               <span class="stat-value balance ${balanceClass}" style="font-weight: 700;">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>${compHTML}
           </div>${etiqHTML}
@@ -520,7 +520,7 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
         </div>
       </div>
       <div class="filter-actions">
-        <button class="btn btn-primary btn-small" id="btnAplicarFiltrosModal">🔍 Filtrar</button>
+        <button class="btn btn-primary btn-small" id="btnAplicarFiltrosModal">Filtrar</button>
         <button class="btn btn-ghost btn-small" id="btnLimpiarFiltrosModal">Limpiar</button>
       </div>
     </div>
@@ -581,7 +581,7 @@ function renderFilasOperaciones(egresos) {
   return egresos.map(e => {
     const monto = Number(e.monto).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const tipoColor = e.tipo_transaccion === "ENTRADA" ? "#10b981" : "#ef4444";
-    const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "📥" : "📤";
+    const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "IN" : "OUT";
 
     let statusBadge = '';
     if (e.status === 'activo') {
