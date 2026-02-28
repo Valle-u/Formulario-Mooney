@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Saldos</title>
-  <link rel="stylesheet" href="styles.css?v=2026022801"/>
+  <link rel="stylesheet" href="styles.css?v=2026010522"/>
   <style>
     /* ============================
        ESTILOS SECCIÓN SALDOS
@@ -403,139 +403,6 @@
     }
     .btn-outline:hover {
       background: var(--border);
-    }
-
-    /* Ajuste visual final: saldos en estilo editorial sobrio */
-    #saldosContainer {
-      margin-top: 24px;
-    }
-
-    .empresa-section {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: linear-gradient(180deg, rgba(255,255,255,.02), transparent 45%), var(--card);
-      box-shadow: var(--shadow);
-    }
-
-    .empresa-header {
-      padding: 14px 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-      border-bottom: 1px solid var(--border);
-    }
-
-    .empresa-header h3 {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-size: 1.45rem;
-      letter-spacing: .25px;
-    }
-
-    .empresa-header h3::before {
-      width: 3px;
-      background: rgba(255,255,255,.38);
-    }
-
-    .empresa-header .empresa-balance {
-      color: #f1f1f2;
-      background: rgba(255,255,255,.07);
-      border-color: rgba(255,255,255,.16);
-      border-radius: 8px;
-    }
-
-    .empresa-header .empresa-balance.negative {
-      color: #b2b6be;
-    }
-
-    .titulares-grid {
-      background: rgba(255,255,255,.015);
-      gap: 14px;
-      padding: 16px;
-    }
-
-    .titular-card {
-      border-radius: 12px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      box-shadow: 0 10px 22px rgba(0,0,0,.22);
-    }
-
-    .titular-card:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 14px 26px rgba(0,0,0,.28);
-    }
-
-    .moneda-tag {
-      border: 1px solid rgba(255,255,255,.16);
-      border-radius: 999px;
-      letter-spacing: .35px;
-    }
-
-    .moneda-tag.ars { background: #4f5259; }
-    .moneda-tag.usd { background: #3e424a; }
-    .moneda-tag.usdt { background: #5f6268; }
-
-    .stat-row .stat-value.entrada {
-      color: #f0f1f3;
-    }
-
-    .stat-row .stat-value.salida,
-    .stat-row .stat-value.balance.negative {
-      color: #a9adb4;
-    }
-
-    .stat-row .stat-value.balance.positive {
-      color: #f0f1f3;
-    }
-
-    .titular-card-footer {
-      background: rgba(255,255,255,.03);
-      border-top: 1px solid var(--border);
-    }
-
-    .badge-sin-cierre {
-      background: #5d6067;
-      color: #f6f6f6;
-      border-radius: 999px;
-    }
-
-    .modal-filters,
-    .summary-card {
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,.03);
-      border-radius: 10px;
-    }
-
-    .summary-card .summary-value.entrada,
-    .summary-card .summary-value.balance.positive {
-      color: #f1f1f2;
-    }
-
-    .summary-card .summary-value.salida,
-    .summary-card .summary-value.balance.negative {
-      color: #a7abb3;
-    }
-
-    [data-theme="light"] .empresa-header .empresa-balance {
-      color: #131418;
-      background: rgba(0,0,0,.05);
-      border-color: rgba(0,0,0,.12);
-    }
-
-    [data-theme="light"] .empresa-header .empresa-balance.negative {
-      color: #5f646c;
-    }
-
-    [data-theme="light"] .moneda-tag.ars { background: #cfd2d8; color: #111216; border-color: rgba(0,0,0,.16); }
-    [data-theme="light"] .moneda-tag.usd { background: #bfc4cb; color: #111216; border-color: rgba(0,0,0,.16); }
-    [data-theme="light"] .moneda-tag.usdt { background: #d9dde3; color: #111216; border-color: rgba(0,0,0,.16); }
-
-    [data-theme="light"] .stat-row .stat-value.entrada,
-    [data-theme="light"] .stat-row .stat-value.balance.positive {
-      color: #111216;
-    }
-
-    [data-theme="light"] .stat-row .stat-value.salida,
-    [data-theme="light"] .stat-row .stat-value.balance.negative {
-      color: #6a7079;
     }
   </style>
 </head>
