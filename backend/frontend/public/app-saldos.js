@@ -10,6 +10,15 @@ let saldosDebounceTimer = null;
 
 const SALDOS_CLIENT_CACHE_TTL_MS = 30000;
 const saldosClientCache = new Map();
+const SALDOS_UI_COLORS = {
+  positive: "#f0f1f3",
+  negative: "#9ea2a9",
+  neutral: "var(--muted)",
+  start: "#c8ccd4",
+  statusActive: "#4a4e55",
+  statusAnulado: "#2f3339",
+  statusEditado: "#686d75"
+};
 
 function getSaldosFiltros() {
   return {
@@ -202,7 +211,7 @@ async function cargarSaldos({ showLoading = true, force = false } = {}) {
     if (requestSerial !== saldosReqSerial) return;
     console.error("Error cargando saldos:", err);
     if (container) {
-      container.innerHTML = `<div class="muted" style="text-align: center; padding: 40px; color: #ef4444;">Error: ${err.message}</div>`;
+      container.innerHTML = `<div class="muted" style="text-align: center; padding: 40px; color: ${SALDOS_UI_COLORS.negative};">Error: ${err.message}</div>`;
     }
   }
 }
@@ -270,20 +279,20 @@ function renderSaldosTarjetas(data, empresaFiltro) {
   const totalUSDEl = document.getElementById("totalUSD");
 
   if (totalARSEl) {
-    const color = totales.ARS >= 0 ? "#10b981" : "#ef4444";
+    const color = totales.ARS >= 0 ? SALDOS_UI_COLORS.positive : SALDOS_UI_COLORS.negative;
     totalARSEl.style.color = color;
     totalARSEl.textContent = `$${Number(totales.ARS).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   if (totalUSDEl) {
-    const color = totales.USD >= 0 ? "#3b82f6" : "#ef4444";
+    const color = totales.USD >= 0 ? SALDOS_UI_COLORS.positive : SALDOS_UI_COLORS.negative;
     totalUSDEl.style.color = color;
     totalUSDEl.textContent = `$${Number(totales.USD).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   const totalUSDTEl = document.getElementById("totalUSDT");
   if (totalUSDTEl) {
-    const color = (totales.USDT || 0) >= 0 ? "#f59e0b" : "#ef4444";
+    const color = (totales.USDT || 0) >= 0 ? SALDOS_UI_COLORS.positive : SALDOS_UI_COLORS.negative;
     totalUSDTEl.style.color = color;
     totalUSDTEl.textContent = `$${Number(totales.USDT || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
@@ -353,7 +362,7 @@ function renderSaldosTarjetas(data, empresaFiltro) {
       if (c.saldo_anterior !== null && c.saldo_anterior !== undefined) {
         const diff = c.diferencia || 0;
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
-        const color = diff > 0 ? '#10b981' : diff < 0 ? '#ef4444' : 'var(--muted)';
+        const color = diff > 0 ? SALDOS_UI_COLORS.positive : diff < 0 ? SALDOS_UI_COLORS.negative : SALDOS_UI_COLORS.neutral;
         const pct = c.diferencia_pct !== null ? ` (${c.diferencia_pct > 0 ? '+' : ''}${c.diferencia_pct}%)` : '';
         compHTML = `
             <div class="stat-row" style="border-top: 1px dashed var(--border); padding-top: 4px; margin-top: 2px;">
@@ -533,7 +542,7 @@ async function verOperacionesCuenta(empresa, cuenta, moneda) {
 
   } catch (err) {
     console.error("Error cargando operaciones:", err);
-    detalleBody.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Error: ${err.message}</div>`;
+    detalleBody.innerHTML = `<div style="padding: 40px; text-align: center; color: ${SALDOS_UI_COLORS.negative};">Error: ${err.message}</div>`;
   }
 }
 
@@ -603,9 +612,9 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
 
     <!-- RESUMEN -->
     <div class="modal-summary">
-      <div class="summary-card" style="border-left: 3px solid #6366f1;">
+      <div class="summary-card" style="border-left: 3px solid ${SALDOS_UI_COLORS.start};">
         <div class="summary-label">Inicio de Caja</div>
-        <div class="summary-value" style="color: #6366f1; font-weight: 700;">${inicioCaja >= 0 ? '' : '-'}$${fmtMoney(inicioCaja)}</div>
+        <div class="summary-value" style="color: ${SALDOS_UI_COLORS.start}; font-weight: 700;">${inicioCaja >= 0 ? '' : '-'}$${fmtMoney(inicioCaja)}</div>
       </div>
       <div class="summary-card">
         <div class="summary-label">Entradas</div>
@@ -615,7 +624,7 @@ function renderModalOperaciones(egresos, etiquetasUnicas = []) {
         <div class="summary-label">Salidas</div>
         <div class="summary-value salida">-$${fmtMoney(totalSalidas)}</div>
       </div>
-      <div class="summary-card" style="border-left: 3px solid ${balance >= 0 ? '#10b981' : '#ef4444'};">
+      <div class="summary-card" style="border-left: 3px solid ${balance >= 0 ? SALDOS_UI_COLORS.positive : SALDOS_UI_COLORS.negative};">
         <div class="summary-label">Balance Final</div>
         <div class="summary-value balance ${balance >= 0 ? 'positive' : 'negative'}" style="font-weight: 700;">${balance >= 0 ? '+' : ''}$${balance.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</div>
       </div>
@@ -656,16 +665,16 @@ function renderFilasOperaciones(egresos) {
 
   return egresos.map(e => {
     const monto = Number(e.monto).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const tipoColor = e.tipo_transaccion === "ENTRADA" ? "#10b981" : "#ef4444";
+    const tipoColor = e.tipo_transaccion === "ENTRADA" ? SALDOS_UI_COLORS.positive : SALDOS_UI_COLORS.negative;
     const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "IN" : "OUT";
 
     let statusBadge = '';
     if (e.status === 'activo') {
-      statusBadge = '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>';
+      statusBadge = `<span style="background: ${SALDOS_UI_COLORS.statusActive}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>`;
     } else if (e.status === 'anulado') {
-      statusBadge = '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Anulado</span>';
+      statusBadge = `<span style="background: ${SALDOS_UI_COLORS.statusAnulado}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Anulado</span>`;
     } else {
-      statusBadge = '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Editado</span>';
+      statusBadge = `<span style="background: ${SALDOS_UI_COLORS.statusEditado}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Editado</span>`;
     }
 
     const rowStyle = e.status === 'anulado' ? 'opacity: 0.5;' : '';

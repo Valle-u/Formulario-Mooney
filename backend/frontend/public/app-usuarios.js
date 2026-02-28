@@ -184,10 +184,10 @@ function setupPasswordMatchValidation(){
 
     if(pass === passConfirm){
       indicator.textContent = "Contrasenas coinciden";
-      indicator.style.color = "#10b981";
+      indicator.style.color = "#f0f1f3";
     } else {
       indicator.textContent = "Contrasenas no coinciden";
-      indicator.style.color = "#ef4444";
+      indicator.style.color = "#9ea2a9";
     }
   }
 

@@ -590,11 +590,11 @@ async function checkIdTransferenciaDuplicado() {
     if (data.exists && feedbackDiv) {
       feedbackDiv.className = "validation-error";
       feedbackDiv.textContent = `Este ID ya existe en ${empresaValue} (Egreso #${data.egreso.id} - ${data.egreso.etiqueta} - $${data.egreso.monto} ${data.egreso.moneda})`;
-      idInput.style.borderColor = "#dc3545";
+      idInput.style.borderColor = "#7f838a";
     } else if (feedbackDiv) {
       feedbackDiv.className = "validation-success";
       feedbackDiv.textContent = "ID disponible";
-      idInput.style.borderColor = "#28a745";
+      idInput.style.borderColor = "#e8e8ea";
     }
 
   } catch (error) {
@@ -657,7 +657,7 @@ function wireNombresValidation() {
         e.target.value = valor.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]/g, "");
 
         // Mostrar feedback temporal
-        e.target.style.borderColor = "#dc3545";
+        e.target.style.borderColor = "#7f838a";
 
         // Resetear después de 1 segundo
         setTimeout(() => {
@@ -897,7 +897,7 @@ function autoCalcularTurno() {
     turnoSelect.value = turno;
     if (turnoSugerido) {
       turnoSugerido.textContent = `${turno} (${hora})`;
-      turnoSugerido.style.color = "#28a745";
+      turnoSugerido.style.color = "#eceef1";
     }
   } else {
     turnoSelect.value = "";
@@ -937,7 +937,7 @@ function toggleModoTurnoCierreCaja() {
     turnoSelect.value = ""; // Reset para que elija
 
     if (turnoLabel) {
-      turnoLabel.innerHTML = 'TURNO * <span style="color: #6c757d; font-size: 0.85em;">(Manual)</span>';
+      turnoLabel.innerHTML = 'TURNO * <span style="color: var(--muted); font-size: 0.85em;">(Manual)</span>';
     }
     if (turnoSugerido) {
       turnoSugerido.textContent = "Seleccioná el turno del cierre";
@@ -954,7 +954,7 @@ function toggleModoTurnoCierreCaja() {
     turnoSelect.classList.add("turno-auto");
 
     if (turnoLabel) {
-      turnoLabel.innerHTML = 'TURNO * <span style="color: #6c757d; font-size: 0.85em;">(Automático)</span>';
+      turnoLabel.innerHTML = 'TURNO * <span style="color: var(--muted); font-size: 0.85em;">(Automatico)</span>';
     }
 
     // Recalcular turno según hora actual

@@ -140,7 +140,7 @@ function renderEgresos(egresos, pagination, sumas){
 
     const moneda = e.moneda || 'ARS';
     const monedaBadge = moneda === 'USDT'
-      ? '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">₮ USDT</span>'
+      ? '<span style="background: #6a6e76; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">USDT</span>'
       : moneda === 'USD'
       ? '<span style="background: #3a3a3a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">USD</span>'
       : '<span style="background: #5a5a5a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ARS</span>';
@@ -284,10 +284,10 @@ function mostrarDetalle(e){
       </div>
 
       ${status === 'anulado' && e.motivo_anulacion ? `
-      <div class="field span12" style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
-        <label style="color: #991b1b; font-weight: 600;">MOTIVO DE ANULACIÓN</label>
-        <div class="note" style="color: #7f1d1d;">${escapeHtml(e.motivo_anulacion)}</div>
-        <div class="note" style="color: #991b1b; font-size: 11px; margin-top: 4px;">
+      <div class="field span12" style="background: rgba(255,255,255,.05); border-left: 4px solid rgba(255,255,255,.35); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+        <label style="color: #e7e8ea; font-weight: 600;">MOTIVO DE ANULACIÓN</label>
+        <div class="note" style="color: #c4c7cd;">${escapeHtml(e.motivo_anulacion)}</div>
+        <div class="note" style="color: #b6bac2; font-size: 11px; margin-top: 4px;">
           Anulado: ${e.anulado_at ? new Date(e.anulado_at).toLocaleString() : 'N/A'}
         </div>
       </div>` : ''}
@@ -378,7 +378,7 @@ function mostrarDetalle(e){
               Editar
             </button>
             ${canDelete ? `
-              <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+              <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #4b4f57; color: white;">
                 Eliminar
               </button>
             ` : ''}
@@ -657,10 +657,10 @@ function editarEgresoModal(){
       </div>
 
       <!-- MOTIVO DEL CAMBIO -->
-      <div class="field span12" style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
-        <label style="color: #92400e; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
+      <div class="field span12" style="background: rgba(255,255,255,.05); border-left: 4px solid rgba(255,255,255,.35); padding: 12px; border-radius: 4px;">
+        <label style="color: #e6e8eb; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
         <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required style="margin-top: 8px;">
-        <div class="note" style="color: #78350f; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
+        <div class="note" style="color: #b7bbc2; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
       </div>
 
       <!-- BOTONES -->
@@ -904,7 +904,7 @@ function mostrarHistorialModal(egresoId, changes){
     }[c.field_name] || c.field_name;
 
     return `
-      <div style="border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 12px; background: var(--bg-alt); border-radius: 4px;">
+      <div style="border-left: 3px solid rgba(255,255,255,.26); padding: 12px; margin-bottom: 12px; background: rgba(255,255,255,.03); border-radius: 4px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
           <strong>${changeTypeLabel}</strong>
           <span class="note">${c.created_at_formatted}</span>
@@ -917,14 +917,14 @@ function mostrarHistorialModal(egresoId, changes){
             <strong>Campo:</strong> ${fieldLabel}
           </div>
           <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-top: 8px;">
-            <div style="background: #fee2e2; padding: 8px; border-radius: 4px;">
-              <span class="note" style="color: #991b1b; font-size: 11px;">ANTES</span>
-              <div style="color: #7f1d1d; font-weight: 500;">${escapeHtml(c.old_value || '-')}</div>
+            <div style="background: rgba(255,255,255,.05); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.12);">
+              <span class="note" style="color: #b5b9bf; font-size: 11px;">ANTES</span>
+              <div style="color: #d2d5da; font-weight: 500;">${escapeHtml(c.old_value || '-')}</div>
             </div>
             <div style="text-align: center;">→</div>
-            <div style="background: #d1fae5; padding: 8px; border-radius: 4px;">
-              <span class="note" style="color: #065f46; font-size: 11px;">DESPUÉS</span>
-              <div style="color: #047857; font-weight: 500;">${escapeHtml(c.new_value || '-')}</div>
+            <div style="background: rgba(255,255,255,.08); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.16);">
+              <span class="note" style="color: #e8eaed; font-size: 11px;">DESPUÉS</span>
+              <div style="color: #f5f6f7; font-weight: 500;">${escapeHtml(c.new_value || '-')}</div>
             </div>
           </div>
         ` : ''}
