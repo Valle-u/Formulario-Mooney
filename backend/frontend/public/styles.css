@@ -35,6 +35,16 @@
   padding: 16px;
 }
 
+.cierre-form-panel #cierreForm > .cierre-step,
+.cierre-form-panel #cierreForm > .cierre-resumen-live,
+.cierre-form-panel #cierreForm > .actions-right {
+  grid-column: 1 / -1;
+}
+
+.cierre-form-panel #cierreForm {
+  row-gap: 12px;
+}
+
 .cierre-panel-head h2 {
   margin: 0;
   font-size: 1.02rem;
@@ -53,6 +63,10 @@
   background: rgba(255,255,255,.02);
   padding: 12px;
   margin-top: 10px;
+}
+
+.cierre-step .grid {
+  align-items: end;
 }
 
 .cierre-step-title {
@@ -641,6 +655,7 @@ body{
   gap:12px;
 }
 .field{ grid-column: span 12; }
+.span12{ grid-column: span 12; }
 @media (min-width: 980px){
   .span6{ grid-column: span 6; }
   .span4{ grid-column: span 4; }

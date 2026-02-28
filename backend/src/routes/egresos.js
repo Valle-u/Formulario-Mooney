@@ -225,7 +225,7 @@ function normalizeHoraOptional(hora){
  * Por defecto exige año actual (alta de egresos), pero puede relajarse en edición.
  * @returns {object} { valid: boolean, fecha: string|null, error: string|null }
  */
-function normalizeFecha(fechaStr, { enforceCurrentYear = true } = {}) {
+function normalizeFecha(fechaStr, { enforceCurrentYear = true, allowFuture = false } = {}) {
   const v = String(fechaStr || "").trim();
 
   // Intentar formato dd/mm/aaaa primero
@@ -259,7 +259,7 @@ function normalizeFecha(fechaStr, { enforceCurrentYear = true } = {}) {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     fecha.setHours(0, 0, 0, 0);
-    if (fecha > hoy) {
+    if (!allowFuture && fecha > hoy) {
       return { valid: false, fecha: null, error: "No se permiten fechas futuras" };
     }
 
@@ -294,7 +294,7 @@ function normalizeFecha(fechaStr, { enforceCurrentYear = true } = {}) {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     fecha.setHours(0, 0, 0, 0);
-    if (fecha > hoy) {
+    if (!allowFuture && fecha > hoy) {
       return { valid: false, fecha: null, error: "No se permiten fechas futuras" };
     }
 
@@ -977,7 +977,7 @@ function parsePeriodoQuery(req) {
 function parseFechaQueryFlexible(rawValue, fallbackISO, fieldName) {
   if (!rawValue) return fallbackISO;
 
-  const parsed = normalizeFecha(String(rawValue), { enforceCurrentYear: false });
+  const parsed = normalizeFecha(String(rawValue), { enforceCurrentYear: false, allowFuture: true });
   if (!parsed.valid) {
     const err = new Error(`${fieldName} inválida: ${parsed.error}`);
     err.status = 400;
