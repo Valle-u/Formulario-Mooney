@@ -1263,7 +1263,7 @@ router.get("/cierres/kpi", auth, async (req, res) => {
   }
 });
 
-// GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados
+// GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados (incluye legacy)
 router.get("/cierres/csv", auth, async (req, res) => {
   try {
     const todayISO = localDateToISO(new Date());
@@ -1298,8 +1298,8 @@ router.get("/cierres/csv", auth, async (req, res) => {
     }
 
     const where = [
-      "e.etiqueta = 'Cierre de Caja'",
-      "e.status <> 'anulado'",
+      "LOWER(COALESCE(e.etiqueta, '')) LIKE '%cierre%caja%'",
+      "COALESCE(e.status, 'activo') <> 'anulado'",
       "e.fecha >= $1::date",
       "e.fecha <= $2::date"
     ];
