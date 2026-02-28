@@ -4,8 +4,12 @@
 function populateEtiquetas(){
   const sel = document.getElementById("etiqueta");
   if(!sel) return;
+
+  // Cierre de Caja se gestiona en el modulo dedicado cierres-caja.html
+  const etiquetasFormulario = ETIQUETAS.filter(e => e !== "Cierre de Caja");
+
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    ETIQUETAS.map(e => `<option value="${e}">${e}</option>`).join("");
+    etiquetasFormulario.map(e => `<option value="${e}">${e}</option>`).join("");
 }
 
 function populateEmpresasSalida(){
@@ -404,12 +408,21 @@ function restaurarValoresRecordados() {
 
   if (recordarEtiqueta && inputEtiqueta) {
     const valorGuardado = localStorage.getItem(STORAGE_KEYS.ETIQUETA);
-    if (valorGuardado) {
+    const optionExists = valorGuardado
+      ? Array.from(inputEtiqueta.options).some(opt => opt.value === valorGuardado)
+      : false;
+
+    if (valorGuardado && optionExists) {
       inputEtiqueta.value = valorGuardado;
       // Disparar eventos para actualizar campos condicionales
       toggleCasinoUserField();
       toggleOtroConcepto();
       toggleCamposPremio();
+    } else if (valorGuardado && !optionExists) {
+      localStorage.removeItem(STORAGE_KEYS.ETIQUETA);
+      if (document.getElementById('recordar_etiqueta')) {
+        document.getElementById('recordar_etiqueta').checked = false;
+      }
     }
   }
 }

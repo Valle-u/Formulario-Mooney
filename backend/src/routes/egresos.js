@@ -60,6 +60,80 @@ function clearSaldosCache() {
   if (saldosCache.size) saldosCache.clear();
 }
 
+const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
+const TURNOS_CIERRE_ORDER = {
+  "Turno mañana": 1,
+  "Turno tarde": 2,
+  "Turno noche": 3
+};
+
+function normalizeTurnoLabel(turnoValue) {
+  const raw = String(turnoValue || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === "turno manana" || lower === "turno mañana") return "Turno mañana";
+  if (lower === "turno tarde") return "Turno tarde";
+  if (lower === "turno noche") return "Turno noche";
+
+  return raw;
+}
+
+function localDateToISO(dateObj) {
+  if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return null;
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function toISODateOnly(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) return localDateToISO(value);
+
+  const text = String(value).trim();
+  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+
+  const parsed = normalizeFecha(text, { enforceCurrentYear: false });
+  if (parsed.valid) return parsed.fecha;
+
+  return null;
+}
+
+function shiftISODate(isoDate, deltaDays) {
+  const dateObj = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(dateObj.getTime())) return isoDate;
+  dateObj.setDate(dateObj.getDate() + deltaDays);
+  return localDateToISO(dateObj);
+}
+
+async function findDuplicateCierreSlot({ fecha, turno, empresaSalida, cuentaSalida, moneda, excludeId = null }) {
+  const params = [fecha, turno, empresaSalida, cuentaSalida, moneda];
+  let excludeSql = "";
+
+  if (excludeId !== null && excludeId !== undefined) {
+    params.push(excludeId);
+    excludeSql = ` AND id <> $${params.length}`;
+  }
+
+  return query(
+    `SELECT id, fecha, turno, empresa_salida, cuenta_salida, moneda, monto, created_at
+       FROM egresos
+      WHERE etiqueta = 'Cierre de Caja'
+        AND status <> 'anulado'
+        AND fecha = $1::date
+        AND turno = $2
+        AND empresa_salida = $3
+        AND cuenta_salida = $4
+        AND moneda = $5
+        ${excludeSql}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1`,
+    params
+  );
+}
+
 // GET distinct empresas (for saldos filter)
 router.get("/distinct-empresas", auth, async (req, res) => {
   try {
@@ -354,7 +428,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
 
     // Validar turno (ahora siempre obligatorio)
-    const turnoNorm = String(turno || "").trim();
+    const turnoNorm = normalizeTurnoLabel(String(turno || "").trim());
     if (!turnoNorm) {
       return res.status(400).json({ message: "Turno es obligatorio" });
     }
@@ -402,6 +476,33 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     if (monedaNorm === "ARS" && tipoTransaccion === "ENTRADA") {
       if (etiqueta !== "[Unidad M] Deposito de cliente") {
         return res.status(400).json({ message: "Transacciones ARS solo pueden ser ENTRADA para 'Deposito de cliente'" });
+      }
+    }
+
+    // Evitar doble carga para el mismo slot de cierre
+    if (esCierreCaja) {
+      if (!TURNOS_CIERRE.includes(turnoNorm)) {
+        return res.status(400).json({ message: "Turno inválido para cierre de caja" });
+      }
+
+      const duplicate = await findDuplicateCierreSlot({
+        fecha: fechaNorm,
+        turno: turnoNorm,
+        empresaSalida: empresa_cuenta_salida,
+        cuentaSalida: String(cuenta_salida || "").trim(),
+        moneda: monedaNorm
+      });
+
+      if (duplicate.rowCount > 0) {
+        const existing = duplicate.rows[0];
+        return res.status(409).json({
+          message: "Ya existe un cierre para esa fecha, turno, empresa, titular y moneda. Revisá el modulo Cierres.",
+          duplicate: {
+            id: existing.id,
+            created_at: existing.created_at,
+            monto: Number(existing.monto || 0)
+          }
+        });
       }
     }
 
@@ -873,6 +974,34 @@ function parsePeriodoQuery(req) {
   return { mes, anio };
 }
 
+function parseFechaQueryFlexible(rawValue, fallbackISO, fieldName) {
+  if (!rawValue) return fallbackISO;
+
+  const parsed = normalizeFecha(String(rawValue), { enforceCurrentYear: false });
+  if (!parsed.valid) {
+    const err = new Error(`${fieldName} inválida: ${parsed.error}`);
+    err.status = 400;
+    throw err;
+  }
+
+  return parsed.fecha;
+}
+
+function buildISODateRange(fechaDesdeISO, fechaHastaISO) {
+  const from = new Date(`${fechaDesdeISO}T00:00:00`);
+  const to = new Date(`${fechaHastaISO}T00:00:00`);
+  const out = [];
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return out;
+
+  const cursor = new Date(from.getTime());
+  while (cursor <= to) {
+    out.push(localDateToISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
 // GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
 // Solo Admin puede ver saldos
 // Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
@@ -988,6 +1117,212 @@ router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
     return res.status(500).json({ message: "Error exportando saldos" });
+  }
+});
+
+// GET /api/egresos/cierres/kpi - Cobertura de cierres por dia/turno/cuenta
+router.get("/cierres/kpi", auth, async (req, res) => {
+  try {
+    const todayISO = localDateToISO(new Date());
+    const defaultDesde = shiftISODate(todayISO, -2);
+
+    const fechaDesde = parseFechaQueryFlexible(req.query.fecha_desde, defaultDesde, "fecha_desde");
+    const fechaHasta = parseFechaQueryFlexible(req.query.fecha_hasta, todayISO, "fecha_hasta");
+
+    if (fechaDesde > fechaHasta) {
+      return res.status(400).json({ message: "fecha_desde no puede ser mayor que fecha_hasta" });
+    }
+
+    const fromDate = new Date(`${fechaDesde}T00:00:00`);
+    const toDate = new Date(`${fechaHasta}T00:00:00`);
+    const totalDays = Math.floor((toDate - fromDate) / 86400000) + 1;
+    if (totalDays < 1 || totalDays > 31) {
+      return res.status(400).json({ message: "El rango de fechas debe estar entre 1 y 31 dias" });
+    }
+
+    const empresaSalida = String(req.query.empresa_salida || "").trim();
+    const cuentaSalida = String(req.query.cuenta_salida || "").trim();
+    const moneda = String(req.query.moneda || "").trim().toUpperCase();
+
+    if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
+      return res.status(400).json({ message: "empresa_salida inválida" });
+    }
+    if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser ARS, USD o USDT" });
+    }
+
+    let slots = [];
+
+    if (empresaSalida && cuentaSalida && moneda) {
+      slots = [{ empresa_salida: empresaSalida, cuenta_salida: cuentaSalida, moneda }];
+    } else {
+      const lookbackDesde = shiftISODate(fechaHasta, -45);
+      const slotWhere = [
+        "status <> 'anulado'",
+        "fecha >= $1::date",
+        "fecha <= $2::date",
+        "moneda IN ('ARS','USD','USDT')",
+        "empresa_salida IS NOT NULL",
+        "cuenta_salida IS NOT NULL",
+        "btrim(empresa_salida) <> ''",
+        "btrim(cuenta_salida) <> ''"
+      ];
+      const slotParams = [lookbackDesde, fechaHasta];
+
+      if (empresaSalida) {
+        slotParams.push(empresaSalida);
+        slotWhere.push(`empresa_salida = $${slotParams.length}`);
+      }
+      if (cuentaSalida) {
+        slotParams.push(cuentaSalida);
+        slotWhere.push(`cuenta_salida = $${slotParams.length}`);
+      }
+      if (moneda) {
+        slotParams.push(moneda);
+        slotWhere.push(`moneda = $${slotParams.length}`);
+      }
+
+      const slotResult = await query(
+        `SELECT DISTINCT empresa_salida, cuenta_salida, moneda
+           FROM egresos
+          WHERE ${slotWhere.join(" AND ")}
+          ORDER BY empresa_salida, cuenta_salida, moneda`,
+        slotParams
+      );
+
+      slots = slotResult.rows.map((r) => ({
+        empresa_salida: r.empresa_salida,
+        cuenta_salida: r.cuenta_salida,
+        moneda: String(r.moneda || "").toUpperCase()
+      }));
+    }
+
+    const cierreWhere = [
+      "e.etiqueta = 'Cierre de Caja'",
+      "e.status <> 'anulado'",
+      "e.fecha >= $1::date",
+      "e.fecha <= $2::date"
+    ];
+    const cierreParams = [fechaDesde, fechaHasta];
+
+    if (empresaSalida) {
+      cierreParams.push(empresaSalida);
+      cierreWhere.push(`e.empresa_salida = $${cierreParams.length}`);
+    }
+    if (cuentaSalida) {
+      cierreParams.push(cuentaSalida);
+      cierreWhere.push(`e.cuenta_salida = $${cierreParams.length}`);
+    }
+    if (moneda) {
+      cierreParams.push(moneda);
+      cierreWhere.push(`e.moneda = $${cierreParams.length}`);
+    }
+
+    const cierresResult = await query(
+      `SELECT
+          e.id,
+          e.fecha,
+          e.turno,
+          e.empresa_salida,
+          e.cuenta_salida,
+          e.moneda,
+          e.monto,
+          e.monto_raw,
+          e.hora,
+          e.created_at,
+          e.created_by,
+          u.username AS created_by_username
+       FROM egresos e
+       LEFT JOIN users u ON u.id = e.created_by
+       WHERE ${cierreWhere.join(" AND ")}
+       ORDER BY e.created_at DESC, e.id DESC`,
+      cierreParams
+    );
+
+    const grouped = new Map();
+    for (const c of cierresResult.rows) {
+      const fechaISO = toISODateOnly(c.fecha);
+      const turnoNorm = normalizeTurnoLabel(c.turno);
+      if (!fechaISO || !TURNOS_CIERRE.includes(turnoNorm)) continue;
+
+      const key = [
+        fechaISO,
+        c.empresa_salida,
+        c.cuenta_salida,
+        String(c.moneda || "").toUpperCase(),
+        turnoNorm
+      ].join("|");
+
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push({
+        id: c.id,
+        monto: Number(c.monto || 0),
+        monto_raw: c.monto_raw,
+        hora: c.hora,
+        created_at: c.created_at,
+        created_by: c.created_by,
+        created_by_username: c.created_by_username || null
+      });
+    }
+
+    const fechas = buildISODateRange(fechaDesde, fechaHasta).reverse();
+    const rows = [];
+    const summary = { total: 0, pendientes: 0, ok: 0, duplicados: 0 };
+
+    for (const fechaISO of fechas) {
+      for (const slot of slots) {
+        for (const turno of TURNOS_CIERRE) {
+          const key = [fechaISO, slot.empresa_salida, slot.cuenta_salida, slot.moneda, turno].join("|");
+          const hits = grouped.get(key) || [];
+
+          let status = "PENDIENTE";
+          if (hits.length === 1) status = "OK";
+          if (hits.length > 1) status = "DUPLICADO";
+
+          summary.total += 1;
+          if (status === "PENDIENTE") summary.pendientes += 1;
+          if (status === "OK") summary.ok += 1;
+          if (status === "DUPLICADO") summary.duplicados += 1;
+
+          rows.push({
+            fecha: fechaISO,
+            turno,
+            empresa_salida: slot.empresa_salida,
+            cuenta_salida: slot.cuenta_salida,
+            moneda: slot.moneda,
+            status,
+            count: hits.length,
+            cierre: hits.length > 0 ? hits[0] : null
+          });
+        }
+      }
+    }
+
+    rows.sort((a, b) => {
+      if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
+      if (a.empresa_salida !== b.empresa_salida) return a.empresa_salida.localeCompare(b.empresa_salida);
+      if (a.cuenta_salida !== b.cuenta_salida) return a.cuenta_salida.localeCompare(b.cuenta_salida);
+      if (a.moneda !== b.moneda) return a.moneda.localeCompare(b.moneda);
+      return (TURNOS_CIERRE_ORDER[a.turno] || 99) - (TURNOS_CIERRE_ORDER[b.turno] || 99);
+    });
+
+    return res.json({
+      periodo: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta, total_dias: totalDays },
+      filtros: {
+        empresa_salida: empresaSalida || null,
+        cuenta_salida: cuentaSalida || null,
+        moneda: moneda || null
+      },
+      slots,
+      summary,
+      rows
+    });
+  } catch (error) {
+    console.error("Error obteniendo KPI de cierres:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Error obteniendo KPI de cierres" });
   }
 });
 
@@ -1823,7 +2158,7 @@ router.put("/:id", auth, async (req, res) => {
       }
     }
 
-    const turnoNorm = sendsTurno ? normText(turno) : null;
+    const turnoNorm = sendsTurno ? normalizeTurnoLabel(normText(turno)) : null;
     if (sendsTurno && !turnoNorm) {
       return res.status(400).json({ message: "Turno es obligatorio" });
     }
@@ -1840,6 +2175,47 @@ router.put("/:id", auth, async (req, res) => {
       }
       if (!EMPRESAS_SALIDA.includes(empresaSalidaNorm)) {
         return res.status(400).json({ message: "empresa_salida inválida" });
+      }
+    }
+
+    const fechaFinal = sendsFecha ? fechaNormalizada : toISODateOnly(oldEgreso.fecha);
+    const turnoFinal = sendsTurno ? turnoNorm : normalizeTurnoLabel(normText(oldEgreso.turno));
+    const cuentaSalidaFinal = cuentaSalidaNorm;
+    const empresaSalidaFinal = empresaSalidaNorm;
+
+    if (esCierreCajaFinal) {
+      if (!fechaFinal) {
+        return res.status(400).json({ message: "Fecha inválida para cierre de caja" });
+      }
+      if (!turnoFinal || !TURNOS_CIERRE.includes(turnoFinal)) {
+        return res.status(400).json({ message: "Turno inválido para cierre de caja" });
+      }
+      if (!empresaSalidaFinal) {
+        return res.status(400).json({ message: "EMPRESA SALIDA es obligatoria para cierre de caja" });
+      }
+      if (!cuentaSalidaFinal) {
+        return res.status(400).json({ message: "CUENTA SALIDA es obligatoria para cierre de caja" });
+      }
+
+      const duplicate = await findDuplicateCierreSlot({
+        fecha: fechaFinal,
+        turno: turnoFinal,
+        empresaSalida: empresaSalidaFinal,
+        cuentaSalida: cuentaSalidaFinal,
+        moneda: monedaFinal,
+        excludeId: id
+      });
+
+      if (duplicate.rowCount > 0) {
+        const existing = duplicate.rows[0];
+        return res.status(409).json({
+          message: "Ya existe otro cierre para ese mismo dia, turno, empresa, titular y moneda.",
+          duplicate: {
+            id: existing.id,
+            created_at: existing.created_at,
+            monto: Number(existing.monto || 0)
+          }
+        });
       }
     }
 
