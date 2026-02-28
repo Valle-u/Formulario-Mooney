@@ -765,6 +765,9 @@ function initCommonUI() {
   // Inicializar tema claro/oscuro
   initThemeToggle();
 
+  // Sidebar colapsable en desktop
+  initSidebarCollapse();
+
   hydrateTopbar();
   document.getElementById("logoutBtn")?.addEventListener("click", logout);
   document.getElementById("logoutBtnMobile")?.addEventListener("click", logout);
@@ -830,6 +833,58 @@ function initCommonUI() {
   // Conectar a notificaciones si hay un token
   if (getToken()) {
     connectToNotifications();
+  }
+}
+
+/* =========================
+   SIDEBAR COLLAPSE (desktop)
+   ========================= */
+function initSidebarCollapse() {
+  const appShell = document.querySelector('.app-nosidebar');
+  const topbarLeft = document.querySelector('.app-nosidebar .topbar-left');
+  if (!appShell || !topbarLeft) return;
+
+  const STORAGE_KEY = 'mm_sidebar_collapsed';
+  const isDesktop = window.matchMedia('(min-width: 901px)').matches;
+
+  const applyState = (collapsed) => {
+    document.body.classList.toggle('sidebar-collapsed', !!collapsed);
+  };
+
+  const saved = localStorage.getItem(STORAGE_KEY) === '1';
+  if (isDesktop) applyState(saved);
+
+  let btn = document.getElementById('sidebarCollapseBtn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'sidebarCollapseBtn';
+    btn.type = 'button';
+    btn.className = 'sidebar-collapse-btn';
+    btn.setAttribute('aria-label', 'Colapsar barra lateral');
+    btn.textContent = 'COLAPSAR';
+    topbarLeft.appendChild(btn);
+  }
+
+  btn.addEventListener('click', () => {
+    const collapsed = !document.body.classList.contains('sidebar-collapsed');
+    applyState(collapsed);
+    localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+  });
+
+  const mq = window.matchMedia('(max-width: 900px)');
+  const onMobileChange = (e) => {
+    if (e.matches) {
+      document.body.classList.remove('sidebar-collapsed');
+    } else {
+      const persisted = localStorage.getItem(STORAGE_KEY) === '1';
+      applyState(persisted);
+    }
+  };
+
+  if (typeof mq.addEventListener === 'function') {
+    mq.addEventListener('change', onMobileChange);
+  } else if (typeof mq.addListener === 'function') {
+    mq.addListener(onMobileChange);
   }
 }
 
