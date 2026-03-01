@@ -756,9 +756,17 @@ function validarCampo(campo){
         mostrarError(campo, 'La fecha es obligatoria');
         return false;
       }
-      if(isFutureDateISO(valor)){
-        mostrarError(campo, 'No podés usar una fecha futura');
-        return false;
+      {
+        const partes = valor.split('/');
+        if(partes.length === 3){
+          const fd = new Date(parseInt(partes[2],10), parseInt(partes[1],10)-1, parseInt(partes[0],10));
+          fd.setHours(0,0,0,0);
+          const hoy = new Date(); hoy.setHours(0,0,0,0);
+          if(fd > hoy){
+            mostrarError(campo, 'No podés usar una fecha futura');
+            return false;
+          }
+        }
       }
       mostrarExito(campo);
       return true;
@@ -1054,6 +1062,22 @@ async function handleEgresoSubmit(e){
 
     // Validaciones básicas
     if(!payload.fecha) throw new Error("Completá FECHA.");
+
+    // Validar formato y año de la fecha antes de enviar al servidor
+    {
+      const fechaRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+      const fechaMatch = payload.fecha.match(fechaRegex);
+      if(!fechaMatch) throw new Error("Formato de fecha inválido. Usá dd/mm/aaaa.");
+      const [, fDia, fMes, fAnio] = fechaMatch;
+      const fAnioNum = parseInt(fAnio, 10);
+      const fAnioActual = new Date().getFullYear();
+      if(fAnioNum !== fAnioActual) throw new Error(`La fecha debe ser del año ${fAnioActual}.`);
+      const fDate = new Date(fAnioNum, parseInt(fMes,10)-1, parseInt(fDia,10));
+      fDate.setHours(0,0,0,0);
+      const hoyDate = new Date(); hoyDate.setHours(0,0,0,0);
+      if(fDate > hoyDate) throw new Error("No se permiten fechas futuras.");
+    }
+
     if(!payload.hora) throw new Error("Completá HORA.");
     if(!payload.turno) throw new Error("Seleccioná TURNO.");
     if(montoNum === null || montoNum <= 0) throw new Error("Monto inválido. Debe ser mayor a 0.");
