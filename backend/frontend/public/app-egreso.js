@@ -996,13 +996,15 @@ async function handleEgresoSubmit(e){
   const prevText = submitBtn ? submitBtn.textContent : "";
   if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = "Validando…"; }
 
+  // Declarar fuera del try para que el finally pueda acceder
+  const turnoSelect = document.getElementById("turno");
+  const turnoDisabled = turnoSelect?.disabled;
+
   try{
     const montoRaw = document.getElementById("monto").value;
     const montoNum = parseMontoARSStrict(montoRaw);
 
     // Habilitar temporalmente el select de turno para poder leer su valor
-    const turnoSelect = document.getElementById("turno");
-    const turnoDisabled = turnoSelect?.disabled;
     if (turnoSelect && turnoDisabled) {
       turnoSelect.disabled = false;
     }
