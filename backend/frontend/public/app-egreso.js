@@ -415,6 +415,7 @@ function restaurarValoresRecordados() {
   toggleCasinoUserField();
   toggleOtroConcepto();
   toggleCamposPremio();
+  toggleModoTurnoCierreCaja(); // Re-activa turno automático + calcula según hora
 }
 
 /**
@@ -475,6 +476,7 @@ function limpiarFormularioConRecordar() {
   toggleCasinoUserField();
   toggleOtroConcepto();
   toggleCamposPremio();
+  toggleModoTurnoCierreCaja(); // Re-activa turno automático + calcula según hora
 }
 
 // Validación en tiempo real de ID de transferencia duplicado
