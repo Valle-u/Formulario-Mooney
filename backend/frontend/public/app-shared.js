@@ -800,6 +800,9 @@ function initCommonUI() {
   // Activar monitor de inactividad
   setupInactivityMonitor();
 
+  // Inicializar toggles de contraseña (usuarios, reset password, etc.)
+  initPasswordToggles();
+
   // Inicializar tema claro/oscuro
   initThemeToggle();
 

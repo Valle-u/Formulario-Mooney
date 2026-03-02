@@ -129,7 +129,13 @@
                 <div class="section-body grid">
                   <!-- MONEDA USD/USDT -->
                   <div class="field span4" id="wrap_moneda_usd_page">
-                    <label>MONEDA *</label>
+                    <label>
+                      MONEDA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_moneda_usd" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <select id="moneda_usd_page" required>
                       <option value="USDT">₮ USDT (Tether)</option>
                       <option value="USD">USD (Dólares)</option>
@@ -139,7 +145,13 @@
 
                   <!-- TIPO DE TRANSACCIÓN -->
                   <div class="field span4" id="wrap_tipo_transaccion">
-                    <label>TIPO DE TRANSACCIÓN *</label>
+                    <label>
+                      TIPO DE TRANSACCIÓN *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_tipo_transaccion" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <select id="tipo_transaccion" required>
                       <option value="">-- Seleccionar --</option>
                       <option value="ENTRADA">Entrada</option>
@@ -167,7 +179,13 @@
                   </div>
 
                   <div class="field span6 hidden" id="wrap_usuario_casino">
-                    <label>USUARIO DEL CASINO *</label>
+                    <label>
+                      USUARIO DEL CASINO *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_usuario_casino" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="usuario_casino">
                     <div class="note">Usuario del casino que recibió el premio</div>
                   </div>
@@ -197,7 +215,13 @@
                   </div>
 
                   <div class="field span3">
-                    <label>HORA *</label>
+                    <label>
+                      HORA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_hora" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="hora" type="time" required>
                     <div class="note">Hora que marca el comprobante</div>
                   </div>
@@ -215,13 +239,25 @@
 
                   <!-- Campos condicionales para PREMIOS -->
                   <div class="field span3 hidden" id="wrap_hora_solicitud">
-                    <label>HORA SOLICITUD CLIENTE *</label>
-                    <input id="hora_solicitud_cliente" type="text" placeholder="Ej: 14:32" required>
-                    <div class="note">Pega acá, la hora del panel</div>
+                    <label>
+                      HORA SOLICITUD CLIENTE *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_hora_solicitud" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
+                    <input id="hora_solicitud_cliente" type="time" required>
+                    <div class="note">Hora del panel de solicitud</div>
                   </div>
 
                   <div class="field span3 hidden" id="wrap_hora_quema">
-                    <label>HORA QUEMA DE FICHAS *</label>
+                    <label>
+                      HORA QUEMA DE FICHAS *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_hora_quema" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="hora_quema_fichas" type="time" required>
                     <div class="note">Hora en la que, al cliente, se les queman la fichas</div>
                   </div>
@@ -241,13 +277,25 @@
                   <!-- Campo MONEDA removido - hardcodeado como USD en JavaScript -->
 
                   <div class="field span6">
-                    <label>MONTO DE TRANSFERENCIA *</label>
+                    <label>
+                      MONTO DE TRANSFERENCIA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_monto" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="monto" placeholder="Ej: 1000 o 1000.50" required>
                     <div class="note" id="montoNote">Formato: 1000 o 1000.50 (use punto para decimales en USD)</div>
                   </div>
 
                   <div class="field span6" id="wrap_id_transferencia">
-                    <label>ID TRANSFERENCIA</label>
+                    <label>
+                      ID TRANSFERENCIA
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_id_transferencia" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input
                       id="id_transferencia"
                       inputmode="text"
@@ -300,7 +348,13 @@
                   </div>
 
                   <div class="field span12" id="wrap_cuenta_receptora">
-                    <label for="cuenta_receptora">TITULAR CUENTA RECEPTORA *</label>
+                    <label for="cuenta_receptora">
+                      TITULAR CUENTA RECEPTORA *
+                      <label style="float: right; font-weight: normal; font-size: 0.85em; cursor: pointer;">
+                        <input type="checkbox" id="recordar_cuenta_receptora" style="margin-left: 5px; cursor: pointer;">
+                        Recordar
+                      </label>
+                    </label>
                     <input id="cuenta_receptora" required>
                     <div class="note">Titular de la cuenta que va a recibir el dinero</div>
                   </div>

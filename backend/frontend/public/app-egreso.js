@@ -322,8 +322,43 @@ const STORAGE_KEYS = {
   CUENTA_SALIDA: 'egreso_recordar_cuenta_salida',
   CUENTA_SALIDA_CHECK: 'egreso_recordar_cuenta_salida_check',
   ETIQUETA: 'egreso_recordar_etiqueta',
-  ETIQUETA_CHECK: 'egreso_recordar_etiqueta_check'
+  ETIQUETA_CHECK: 'egreso_recordar_etiqueta_check',
+  HORA: 'egreso_recordar_hora',
+  HORA_CHECK: 'egreso_recordar_hora_check',
+  MONTO: 'egreso_recordar_monto',
+  MONTO_CHECK: 'egreso_recordar_monto_check',
+  CUENTA_RECEPTORA: 'egreso_recordar_cuenta_receptora',
+  CUENTA_RECEPTORA_CHECK: 'egreso_recordar_cuenta_receptora_check',
+  USUARIO_CASINO: 'egreso_recordar_usuario_casino',
+  USUARIO_CASINO_CHECK: 'egreso_recordar_usuario_casino_check',
+  ID_TRANSFERENCIA: 'egreso_recordar_id_transferencia',
+  ID_TRANSFERENCIA_CHECK: 'egreso_recordar_id_transferencia_check',
+  HORA_SOLICITUD: 'egreso_recordar_hora_solicitud',
+  HORA_SOLICITUD_CHECK: 'egreso_recordar_hora_solicitud_check',
+  HORA_QUEMA: 'egreso_recordar_hora_quema',
+  HORA_QUEMA_CHECK: 'egreso_recordar_hora_quema_check',
+  MONEDA_USD: 'egreso_recordar_moneda_usd',
+  MONEDA_USD_CHECK: 'egreso_recordar_moneda_usd_check',
+  TIPO_TRANSACCION: 'egreso_recordar_tipo_transaccion',
+  TIPO_TRANSACCION_CHECK: 'egreso_recordar_tipo_transaccion_check'
 };
+
+// Mapa de campos recordables: [inputId, checkboxId, storageKey, storageCheckKey]
+const RECORDAR_FIELDS = [
+  ['fecha', 'recordar_fecha', STORAGE_KEYS.FECHA, STORAGE_KEYS.FECHA_CHECK],
+  ['empresa_salida', 'recordar_empresa', STORAGE_KEYS.EMPRESA, STORAGE_KEYS.EMPRESA_CHECK],
+  ['cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK],
+  ['etiqueta', 'recordar_etiqueta', STORAGE_KEYS.ETIQUETA, STORAGE_KEYS.ETIQUETA_CHECK],
+  ['hora', 'recordar_hora', STORAGE_KEYS.HORA, STORAGE_KEYS.HORA_CHECK],
+  ['monto', 'recordar_monto', STORAGE_KEYS.MONTO, STORAGE_KEYS.MONTO_CHECK],
+  ['cuenta_receptora', 'recordar_cuenta_receptora', STORAGE_KEYS.CUENTA_RECEPTORA, STORAGE_KEYS.CUENTA_RECEPTORA_CHECK],
+  ['usuario_casino', 'recordar_usuario_casino', STORAGE_KEYS.USUARIO_CASINO, STORAGE_KEYS.USUARIO_CASINO_CHECK],
+  ['id_transferencia', 'recordar_id_transferencia', STORAGE_KEYS.ID_TRANSFERENCIA, STORAGE_KEYS.ID_TRANSFERENCIA_CHECK],
+  ['hora_solicitud_cliente', 'recordar_hora_solicitud', STORAGE_KEYS.HORA_SOLICITUD, STORAGE_KEYS.HORA_SOLICITUD_CHECK],
+  ['hora_quema_fichas', 'recordar_hora_quema', STORAGE_KEYS.HORA_QUEMA, STORAGE_KEYS.HORA_QUEMA_CHECK],
+  ['moneda_usd_page', 'recordar_moneda_usd', STORAGE_KEYS.MONEDA_USD, STORAGE_KEYS.MONEDA_USD_CHECK],
+  ['tipo_transaccion', 'recordar_tipo_transaccion', STORAGE_KEYS.TIPO_TRANSACCION, STORAGE_KEYS.TIPO_TRANSACCION_CHECK],
+];
 
 /**
  * Guarda un valor en localStorage si el checkbox está marcado
@@ -349,146 +384,57 @@ function guardarValorSiRecordado(inputId, checkboxId, storageKey, storageCheckKe
  * Restaura valores guardados al cargar la página
  */
 function restaurarValoresRecordados() {
-  // Restaurar FECHA
-  const recordarFecha = localStorage.getItem(STORAGE_KEYS.FECHA_CHECK) === 'true';
-  const checkboxFecha = document.getElementById('recordar_fecha');
-  const inputFecha = document.getElementById('fecha');
+  for (const [inputId, checkboxId, storageKey, storageCheckKey] of RECORDAR_FIELDS) {
+    const checkbox = document.getElementById(checkboxId);
+    const input = document.getElementById(inputId);
+    if (!checkbox) continue;
 
-  if (checkboxFecha) {
-    checkboxFecha.checked = recordarFecha;
-  }
+    const recordar = localStorage.getItem(storageCheckKey) === 'true';
+    checkbox.checked = recordar;
 
-  if (recordarFecha && inputFecha) {
-    const valorGuardado = localStorage.getItem(STORAGE_KEYS.FECHA);
-    if (valorGuardado) {
-      inputFecha.value = valorGuardado;
-    }
-  }
+    if (!recordar || !input) continue;
 
-  // Restaurar EMPRESA
-  const recordarEmpresa = localStorage.getItem(STORAGE_KEYS.EMPRESA_CHECK) === 'true';
-  const checkboxEmpresa = document.getElementById('recordar_empresa');
-  const inputEmpresa = document.getElementById('empresa_salida');
+    const valorGuardado = localStorage.getItem(storageKey);
+    if (!valorGuardado) continue;
 
-  if (checkboxEmpresa) {
-    checkboxEmpresa.checked = recordarEmpresa;
-  }
-
-  if (recordarEmpresa && inputEmpresa) {
-    const valorGuardado = localStorage.getItem(STORAGE_KEYS.EMPRESA);
-    if (valorGuardado) {
-      inputEmpresa.value = valorGuardado;
-    }
-  }
-
-  // Restaurar CUENTA SALIDA
-  const recordarCuentaSalida = localStorage.getItem(STORAGE_KEYS.CUENTA_SALIDA_CHECK) === 'true';
-  const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
-  const inputCuentaSalida = document.getElementById('cuenta_salida');
-
-  if (checkboxCuentaSalida) {
-    checkboxCuentaSalida.checked = recordarCuentaSalida;
-  }
-
-  if (recordarCuentaSalida && inputCuentaSalida) {
-    const valorGuardado = localStorage.getItem(STORAGE_KEYS.CUENTA_SALIDA);
-    if (valorGuardado) {
-      inputCuentaSalida.value = valorGuardado;
-    }
-  }
-
-  // Restaurar ETIQUETA
-  const recordarEtiqueta = localStorage.getItem(STORAGE_KEYS.ETIQUETA_CHECK) === 'true';
-  const checkboxEtiqueta = document.getElementById('recordar_etiqueta');
-  const inputEtiqueta = document.getElementById('etiqueta');
-
-  if (checkboxEtiqueta) {
-    checkboxEtiqueta.checked = recordarEtiqueta;
-  }
-
-  if (recordarEtiqueta && inputEtiqueta) {
-    const valorGuardado = localStorage.getItem(STORAGE_KEYS.ETIQUETA);
-    const optionExists = valorGuardado
-      ? Array.from(inputEtiqueta.options).some(opt => opt.value === valorGuardado)
-      : false;
-
-    if (valorGuardado && optionExists) {
-      inputEtiqueta.value = valorGuardado;
-      // Disparar eventos para actualizar campos condicionales
-      toggleCasinoUserField();
-      toggleOtroConcepto();
-      toggleCamposPremio();
-    } else if (valorGuardado && !optionExists) {
-      localStorage.removeItem(STORAGE_KEYS.ETIQUETA);
-      if (document.getElementById('recordar_etiqueta')) {
-        document.getElementById('recordar_etiqueta').checked = false;
+    // Para selects, verificar que la opción exista
+    if (input.tagName === 'SELECT') {
+      const optionExists = Array.from(input.options).some(opt => opt.value === valorGuardado);
+      if (optionExists) {
+        input.value = valorGuardado;
+      } else {
+        localStorage.removeItem(storageKey);
+        checkbox.checked = false;
       }
+    } else {
+      input.value = valorGuardado;
     }
   }
+
+  // Disparar eventos para actualizar campos condicionales de etiqueta
+  toggleCasinoUserField();
+  toggleOtroConcepto();
+  toggleCamposPremio();
 }
 
 /**
  * Conecta los event listeners para guardar valores cuando cambian
  */
 function conectarRecordarValores() {
-  // Event listeners para FECHA
-  const inputFecha = document.getElementById('fecha');
-  const checkboxFecha = document.getElementById('recordar_fecha');
+  for (const [inputId, checkboxId, storageKey, storageCheckKey] of RECORDAR_FIELDS) {
+    const input = document.getElementById(inputId);
+    const checkbox = document.getElementById(checkboxId);
+    if (!input || !checkbox) continue;
 
-  if (inputFecha && checkboxFecha) {
-    inputFecha.addEventListener('change', () => {
-      guardarValorSiRecordado('fecha', 'recordar_fecha', STORAGE_KEYS.FECHA, STORAGE_KEYS.FECHA_CHECK);
-    });
+    const guardar = () => guardarValorSiRecordado(inputId, checkboxId, storageKey, storageCheckKey);
 
-    checkboxFecha.addEventListener('change', () => {
-      guardarValorSiRecordado('fecha', 'recordar_fecha', STORAGE_KEYS.FECHA, STORAGE_KEYS.FECHA_CHECK);
-    });
-  }
+    input.addEventListener('change', guardar);
+    checkbox.addEventListener('change', guardar);
 
-  // Event listeners para EMPRESA
-  const inputEmpresa = document.getElementById('empresa_salida');
-  const checkboxEmpresa = document.getElementById('recordar_empresa');
-
-  if (inputEmpresa && checkboxEmpresa) {
-    inputEmpresa.addEventListener('change', () => {
-      guardarValorSiRecordado('empresa_salida', 'recordar_empresa', STORAGE_KEYS.EMPRESA, STORAGE_KEYS.EMPRESA_CHECK);
-    });
-
-    checkboxEmpresa.addEventListener('change', () => {
-      guardarValorSiRecordado('empresa_salida', 'recordar_empresa', STORAGE_KEYS.EMPRESA, STORAGE_KEYS.EMPRESA_CHECK);
-    });
-  }
-
-  // Event listeners para CUENTA SALIDA
-  const inputCuentaSalida = document.getElementById('cuenta_salida');
-  const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
-
-  if (inputCuentaSalida && checkboxCuentaSalida) {
-    inputCuentaSalida.addEventListener('change', () => {
-      guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
-    });
-
-    inputCuentaSalida.addEventListener('blur', () => {
-      guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
-    });
-
-    checkboxCuentaSalida.addEventListener('change', () => {
-      guardarValorSiRecordado('cuenta_salida', 'recordar_cuenta_salida', STORAGE_KEYS.CUENTA_SALIDA, STORAGE_KEYS.CUENTA_SALIDA_CHECK);
-    });
-  }
-
-  // Event listeners para ETIQUETA
-  const inputEtiqueta = document.getElementById('etiqueta');
-  const checkboxEtiqueta = document.getElementById('recordar_etiqueta');
-
-  if (inputEtiqueta && checkboxEtiqueta) {
-    inputEtiqueta.addEventListener('change', () => {
-      guardarValorSiRecordado('etiqueta', 'recordar_etiqueta', STORAGE_KEYS.ETIQUETA, STORAGE_KEYS.ETIQUETA_CHECK);
-    });
-
-    checkboxEtiqueta.addEventListener('change', () => {
-      guardarValorSiRecordado('etiqueta', 'recordar_etiqueta', STORAGE_KEYS.ETIQUETA, STORAGE_KEYS.ETIQUETA_CHECK);
-    });
+    // Para inputs de texto, también guardar al perder foco
+    if (input.tagName === 'INPUT' && (input.type === 'text' || input.type === 'time')) {
+      input.addEventListener('blur', guardar);
+    }
   }
 }
 
@@ -500,24 +446,14 @@ function limpiarFormularioConRecordar() {
   if (!form) return;
 
   // Guardar valores que deben recordarse ANTES de limpiar
-  const valoresRecordados = {
-    fecha: {
-      recordar: document.getElementById('recordar_fecha')?.checked,
-      valor: document.getElementById('fecha')?.value
-    },
-    empresa: {
-      recordar: document.getElementById('recordar_empresa')?.checked,
-      valor: document.getElementById('empresa_salida')?.value
-    },
-    cuentaSalida: {
-      recordar: document.getElementById('recordar_cuenta_salida')?.checked,
-      valor: document.getElementById('cuenta_salida')?.value
-    },
-    etiqueta: {
-      recordar: document.getElementById('recordar_etiqueta')?.checked,
-      valor: document.getElementById('etiqueta')?.value
+  const valoresRecordados = [];
+  for (const [inputId, checkboxId] of RECORDAR_FIELDS) {
+    const checkbox = document.getElementById(checkboxId);
+    const input = document.getElementById(inputId);
+    if (checkbox?.checked && input) {
+      valoresRecordados.push({ inputId, checkboxId, valor: input.value });
     }
-  };
+  }
 
   // Resetear formulario
   form.reset();
@@ -527,32 +463,11 @@ function limpiarFormularioConRecordar() {
   if(idTransInput){ idTransInput.disabled = false; idTransInput.style.opacity = "1"; }
 
   // Restaurar valores recordados
-  if (valoresRecordados.fecha.recordar) {
-    const inputFecha = document.getElementById('fecha');
-    const checkboxFecha = document.getElementById('recordar_fecha');
-    if (inputFecha) inputFecha.value = valoresRecordados.fecha.valor;
-    if (checkboxFecha) checkboxFecha.checked = true;
-  }
-
-  if (valoresRecordados.empresa.recordar) {
-    const inputEmpresa = document.getElementById('empresa_salida');
-    const checkboxEmpresa = document.getElementById('recordar_empresa');
-    if (inputEmpresa) inputEmpresa.value = valoresRecordados.empresa.valor;
-    if (checkboxEmpresa) checkboxEmpresa.checked = true;
-  }
-
-  if (valoresRecordados.cuentaSalida.recordar) {
-    const inputCuentaSalida = document.getElementById('cuenta_salida');
-    const checkboxCuentaSalida = document.getElementById('recordar_cuenta_salida');
-    if (inputCuentaSalida) inputCuentaSalida.value = valoresRecordados.cuentaSalida.valor;
-    if (checkboxCuentaSalida) checkboxCuentaSalida.checked = true;
-  }
-
-  if (valoresRecordados.etiqueta.recordar) {
-    const inputEtiqueta = document.getElementById('etiqueta');
-    const checkboxEtiqueta = document.getElementById('recordar_etiqueta');
-    if (inputEtiqueta) inputEtiqueta.value = valoresRecordados.etiqueta.valor;
-    if (checkboxEtiqueta) checkboxEtiqueta.checked = true;
+  for (const { inputId, checkboxId, valor } of valoresRecordados) {
+    const input = document.getElementById(inputId);
+    const checkbox = document.getElementById(checkboxId);
+    if (input) input.value = valor;
+    if (checkbox) checkbox.checked = true;
   }
 
   // Restablecer estados visuales
@@ -988,6 +903,7 @@ function toggleModoTurnoCierreCaja() {
    ========================= */
 // Variable global para guardar los datos del formulario validados
 let datosEgresoValidados = null;
+let isSubmittingEgreso = false;
 
 async function handleEgresoSubmit(e){
   e.preventDefault();
@@ -1317,10 +1233,9 @@ document.addEventListener("keydown", handleModalEscape);
 
 // Confirmar y enviar el egreso
 async function confirmarYEnviarEgreso(){
-  if(!datosEgresoValidados) return;
+  if(!datosEgresoValidados || isSubmittingEgreso) return;
 
   const { payload, file } = datosEgresoValidados;
-  const modal = document.getElementById("modalConfirmacion");
 
   // Función helper para rehabilitar botones
   const rehabilitarBotones = () => {
@@ -1337,6 +1252,8 @@ async function confirmarYEnviarEgreso(){
   };
 
   try{
+    isSubmittingEgreso = true;
+
     const btnConfirmar = document.querySelector("#modalConfirmacion .btn-primary");
     const btnCancelar = document.querySelector("#modalConfirmacion .btn-ghost");
 
@@ -1371,26 +1288,19 @@ async function confirmarYEnviarEgreso(){
 
     await api("/api/egresos", { method:"POST", body: fd, auth:true });
 
-    // Rehabilitar botones inmediatamente después del éxito
-    rehabilitarBotones();
+    // Cerrar modal inmediatamente y limpiar formulario
+    cerrarModalConfirmacion();
+    limpiarFormularioConRecordar();
+    datosEgresoValidados = null;
 
-    // Mostrar mensaje de éxito con duración extendida (8 segundos)
+    // Mostrar toast de éxito
     toast("Guardado", "Egreso registrado correctamente.", "success", 8000);
 
-    // Cerrar modal después de un delay para que se vea el mensaje
-    setTimeout(() => {
-      cerrarModalConfirmacion();
-      limpiarFormularioConRecordar(); // Limpia pero mantiene valores recordados
-
-      // Limpiar datos validados
-      datosEgresoValidados = null;
-    }, 2500); // Esperar 2.5 segundos antes de cerrar modal y resetear
-
   }catch(err){
-    // Rehabilitar botones inmediatamente en caso de error
     rehabilitarBotones();
-
     toast("Error", err.message, "error", 10000);
+  }finally{
+    isSubmittingEgreso = false;
   }
 }
 

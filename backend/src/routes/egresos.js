@@ -1330,7 +1330,8 @@ router.get("/cierres/csv", auth, async (req, res) => {
          e.monto,
          e.monto_raw,
          to_char((e.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'), 'DD/MM/YYYY HH24:MI:SS') AS created_at_ar,
-         u.username AS created_by_username
+         u.username AS created_by_username,
+         e.comprobante_url
        FROM egresos e
        LEFT JOIN users u ON u.id = e.created_by
        WHERE ${where.join(" AND ")}
@@ -1357,7 +1358,8 @@ router.get("/cierres/csv", auth, async (req, res) => {
       "monto",
       "monto_raw",
       "created_by_username",
-      "created_at"
+      "created_at",
+      "comprobante_url"
     ];
 
     const rows = r.rows.map((x) => ([
@@ -1371,7 +1373,8 @@ router.get("/cierres/csv", auth, async (req, res) => {
       montoToCommaString(Number(x.monto)),
       x.monto_raw || "",
       x.created_by_username || "",
-      x.created_at_ar || ""
+      x.created_at_ar || "",
+      x.comprobante_url || ""
     ]));
 
     const csv = withBOM(toCSV({ columns, rows, delimiter: ";" }));

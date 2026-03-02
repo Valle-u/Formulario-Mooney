@@ -603,6 +603,14 @@ function editarEgresoModal(){
       </div>
 
       <div class="field span6">
+        <label>TIPO TRANSACCION *</label>
+        <select id="edit_tipo_transaccion" required>
+          <option value="SALIDA" ${egreso.tipo_transaccion === 'SALIDA' ? 'selected' : ''}>SALIDA</option>
+          <option value="ENTRADA" ${egreso.tipo_transaccion === 'ENTRADA' ? 'selected' : ''}>ENTRADA</option>
+        </select>
+      </div>
+
+      <div class="field span6">
         <label>MONTO *</label>
         <input type="text" id="edit_monto" value="${escapeHtml(egreso.monto_raw)}" placeholder="Ej: 12000 o 12000,50" required>
       </div>
@@ -615,7 +623,7 @@ function editarEgresoModal(){
 
       <div class="field span6 ${esPremio ? '' : 'hidden'}" id="edit_wrap_hora_solicitud">
         <label>HORA SOLICITUD CLIENTE ${esPremio ? '*' : ''}</label>
-        <input type="text" id="edit_hora_solicitud_cliente" value="${escapeHtml(egreso.hora_solicitud_cliente || '')}" placeholder="HH:MM" ${esPremio ? 'required' : ''}>
+        <input type="time" id="edit_hora_solicitud_cliente" value="${escapeHtml(egreso.hora_solicitud_cliente || '')}" ${esPremio ? 'required' : ''}>
       </div>
 
       <div class="field span6 ${esPremio ? '' : 'hidden'}" id="edit_wrap_hora_quema">
@@ -826,6 +834,7 @@ function editarEgresoModal(){
         usuario_casino: document.getElementById('edit_usuario_casino')?.value || null,
         hora_solicitud_cliente: document.getElementById('edit_hora_solicitud_cliente')?.value || null,
         hora_quema_fichas: document.getElementById('edit_hora_quema_fichas')?.value || null,
+        tipo_transaccion: document.getElementById('edit_tipo_transaccion')?.value || null,
         empresa_salida: document.getElementById('edit_empresa_salida').value,
         cuenta_salida: document.getElementById('edit_cuenta_salida').value,
         id_transferencia: esCierreCajaEdit ? null : idTransferenciaEdit,
