@@ -1299,9 +1299,9 @@ async function confirmarYEnviarEgreso(){
     toast("Guardado", "Egreso registrado correctamente.", "success", 8000);
 
   }catch(err){
-    rehabilitarBotones();
     toast("Error", err.message, "error", 10000);
   }finally{
+    rehabilitarBotones();
     isSubmittingEgreso = false;
   }
 }
