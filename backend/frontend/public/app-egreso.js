@@ -181,6 +181,36 @@ function wireDropZone(){
     input.files = dt.files;
     fileLabel();
   });
+
+  // Paste handler: pegar imagen del portapapeles como comprobante (Ctrl+V)
+  document.addEventListener("paste", (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+
+        if (!["image/jpeg", "image/png"].includes(file.type)) {
+          toast("Formato no soportado", "Solo se pueden pegar imágenes JPG o PNG.", "error");
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          toast("Imagen muy grande", "El máximo es 10MB.", "error");
+          return;
+        }
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        fileLabel();
+        toast("Comprobante pegado", "Imagen del portapapeles cargada.", "success", 3000);
+        break;
+      }
+    }
+  });
 }
 
 function wireIdTransferenciaAlphanumeric(){
@@ -359,6 +389,54 @@ const RECORDAR_FIELDS = [
   ['moneda_usd_page', 'recordar_moneda_usd', STORAGE_KEYS.MONEDA_USD, STORAGE_KEYS.MONEDA_USD_CHECK],
   ['tipo_transaccion', 'recordar_tipo_transaccion', STORAGE_KEYS.TIPO_TRANSACCION, STORAGE_KEYS.TIPO_TRANSACCION_CHECK],
 ];
+
+/* =========================
+   AUTOCOMPLETADO (datalist) para campos de texto frecuentes
+   ========================= */
+const HISTORY_KEYS = {
+  CUENTAS: 'egreso_cuentas_receptoras_history',
+  USUARIOS: 'egreso_usuarios_casino_history'
+};
+const MAX_HISTORY = 50;
+
+function guardarEnHistorial(key, valor) {
+  if (!valor || !valor.trim()) return;
+  const limpio = valor.trim();
+  try {
+    let arr = JSON.parse(localStorage.getItem(key) || '[]');
+    // Quitar duplicados (case-insensitive)
+    arr = arr.filter(v => v.toLowerCase() !== limpio.toLowerCase());
+    arr.unshift(limpio);
+    if (arr.length > MAX_HISTORY) arr.length = MAX_HISTORY;
+    localStorage.setItem(key, JSON.stringify(arr));
+  } catch { /* localStorage lleno o corrupto */ }
+}
+
+function actualizarDatalist(datalistId, historyKey) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
+  try {
+    const arr = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    dl.innerHTML = arr.map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
+  } catch { dl.innerHTML = ''; }
+}
+
+function inicializarDatalist(inputId, datalistId, historyKey) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  // Crear datalist si no existe
+  let dl = document.getElementById(datalistId);
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = datalistId;
+    input.parentNode.appendChild(dl);
+  }
+
+  input.setAttribute('list', datalistId);
+  input.setAttribute('autocomplete', 'off');
+  actualizarDatalist(datalistId, historyKey);
+}
 
 /**
  * Guarda un valor en localStorage si el checkbox está marcado
@@ -1230,8 +1308,29 @@ function handleModalEscape(e){
   }
 }
 
-// Registrar event listener para ESC al cargar la página
-document.addEventListener("keydown", handleModalEscape);
+// Atajo Ctrl+Enter para enviar formulario / confirmar modal
+function handleGlobalShortcuts(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    // No interceptar si el foco está en un textarea (notas)
+    if (e.target.tagName === "TEXTAREA") return;
+    e.preventDefault();
+
+    const modal = document.getElementById("modalConfirmacion");
+    if (modal && modal.style.display === "flex") {
+      // Modal abierto → confirmar
+      document.getElementById("btnConfirmarEgreso")?.click();
+    } else {
+      // Modal cerrado → submit del form
+      document.getElementById("egresoForm")?.requestSubmit();
+    }
+  }
+}
+
+// Registrar event listeners globales de teclado
+document.addEventListener("keydown", (e) => {
+  handleModalEscape(e);
+  handleGlobalShortcuts(e);
+});
 
 // Confirmar y enviar el egreso
 async function confirmarYEnviarEgreso(){
@@ -1289,6 +1388,12 @@ async function confirmarYEnviarEgreso(){
     fd.append("comprobante", file);
 
     await api("/api/egresos", { method:"POST", body: fd, auth:true });
+
+    // Guardar en historial de autocompletado antes de limpiar
+    guardarEnHistorial(HISTORY_KEYS.CUENTAS, payload.cuenta_receptora);
+    if (payload.usuario_casino) guardarEnHistorial(HISTORY_KEYS.USUARIOS, payload.usuario_casino);
+    actualizarDatalist('dl_cuentas', HISTORY_KEYS.CUENTAS);
+    actualizarDatalist('dl_usuarios', HISTORY_KEYS.USUARIOS);
 
     // Cerrar modal inmediatamente y limpiar formulario
     cerrarModalConfirmacion();
@@ -1359,6 +1464,11 @@ document.addEventListener("DOMContentLoaded", () => {
     inputComprobante.addEventListener("change", fileLabel);
   }
   wireDropZone();
+
+  // Inicializar autocompletado (datalist) para campos de texto frecuentes
+  inicializarDatalist('cuenta_receptora', 'dl_cuentas', HISTORY_KEYS.CUENTAS);
+  inicializarDatalist('usuario_casino', 'dl_usuarios', HISTORY_KEYS.USUARIOS);
+
   document.getElementById("egresoForm")?.addEventListener("submit", handleEgresoSubmit);
 
   // Event listeners para el modal de confirmación

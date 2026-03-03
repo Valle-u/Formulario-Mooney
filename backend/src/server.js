@@ -123,24 +123,57 @@ if (!fs.existsSync(uploadsPath)) {
 app.use(`/${UPLOAD_DIR}`, express.static(uploadsPath));
 console.log(`📤 Serving uploads from: /${UPLOAD_DIR}`);
 
+// Cache-busting automático: reemplaza ?v=AUTO con ?v={mtime} en HTML
+const htmlCache = new Map();
+function serveHtmlWithCacheBusting(req, res, next) {
+  // Solo interceptar requests a archivos .html (o raíz)
+  let htmlFile = req.path;
+  if (htmlFile === '/') htmlFile = '/index.html';
+  if (!htmlFile.endsWith('.html')) return next();
+
+  const filePath = path.join(frontendPath, htmlFile);
+  if (!fs.existsSync(filePath)) return next();
+
+  try {
+    const stat = fs.statSync(filePath);
+    const cacheKey = `${filePath}:${stat.mtimeMs}`;
+
+    // Usar caché en memoria si el HTML no cambió
+    if (htmlCache.has(cacheKey)) {
+      res.type('html').send(htmlCache.get(cacheKey));
+      return;
+    }
+
+    let html = fs.readFileSync(filePath, 'utf8');
+
+    // Reemplazar ?v=AUTO (o cualquier ?v=...) con ?v={mtime del archivo referenciado}
+    html = html.replace(/((?:src|href)=["'])([^"']+\.(?:js|css))\?v=[^"']*(["'])/g, (match, pre, assetPath, post) => {
+      try {
+        const assetFile = path.join(frontendPath, assetPath);
+        const assetStat = fs.statSync(assetFile);
+        return `${pre}${assetPath}?v=${Math.floor(assetStat.mtimeMs)}${post}`;
+      } catch {
+        return match; // Si no encuentra el archivo, dejar como está
+      }
+    });
+
+    // Cachear resultado (limpiar cache vieja del mismo archivo)
+    for (const [k] of htmlCache) {
+      if (k.startsWith(filePath + ':')) htmlCache.delete(k);
+    }
+    htmlCache.set(cacheKey, html);
+
+    res.type('html').send(html);
+  } catch (err) {
+    next(); // Fallback a express.static si hay error
+  }
+}
+
+// Middleware de cache-busting ANTES de express.static
+app.use(serveHtmlWithCacheBusting);
+
 // Servir archivos estáticos (CSS, JS, imágenes)
 app.use(express.static(frontendPath));
-
-// Ruta para servir index.html en la raíz
-app.get('/', (req, res) => {
-  const indexPath = path.join(frontendPath, 'index.html');
-  console.log('🔍 Trying to serve:', indexPath);
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error('❌ Error serving index.html:', err);
-      res.status(500).json({
-        message: 'Error loading frontend',
-        frontendPath: frontendPath,
-        error: err.message
-      });
-    }
-  });
-});
 
 // Routes
 app.use("/api/auth", authRoutes);

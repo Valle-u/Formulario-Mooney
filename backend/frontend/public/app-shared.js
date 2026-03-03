@@ -578,6 +578,40 @@ function updateThemeIcon(icon) {
 }
 
 // ===================================================================
+// INDICADOR DE CONEXIÓN
+// ===================================================================
+const CONN_STATUS = { CONNECTED: 'connected', RECONNECTING: 'reconnecting', OFFLINE: 'offline' };
+const CONN_LABELS = { connected: 'Conectado', reconnecting: 'Reconectando…', offline: 'Sin conexión' };
+
+function updateConnectionStatus(status) {
+  const dot = document.getElementById('connectionDot');
+  if (!dot) return;
+  dot.className = status === CONN_STATUS.CONNECTED ? 'conn-ok'
+    : status === CONN_STATUS.RECONNECTING ? 'conn-warn'
+    : 'conn-off';
+  dot.title = CONN_LABELS[status] || status;
+}
+
+function initConnectionIndicator() {
+  const brand = document.querySelector('.topbar-left .brand');
+  if (!brand || document.getElementById('connectionDot')) return;
+
+  const dot = document.createElement('span');
+  dot.id = 'connectionDot';
+  dot.className = 'conn-warn'; // empieza como "conectando"
+  dot.title = 'Conectando…';
+  brand.insertAdjacentElement('afterend', dot);
+
+  // Detectar online/offline del navegador
+  window.addEventListener('offline', () => updateConnectionStatus(CONN_STATUS.OFFLINE));
+  window.addEventListener('online', () => {
+    updateConnectionStatus(CONN_STATUS.RECONNECTING);
+    // Reconectar SSE al volver online
+    connectToNotifications();
+  });
+}
+
+// ===================================================================
 // SISTEMA DE NOTIFICACIONES EN TIEMPO REAL
 // ===================================================================
 
@@ -601,15 +635,15 @@ function connectToNotifications() {
 
   notificationEventSource.onopen = () => {
     console.log("Conectado a notificaciones en tiempo real");
+    updateConnectionStatus(CONN_STATUS.CONNECTED);
   };
 
   notificationEventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log("Notificacion recibida:", data);
 
       if (data.type === "connected") {
-        console.log("Conexion SSE establecida");
+        updateConnectionStatus(CONN_STATUS.CONNECTED);
         return;
       }
 
@@ -624,10 +658,10 @@ function connectToNotifications() {
   notificationEventSource.onerror = (error) => {
     console.error("Error en SSE:", error);
     notificationEventSource.close();
+    updateConnectionStatus(CONN_STATUS.RECONNECTING);
 
     // Reconectar después de 5 segundos
     setTimeout(() => {
-      console.log("Reintentando conexion a notificaciones...");
       connectToNotifications();
     }, 5000);
   };
@@ -799,6 +833,9 @@ function getTimeAgo(date) {
 function initCommonUI() {
   // Activar monitor de inactividad
   setupInactivityMonitor();
+
+  // Indicador de conexión en topbar
+  initConnectionIndicator();
 
   // Inicializar toggles de contraseña (usuarios, reset password, etc.)
   initPasswordToggles();
