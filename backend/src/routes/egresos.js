@@ -21,8 +21,7 @@ import {
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
 
-// Soportar múltiples proveedores de almacenamiento
-import { uploadToR2, isR2Configured } from "../config/r2-fetch.js";
+// Almacenamiento de comprobantes
 import { uploadToImgBB, isImgBBConfigured } from "../config/imgbb.js";
 
 // Notificaciones en tiempo real
@@ -304,7 +303,7 @@ function normalizeFecha(fechaStr, { enforceCurrentYear = true, allowFuture = fal
   return { valid: false, fecha: null, error: "Formato de fecha inválido. Usá dd/mm/aaaa" };
 }
 
-// Siempre usar memoryStorage para flexibilidad (R2 o disco)
+// memoryStorage para subir a ImgBB o disco local como fallback
 const storage = multer.memoryStorage();
 
 function fileFilter(req, file, cb) {
@@ -520,18 +519,15 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       }
     }
 
-    // Subir archivo a almacenamiento externo o guardar localmente
-    // Prioridad: ImgBB > R2 > Local
+    // Subir archivo a ImgBB o guardar localmente como fallback
     let comprobanteUrl;
     const safe = file.originalname.replace(/[^\w.\-() ]+/g, "_");
     const fileName = `${Date.now()}_${safe}`;
     const fileNameWithoutExt = fileName.replace(/\.[^.]+$/, ''); // Sin extensión para ImgBB
 
     console.log(`📁 Archivo recibido: ${file.originalname}, Size: ${file.size} bytes, MIME: ${file.mimetype}`);
-    console.log(`🔧 ImgBB configurado: ${isImgBBConfigured()}`);
-    console.log(`🔧 R2 configurado: ${isR2Configured()}`);
 
-    // Prioridad 1: ImgBB (servicio principal)
+    // ImgBB (servicio principal)
     if (isImgBBConfigured()) {
       try {
         console.log(`☁️ Intentando subir a ImgBB: ${fileName}`);
@@ -539,27 +535,11 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
         console.log(`✅ Comprobante subido a ImgBB: ${fileName} -> ${comprobanteUrl}`);
       } catch (error) {
         console.error('❌ Error subiendo a ImgBB:', error);
-        console.error('Error details:', error.message, error.stack);
-        console.warn('⚠️ ImgBB falló, intentando fallback a R2 o almacenamiento local...');
-        // NO hacer return, intentar fallbacks
+        console.warn('⚠️ ImgBB falló, usando almacenamiento local como fallback...');
       }
     }
 
-    // Prioridad 2: Cloudflare R2 (si ImgBB no está configurado o falló)
-    if (!comprobanteUrl && isR2Configured()) {
-      try {
-        console.log(`☁️ Intentando subir a R2: ${fileName}`);
-        comprobanteUrl = await uploadToR2(file.buffer, fileName, file.mimetype);
-        console.log(`✅ Comprobante subido a R2: ${fileName} -> ${comprobanteUrl}`);
-      } catch (error) {
-        console.error('❌ Error subiendo a R2:', error);
-        console.error('Error details:', error.message, error.stack);
-        console.warn('⚠️ R2 falló, usando almacenamiento local como último fallback...');
-        // NO hacer return, usar fallback local
-      }
-    }
-
-    // Fallback final: Guardar en disco local (si todo lo demás falló)
+    // Fallback: Guardar en disco local (si ImgBB falló o no está configurado)
     if (!comprobanteUrl) {
       try {
         console.log(`💾 Guardando localmente en: ${UPLOAD_DIR}/${fileName}`);
@@ -1842,21 +1822,17 @@ router.get("/:id/comprobante", auth, async (req, res) => {
     console.log(`  - UPLOAD_DIR: ${UPLOAD_DIR}`);
     console.log(`  - process.cwd(): ${process.cwd()}`);
 
-    // Si el comprobante está en almacenamiento externo (R2 o ImgBB), redirigir
-    // Verificar que sea URL externa y no URL local de uploads
+    // Si el comprobante está en ImgBB, redirigir
     const isExternalUrl = egreso.comprobante_url &&
                           egreso.comprobante_url.startsWith('http') &&
-                          (egreso.comprobante_url.includes('.r2.dev') ||
-                           egreso.comprobante_url.includes('.r2.cloudflarestorage.com') ||
-                           egreso.comprobante_url.includes('pub-') ||
-                           egreso.comprobante_url.includes('i.ibb.co') ||
+                          (egreso.comprobante_url.includes('i.ibb.co') ||
                            egreso.comprobante_url.includes('ibb.co'));
 
     if (isExternalUrl) {
       // Verificar que la URL externa siga accesible antes de redirigir.
       // Si no está disponible, intentar servir el comprobante localmente como fallback.
       const externalUrl = egreso.comprobante_url;
-      const storageType = egreso.comprobante_url.includes('ibb.co') ? 'ImgBB' : 'R2';
+      const storageType = 'ImgBB';
       let accessible = false;
       try {
         const urlObj = new URL(externalUrl);

@@ -30,11 +30,7 @@ console.log("  - PORT:", process.env.PORT || "not set (will use 4000)");
 console.log("  - BASE_URL:", process.env.BASE_URL || "not set");
 
 // Log de configuración de almacenamiento
-const r2Configured = !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID &&
-                        process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET_NAME);
-console.log("📦 Storage configuration:");
-console.log("  - Mode:", r2Configured ? "☁️  Cloudflare R2 (Cloud)" : "💾 Local Disk");
-console.log("  - Upload directory:", process.env.UPLOAD_DIR || "uploads");
+console.log("📦 Storage: ImgBB (principal) + Local Disk (fallback)");
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
