@@ -1102,11 +1102,6 @@ async function handleEgresoSubmit(e){
     if(payload.etiqueta === "Otro" && !payload.otro_concepto){
       throw new Error("Si elegís 'Otro', completá el detalle.");
     }
-    // Validación de monto mínimo solo para transferencias en ARS (pesos)
-    if(ETIQUETAS_PREMIO_MINIMO.has(payload.etiqueta) && payload.moneda === 'ARS' && montoNum < 3000){
-      throw new Error("Para Premio Pagado en ARS el monto debe ser >= $3000.");
-    }
-
     const hs = normalizeHoraTextOptional(payload.hora_solicitud_cliente);
     if(hs === null) throw new Error("Hora solicitud cliente inválida (HH:MM).");
     payload.hora_solicitud_cliente = hs;

@@ -479,30 +479,10 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       }
     }
 
-    // Evitar doble carga para el mismo slot de cierre
+    // Validar turno para cierre de caja (sin límite de duplicados)
     if (esCierreCaja) {
       if (!TURNOS_CIERRE.includes(turnoNorm)) {
         return res.status(400).json({ message: "Turno inválido para cierre de caja" });
-      }
-
-      const duplicate = await findDuplicateCierreSlot({
-        fecha: fechaNorm,
-        turno: turnoNorm,
-        empresaSalida: empresa_cuenta_salida,
-        cuentaSalida: String(cuenta_salida || "").trim(),
-        moneda: monedaNorm
-      });
-
-      if (duplicate.rowCount > 0) {
-        const existing = duplicate.rows[0];
-        return res.status(409).json({
-          message: "Ya existe un cierre para esa fecha, turno, empresa, titular y moneda. Revisá el modulo Cierres.",
-          duplicate: {
-            id: existing.id,
-            created_at: existing.created_at,
-            monto: Number(existing.monto || 0)
-          }
-        });
       }
     }
 
@@ -510,11 +490,6 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const montoNum = parseMontoARSStrict(raw);
     if (montoNum === null) return res.status(400).json({ message: "Monto inválido" });
     if (montoNum <= 0) return res.status(400).json({ message: "Monto debe ser mayor a 0" });
-
-    // Validación de monto mínimo solo para transferencias en ARS (pesos)
-    if (ETIQUETAS_PREMIO_MINIMO.has(etiqueta) && monedaNorm === 'ARS' && montoNum < 3000) {
-      return res.status(400).json({ message: "Para Premio Pagado en ARS el monto debe ser >= $3000" });
-    }
 
     // Validar horas de premio - OBLIGATORIAS para etiquetas con usuario_casino
     const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
@@ -2277,27 +2252,6 @@ router.put("/:id", auth, async (req, res) => {
       }
       if (!cuentaSalidaFinal) {
         return res.status(400).json({ message: "CUENTA SALIDA es obligatoria para cierre de caja" });
-      }
-
-      const duplicate = await findDuplicateCierreSlot({
-        fecha: fechaFinal,
-        turno: turnoFinal,
-        empresaSalida: empresaSalidaFinal,
-        cuentaSalida: cuentaSalidaFinal,
-        moneda: monedaFinal,
-        excludeId: id
-      });
-
-      if (duplicate.rowCount > 0) {
-        const existing = duplicate.rows[0];
-        return res.status(409).json({
-          message: "Ya existe otro cierre para ese mismo dia, turno, empresa, titular y moneda.",
-          duplicate: {
-            id: existing.id,
-            created_at: existing.created_at,
-            monto: Number(existing.monto || 0)
-          }
-        });
       }
     }
 
