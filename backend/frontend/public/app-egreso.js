@@ -57,20 +57,14 @@ function toggleCamposPremio(){
 
   if(wrapSolicitud && inputSolicitud){
     wrapSolicitud.classList.toggle("hidden", !esPremio);
-    if(esPremio){
-      inputSolicitud.setAttribute("required", "required");
-    } else {
-      inputSolicitud.removeAttribute("required");
+    if(!esPremio){
       inputSolicitud.value = "";
     }
   }
 
   if(wrapQuema && inputQuema){
     wrapQuema.classList.toggle("hidden", !esPremio);
-    if(esPremio){
-      inputQuema.setAttribute("required", "required");
-    } else {
-      inputQuema.removeAttribute("required");
+    if(!esPremio){
       inputQuema.value = "";
     }
   }
@@ -85,7 +79,7 @@ function toggleCamposPremio(){
 
   camposOcultar.forEach(id => {
     const wrap = document.getElementById(id);
-    const input = wrap?.querySelector("input, select, textarea");
+    const input = wrap?.querySelector("input:not([type='checkbox']), select, textarea");
 
     if(wrap){
       wrap.classList.toggle("hidden", esCierreCaja);
