@@ -1,6 +1,7 @@
 import express from "express";
 import { query } from "../config/db.js";
 import { auth, requireAdminOrDireccionOrEncargado } from "../middleware/auth.js";
+import { getHealthSummary } from "../utils/health-monitor.js";
 
 const router = express.Router();
 
@@ -68,6 +69,23 @@ router.get("/", auth, requireAdminOrDireccionOrEncargado, async (req, res) => {
     return res.json({ logs: r.rows, total: Number(total), limit: lim, offset: off });
   } catch {
     return res.status(500).json({ message: "Error listando logs" });
+  }
+});
+
+/**
+ * GET /api/logs/health
+ * Historial de salud del servidor y DB
+ * Query params: hours (default 24), limit (default 200)
+ * Permisos: admin, direccion, encargado
+ */
+router.get("/health", auth, requireAdminOrDireccionOrEncargado, async (req, res) => {
+  try {
+    const hours = Math.min(Number(req.query.hours || 24), 168); // max 7 días
+    const limit = Math.min(Number(req.query.limit || 200), 500);
+    const data = await getHealthSummary(hours, limit);
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ message: "Error obteniendo historial de salud", error: err.message });
   }
 });
 

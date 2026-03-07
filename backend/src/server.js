@@ -16,6 +16,7 @@ import checkMigrationsRoutes from "./routes/check-migrations.js";
 import runMigrationsRoutes from "./routes/run-migrations.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
+import { startHealthMonitor } from "./utils/health-monitor.js";
 
 dotenv.config();
 validateRequiredEnv();
@@ -186,14 +187,16 @@ import { query } from "./config/db.js";
 
 app.get("/health", async (req, res) => {
   try {
-    // Verificar conexión a la base de datos
+    const start = Date.now();
     const dbCheck = await query("SELECT NOW() as time");
+    const responseTimeMs = Date.now() - start;
 
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
       database: 'connected',
+      response_time_ms: responseTimeMs,
       dbTime: dbCheck.rows[0].time,
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -233,6 +236,7 @@ async function start() {
     await runMigrations();
     dbReady = true;
     console.log("✅ Database ready, all systems operational");
+    startHealthMonitor();
   } catch (e) {
     console.error("❌ Migrations failed after retries:", e.message);
     console.error("⚠️  Server running but database unavailable. Requests will fail until DB recovers.");
