@@ -118,7 +118,7 @@ function renderEgresos(egresos, pagination, sumas){
   if(!tbody) return;
 
   if(egresos.length === 0){
-    tbody.innerHTML = `<tr><td colspan="11" class="muted">No se encontraron resultados</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="muted">No se encontraron resultados</td></tr>`;
 
     const info = document.getElementById("resultadosInfo");
     if(info) info.textContent = "0 resultados";
@@ -156,6 +156,7 @@ function renderEgresos(egresos, pagination, sumas){
 
     return `
       <tr>
+        <td style="font-family:monospace;font-size:12px;white-space:nowrap;">${e.codigo_operacion || '-'}</td>
         <td>${e.fecha}</td>
         <td>${e.hora || "-"}</td>
         <td>${e.empresa_salida}</td>

@@ -34,7 +34,7 @@ console.log('API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
-const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Lohas", "Otra (Especificar en notas)"];
+const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Lohas", "Banco Nacion", "Otra (Especificar en notas)"];
 
 const ETIQUETAS = [
   // Unidad M
@@ -91,6 +91,7 @@ const ETIQUETAS = [
   "[Otra] Recepcion Peso Fisico",
   "[Otra] Cambio a Pesos",
   "[Otra] Devolucion de Prestamo",
+  "[Otra] Pago Diseñadora",
   // Especiales
   "Cierre de Caja",
   "Otro"

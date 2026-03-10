@@ -607,6 +607,10 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
 
     const egresoId = insert.rows[0].id;
 
+    // Generar código de operación único visible (ej: MNY-000001)
+    const codigoOperacion = 'MNY-' + String(egresoId).padStart(6, '0');
+    await query('UPDATE egresos SET codigo_operacion = $1 WHERE id = $2', [codigoOperacion, egresoId]);
+
     await auditLog(req, {
       action: "EGRESO_CREATE",
       entity: "egresos",
@@ -658,7 +662,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     }
 
     clearSaldosCache();
-    return res.status(201).json({ id: egresoId, message: "ok" });
+    return res.status(201).json({ id: egresoId, codigo_operacion: codigoOperacion, message: "ok" });
   } catch (e) {
     console.error("🔥 POST /api/egresos ERROR:", e);
 

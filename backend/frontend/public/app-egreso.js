@@ -1376,7 +1376,7 @@ async function confirmarYEnviarEgreso(){
     }));
     fd.append("comprobante", file);
 
-    await api("/api/egresos", { method:"POST", body: fd, auth:true });
+    const resultado = await api("/api/egresos", { method:"POST", body: fd, auth:true });
 
     // Guardar en historial de autocompletado antes de limpiar
     guardarEnHistorial(HISTORY_KEYS.CUENTAS, payload.cuenta_receptora);
@@ -1389,8 +1389,9 @@ async function confirmarYEnviarEgreso(){
     limpiarFormularioConRecordar();
     datosEgresoValidados = null;
 
-    // Mostrar toast de éxito
-    toast("Guardado", "Egreso registrado correctamente.", "success", 8000);
+    // Mostrar toast de éxito con código de operación
+    const codigo = resultado?.codigo_operacion || '';
+    toast("Guardado", `Egreso registrado correctamente.${codigo ? ` Codigo: ${codigo}` : ''}`, "success", 8000);
 
   }catch(err){
     toast("Error", err.message, "error", 10000);
