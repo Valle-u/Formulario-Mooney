@@ -1712,6 +1712,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
     );
 
     const columns = [
+      "codigo_operacion",
       "fecha","hora","turno",
       "hora_solicitud_cliente","hora_quema_fichas",
       "empresa_salida","cuenta_salida","id_transferencia",
@@ -1725,6 +1726,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
     ];
 
     const rows = r.rows.map(x => ([
+      x.codigo_operacion || "",
       formatFechaDDMMAAAA(x.fecha) || x.fecha,
       x.hora || "",
       x.turno || "",
