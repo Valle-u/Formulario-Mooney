@@ -8,16 +8,17 @@ import { query } from "../config/db.js";
 import { auth, requireAdminOrDireccion, requireAdmin } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
 import {
-  EMPRESAS_SALIDA,
-  ETIQUETAS_CON_USUARIO_CASINO,
-  ETIQUETAS_PREMIO_MINIMO,
-  ETIQUETAS_CIERRE_CAJA,
   isFutureDateISO,
   parseMontoARSStrict,
   montoToCommaString,
-  requireNonEmpty,
-  getEtiquetasEquivalentes
+  requireNonEmpty
 } from "../utils/validators.js";
+import {
+  isValidEmpresa,
+  getActiveEmpresas,
+  getEtiquetaFlags,
+  getLegacyEquivalentes
+} from "../utils/optionsCache.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
 
@@ -333,9 +334,10 @@ router.get("/check-id-transferencia", auth, async (req, res) => {
     }
 
     // Validar empresa
-    if (!EMPRESAS_SALIDA.includes(empresa_salida)) {
+    if (!(await isValidEmpresa(empresa_salida))) {
+      const empresas = await getActiveEmpresas();
       return res.status(400).json({
-        message: `Empresa inválida. Debe ser una de: ${EMPRESAS_SALIDA.join(", ")}`
+        message: `Empresa inválida. Debe ser una de: ${empresas.join(", ")}`
       });
     }
 
@@ -424,7 +426,8 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     if (errEtiqueta) return res.status(400).json({ message: errEtiqueta });
 
     // Detectar si es cierre de caja
-    const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
+    const etiquetaFlagsCreate = await getEtiquetaFlags(etiqueta);
+    const esCierreCaja = etiquetaFlagsCreate.flag_cierre_caja;
 
     // Validar turno (ahora siempre obligatorio)
     const turnoNorm = normalizeTurnoLabel(String(turno || "").trim());
@@ -436,7 +439,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
       return res.status(400).json({ message: "Si etiqueta es 'Otro', otro_concepto es obligatorio" });
     }
 
-    if (ETIQUETAS_CON_USUARIO_CASINO.has(etiqueta) && !String(usuario_casino || "").trim()) {
+    if (etiquetaFlagsCreate.flag_usuario_casino && !String(usuario_casino || "").trim()) {
       return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
     }
 
@@ -457,7 +460,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     if (requireNonEmpty(cuenta_salida, "cuenta_salida")) return res.status(400).json({ message: "cuenta_salida es obligatoria" });
 
     if (requireNonEmpty(empresa_cuenta_salida, "empresa_cuenta_salida")) return res.status(400).json({ message: "empresa_cuenta_salida es obligatoria" });
-    if (!EMPRESAS_SALIDA.includes(empresa_cuenta_salida)) return res.status(400).json({ message: "empresa_salida inválida" });
+    if (!(await isValidEmpresa(empresa_cuenta_salida))) return res.status(400).json({ message: "empresa_salida inválida" });
 
     // Validar moneda primero (antes de validar monto mínimo)
     const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
@@ -494,7 +497,7 @@ router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async
     const hsNorm = normalizeHoraOptional(hora_solicitud_cliente);
     const hqNorm = normalizeHoraOptional(hora_quema_fichas);
 
-    if (ETIQUETAS_CON_USUARIO_CASINO.has(etiqueta)) {
+    if (etiquetaFlagsCreate.flag_usuario_casino) {
       // Para premios, ambas horas son OBLIGATORIAS
       if (!String(hora_solicitud_cliente || "").trim()) {
         return res.status(400).json({ message: "Hora solicitud cliente es obligatoria para este concepto" });
@@ -1102,7 +1105,7 @@ router.get("/cierres/kpi", auth, async (req, res) => {
     const empresaSalida = String(req.query.empresa_salida || "").trim();
     const moneda = String(req.query.moneda || "").trim().toUpperCase();
 
-    if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
+    if (empresaSalida && !(await isValidEmpresa(empresaSalida))) {
       return res.status(400).json({ message: "empresa_salida inválida" });
     }
     if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
@@ -1246,7 +1249,7 @@ router.get("/cierres/csv", auth, async (req, res) => {
     const moneda = String(req.query.moneda || "").trim().toUpperCase();
     const turno = req.query.turno ? normalizeTurnoLabel(String(req.query.turno || "").trim()) : "";
 
-    if (empresaSalida && !EMPRESAS_SALIDA.includes(empresaSalida)) {
+    if (empresaSalida && !(await isValidEmpresa(empresaSalida))) {
       return res.status(400).json({ message: "empresa_salida inválida" });
     }
     if (moneda && !["ARS", "USD", "USDT"].includes(moneda)) {
@@ -1409,7 +1412,7 @@ router.get("/", auth, async (req, res) => {
 
     if (etiqueta) {
       // Buscar etiqueta y sus equivalentes legacy/nuevos
-      const etiquetasEquivalentes = getEtiquetasEquivalentes(etiqueta);
+      const etiquetasEquivalentes = await getLegacyEquivalentes(etiqueta);
       if (etiquetasEquivalentes.length === 1) {
         params.push(etiqueta);
         where.push(`e.etiqueta = $${params.length}`);
@@ -1635,7 +1638,7 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
 
     if (etiqueta) {
       // Buscar etiqueta y sus equivalentes legacy/nuevos
-      const etiquetasEquivalentes = getEtiquetasEquivalentes(etiqueta);
+      const etiquetasEquivalentes = await getLegacyEquivalentes(etiqueta);
       if (etiquetasEquivalentes.length === 1) {
         params.push(etiqueta);
         where.push(`e.etiqueta = $${params.length}`);
@@ -1966,7 +1969,8 @@ router.put("/:id", auth, async (req, res) => {
     const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
 
     // Si es Cierre de Caja, solo Admin/Dirección pueden cambiar la moneda
-    const esCierreCajaOld = ETIQUETAS_CIERRE_CAJA.has(oldEgreso.etiqueta);
+    const oldFlags = await getEtiquetaFlags(oldEgreso.etiqueta);
+    const esCierreCajaOld = oldFlags.flag_cierre_caja;
     const nuevaMoneda = req.body?.moneda ? String(req.body.moneda).toUpperCase() : null;
     if (esCierreCajaOld && nuevaMoneda && nuevaMoneda !== oldEgreso.moneda && !isAdminOrDireccion) {
       return res.status(403).json({ message: "Solo Admin/Dirección pueden cambiar la moneda de un Cierre de Caja" });
@@ -2032,8 +2036,9 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(400).json({ message: "Etiqueta inválida" });
     }
 
-    const esCierreCajaFinal = ETIQUETAS_CIERRE_CAJA.has(etiquetaFinal);
-    const esPremioFinal = ETIQUETAS_CON_USUARIO_CASINO.has(etiquetaFinal);
+    const editFlags = await getEtiquetaFlags(etiquetaFinal);
+    const esCierreCajaFinal = editFlags.flag_cierre_caja;
+    const esPremioFinal = editFlags.flag_usuario_casino;
 
     const monedaNorm = normText(moneda)
       ? String(moneda).trim().toUpperCase().replace(/\s*\(.+\)$/, "")
@@ -2212,7 +2217,7 @@ router.put("/:id", auth, async (req, res) => {
       if (!empresaSalidaNorm) {
         return res.status(400).json({ message: "EMPRESA SALIDA es obligatoria" });
       }
-      if (!EMPRESAS_SALIDA.includes(empresaSalidaNorm)) {
+      if (!(await isValidEmpresa(empresaSalidaNorm))) {
         return res.status(400).json({ message: "empresa_salida inválida" });
       }
     }

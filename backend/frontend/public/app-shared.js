@@ -108,6 +108,53 @@ const ETIQUETAS_CIERRE_CAJA = new Set([
 const ETIQUETAS_PREMIO_MINIMO = new Set(["[Unidad M] Premio Pagado"]);
 
 /* =========================
+   OPCIONES DINÁMICAS (desde DB)
+   ========================= */
+let _optionsLoaded = false;
+let _empresasCache = [];
+let _etiquetasCache = [];
+let _etiquetaFlagsCache = {};
+
+async function loadSelectOptions() {
+  if (_optionsLoaded) return;
+  try {
+    const [empRes, etqRes] = await Promise.all([
+      api("/api/options?type=empresa"),
+      api("/api/options?type=etiqueta")
+    ]);
+    _empresasCache = empRes.options.map(o => o.value);
+    _etiquetasCache = etqRes.options.map(o => o.value);
+    _etiquetaFlagsCache = {};
+    etqRes.options.forEach(o => {
+      _etiquetaFlagsCache[o.value] = {
+        usuario_casino: o.flag_usuario_casino,
+        premio_minimo: o.flag_premio_minimo,
+        cierre_caja: o.flag_cierre_caja
+      };
+    });
+    _optionsLoaded = true;
+  } catch (err) {
+    console.warn("Error cargando opciones dinámicas, usando fallback hardcodeado:", err.message);
+    _empresasCache = [...EMPRESAS_SALIDA];
+    _etiquetasCache = [...ETIQUETAS];
+    _etiquetaFlagsCache = {};
+    ETIQUETAS.forEach(e => {
+      _etiquetaFlagsCache[e] = {
+        usuario_casino: ETIQUETAS_CON_USUARIO_CASINO.has(e),
+        premio_minimo: ETIQUETAS_PREMIO_MINIMO.has(e),
+        cierre_caja: ETIQUETAS_CIERRE_CAJA.has(e)
+      };
+    });
+    _optionsLoaded = true;
+  }
+}
+
+function getEmpresas() { return _empresasCache.length ? _empresasCache : EMPRESAS_SALIDA; }
+function getEtiquetas_dynamic() { return _etiquetasCache.length ? _etiquetasCache : ETIQUETAS; }
+function getEtiquetaFlags(value) { return _etiquetaFlagsCache[value] || { usuario_casino: false, premio_minimo: false, cierre_caja: false }; }
+function reloadSelectOptions() { _optionsLoaded = false; return loadSelectOptions(); }
+
+/* =========================
    DETECCIÓN DE PÁGINA USD
    ========================= */
 // Detectar página actual para determinar moneda y tipo
@@ -831,7 +878,10 @@ function getTimeAgo(date) {
    INIT COMMON UI
    (setup común de todas las páginas autenticadas)
    ========================= */
-function initCommonUI() {
+async function initCommonUI() {
+  // Cargar opciones dinámicas de la DB
+  await loadSelectOptions();
+
   // Activar monitor de inactividad
   setupInactivityMonitor();
 

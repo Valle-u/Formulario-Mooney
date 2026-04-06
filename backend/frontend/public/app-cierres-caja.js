@@ -64,13 +64,13 @@ function populateEmpresas() {
   if (empresaForm) {
     empresaForm.innerHTML =
       `<option value="">Seleccionar...</option>` +
-      EMPRESAS_SALIDA.map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
+      getEmpresas().map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 
   if (empresaKpi) {
     empresaKpi.innerHTML =
       `<option value="">Todas</option>` +
-      EMPRESAS_SALIDA.map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
+      getEmpresas().map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 }
 

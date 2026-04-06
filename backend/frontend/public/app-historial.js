@@ -28,12 +28,12 @@ async function populateFiltrosSelects(){
 
   if(selEmpresa){
     selEmpresa.innerHTML = `<option value="">Todas</option>` +
-      EMPRESAS_SALIDA.map(e => `<option value="${e}">${e}</option>`).join("");
+      getEmpresas().map(e => `<option value="${e}">${e}</option>`).join("");
   }
 
   if(selEtiqueta){
     selEtiqueta.innerHTML = `<option value="">Todas</option>` +
-      ETIQUETAS.map(e => `<option value="${e}">${e}</option>`).join("");
+      getEtiquetas_dynamic().map(e => `<option value="${e}">${e}</option>`).join("");
   }
 
   // Cargar lista de usuarios para el filtro "Creado por" según jerarquía
@@ -549,8 +549,9 @@ function editarEgresoModal(){
   if(!modal || !body) return;
 
   // Determinar si es un premio o cierre de caja (para campos condicionales)
-  const esPremio = ETIQUETAS_CON_USUARIO_CASINO.has(egreso.etiqueta);
-  const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(egreso.etiqueta);
+  const _flags = getEtiquetaFlags(egreso.etiqueta);
+  const esPremio = _flags.usuario_casino;
+  const esCierreCaja = _flags.cierre_caja;
 
   // Formulario de edición con TODOS los campos
   body.innerHTML = `
@@ -584,7 +585,8 @@ function editarEgresoModal(){
       <div class="field span6">
         <label>CONCEPTO/ETIQUETA *</label>
         <select id="edit_etiqueta" required>
-          ${ETIQUETAS.map(et => `<option value="${et}" ${egreso.etiqueta === et ? 'selected' : ''}>${et}</option>`).join('')}
+          ${getEtiquetas_dynamic().map(et => `<option value="${et}" ${egreso.etiqueta === et ? 'selected' : ''}>${et}</option>`).join('')}
+          ${!getEtiquetas_dynamic().includes(egreso.etiqueta) ? `<option value="${escapeHtml(egreso.etiqueta)}" selected>${escapeHtml(egreso.etiqueta)} (Inactiva)</option>` : ''}
         </select>
       </div>
 
@@ -635,7 +637,8 @@ function editarEgresoModal(){
       <div class="field span6">
         <label>EMPRESA SALIDA *</label>
         <select id="edit_empresa_salida" required>
-          ${EMPRESAS_SALIDA.map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
+          ${getEmpresas().map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
+          ${!getEmpresas().includes(egreso.empresa_salida) ? `<option value="${escapeHtml(egreso.empresa_salida)}" selected>${escapeHtml(egreso.empresa_salida)} (Inactiva)</option>` : ''}
         </select>
       </div>
 
@@ -695,7 +698,7 @@ function editarEgresoModal(){
       }
 
       // Mostrar/ocultar campos de premios
-      const esPremioNuevo = ETIQUETAS_CON_USUARIO_CASINO.has(etiquetaValue);
+      const esPremioNuevo = getEtiquetaFlags(etiquetaValue).usuario_casino;
       if(wrapUsuario) wrapUsuario.classList.toggle('hidden', !esPremioNuevo);
       if(wrapHoraSolicitud) wrapHoraSolicitud.classList.toggle('hidden', !esPremioNuevo);
       if(wrapHoraQuema) wrapHoraQuema.classList.toggle('hidden', !esPremioNuevo);
@@ -710,7 +713,7 @@ function editarEgresoModal(){
       if(inputHoraQuema) inputHoraQuema.required = esPremioNuevo;
 
       // Mostrar/ocultar campos para Cierre de Caja
-      const esCierreCajaNuevo = ETIQUETAS_CIERRE_CAJA.has(etiquetaValue);
+      const esCierreCajaNuevo = getEtiquetaFlags(etiquetaValue).cierre_caja;
       const wrapIdTransferencia = document.getElementById('edit_wrap_id_transferencia');
       const wrapCuentaReceptora = document.getElementById('edit_wrap_cuenta_receptora');
       const inputIdTransferencia = document.getElementById('edit_id_transferencia');
@@ -806,7 +809,7 @@ function editarEgresoModal(){
       }
 
       const etiquetaEdit = document.getElementById('edit_etiqueta').value;
-      const esCierreCajaEdit = ETIQUETAS_CIERRE_CAJA.has(etiquetaEdit);
+      const esCierreCajaEdit = getEtiquetaFlags(etiquetaEdit).cierre_caja;
       const monedaRaw = document.getElementById('edit_moneda').value;
       const monedaEdit = ['ARS', 'USD', 'USDT'].includes(monedaRaw) ? monedaRaw : 'ARS';
       const sinIdEdit = document.getElementById('edit_sin_id_transferencia')?.checked ?? false;

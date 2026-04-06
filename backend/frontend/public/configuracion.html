@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Configuración</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css?v=AUTO"/>
+</head>
+
+<body>
+  <div class="app-nosidebar">
+
+    <!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-left">
+      <span class="brand">MooneyMaker</span>
+    </div>
+
+    <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="topbar-center nav-desktop">
+      <a href="egreso.html" class="nav-item">Retiros</a>
+      <a href="consulta-egresos.html" class="nav-item">Historial</a>
+      <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="nav-item">Cierres</a>
+      <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
+      <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+      <a href="configuracion.html" class="nav-item active" data-admin-strict="1">Config</a>
+    </nav>
+
+    <div class="topbar-right nav-desktop">
+      <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+      <span id="whoami" class="user-badge">—</span>
+      <button id="logoutBtn" class="btn-logout">Salir</button>
+    </div>
+  </div>
+
+  <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+    <div class="mobile-drawer-head">
+      <span class="brand">MooneyMaker</span>
+      <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
+    </div>
+    <nav class="mobile-nav">
+      <a href="egreso.html" class="mobile-item">Retiros</a>
+      <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+      <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+      <a href="cierres-caja.html" class="mobile-item">Cierres</a>
+      <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
+      <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+      <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+      <a href="configuracion.html" class="mobile-item active" data-admin-strict="1">Config</a>
+    </nav>
+    <div class="mobile-actions">
+      <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+      <div id="whoamiMobile" class="user-badge">—</div>
+      <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+    </div>
+  </div>
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+</header>
+
+<div id="toastContainer" class="toast-container"></div>
+
+    <main class="content-wrap">
+      <div class="page">
+
+        <!-- Tabs -->
+        <div class="config-tabs">
+          <button class="config-tab active" data-tab="empresas">Empresas de Salida</button>
+          <button class="config-tab" data-tab="etiquetas">Etiquetas / Conceptos</button>
+        </div>
+
+        <!-- ===== EMPRESAS ===== -->
+        <section class="card config-panel" id="panel-empresas">
+          <div class="card-header">
+            Empresas de Salida
+            <button class="btn btn-primary btn-small" id="btnAddEmpresa">+ Agregar</button>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="table" id="tableEmpresas">
+                <thead>
+                  <tr>
+                    <th style="width:40px">#</th>
+                    <th>Nombre</th>
+                    <th style="width:80px">Activa</th>
+                    <th style="width:160px">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyEmpresas"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== ETIQUETAS ===== -->
+        <section class="card config-panel" id="panel-etiquetas" style="display:none">
+          <div class="card-header">
+            Etiquetas / Conceptos
+            <button class="btn btn-primary btn-small" id="btnAddEtiqueta">+ Agregar</button>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="table" id="tableEtiquetas">
+                <thead>
+                  <tr>
+                    <th style="width:40px">#</th>
+                    <th>Categoría</th>
+                    <th>Nombre</th>
+                    <th style="width:70px" title="Muestra campo usuario casino">Casino</th>
+                    <th style="width:70px" title="Muestra campo premio mínimo">Premio</th>
+                    <th style="width:70px" title="Es cierre de caja">Cierre</th>
+                    <th style="width:80px">Activa</th>
+                    <th style="width:160px">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyEtiquetas"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Modal agregar/editar -->
+  <div id="optionModal" class="modal-backdrop" style="display:none">
+    <div class="modal-content" style="max-width:500px;width:90%">
+      <div class="modal-header">
+        <h3 id="optionModalTitle">Agregar opción</h3>
+        <button class="btn-close" id="optionModalClose">X</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal_option_id"/>
+        <input type="hidden" id="modal_option_type"/>
+
+        <div class="field" style="margin-bottom:12px">
+          <label>NOMBRE / VALOR *</label>
+          <input id="modal_value" placeholder="Ej: Mercado Pago"/>
+        </div>
+
+        <div id="modal_category_wrap" class="field" style="margin-bottom:12px;display:none">
+          <label>CATEGORÍA</label>
+          <div style="display:flex;gap:8px">
+            <select id="modal_category_select" style="flex:1">
+              <option value="">Sin categoría</option>
+            </select>
+            <input id="modal_category_new" placeholder="Nueva categoría..." style="flex:1"/>
+          </div>
+        </div>
+
+        <div id="modal_flags_wrap" style="display:none;margin-bottom:12px">
+          <label style="margin-bottom:8px;display:block">FLAGS</label>
+          <label class="config-check"><input type="checkbox" id="modal_flag_casino"/> Muestra campo usuario casino</label>
+          <label class="config-check"><input type="checkbox" id="modal_flag_premio"/> Muestra campo premio mínimo</label>
+          <label class="config-check"><input type="checkbox" id="modal_flag_cierre"/> Es cierre de caja</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="optionModalCancel">Cancelar</button>
+        <button class="btn btn-primary" id="optionModalSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app-shared.js?v=AUTO"></script>
+  <script src="app-configuracion.js?v=AUTO"></script>
+</body>
+</html>

@@ -2570,3 +2570,143 @@ body {
     border-color: #111111;
   }
 }
+
+/* =========================
+   CONFIGURACIÓN PAGE
+   ========================= */
+.config-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.config-tab {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: var(--card);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+
+.config-tab.active {
+  background: var(--blue);
+  color: #fff;
+}
+
+.config-tab:hover:not(.active) {
+  background: var(--card2);
+  color: var(--text);
+}
+
+.config-panel .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.config-order {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.btn-order {
+  background: none;
+  border: 1px solid rgba(255,255,255,.15);
+  color: var(--muted);
+  border-radius: 4px;
+  width: 24px;
+  height: 20px;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+  padding: 0;
+}
+
+.btn-order:hover:not(:disabled) {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.btn-order:disabled {
+  opacity: .25;
+  cursor: not-allowed;
+}
+
+.row-inactive {
+  opacity: .45;
+}
+
+.config-flag {
+  text-align: center;
+  color: var(--blue);
+  font-weight: 700;
+}
+
+/* Toggle switch */
+.config-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+
+.config-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.config-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.12);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.config-toggle-slider::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+}
+
+.config-toggle input:checked + .config-toggle-slider {
+  background: var(--blue);
+}
+
+.config-toggle input:checked + .config-toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* Checkbox labels en modal */
+.config-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.config-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--blue);
+}

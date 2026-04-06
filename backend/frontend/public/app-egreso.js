@@ -6,7 +6,7 @@ function populateEtiquetas(){
   if(!sel) return;
 
   // Cierre de Caja se gestiona en el modulo dedicado cierres-caja.html
-  const etiquetasFormulario = ETIQUETAS.filter(e => e !== "Cierre de Caja");
+  const etiquetasFormulario = getEtiquetas_dynamic().filter(e => !getEtiquetaFlags(e).cierre_caja);
 
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
     etiquetasFormulario.map(e => `<option value="${e}">${e}</option>`).join("");
@@ -16,7 +16,7 @@ function populateEmpresasSalida(){
   const sel = document.getElementById("empresa_salida");
   if(!sel) return;
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    EMPRESAS_SALIDA.map(x => `<option value="${x}">${x}</option>`).join("");
+    getEmpresas().map(x => `<option value="${x}">${x}</option>`).join("");
 }
 
 function toggleCasinoUserField(){
@@ -25,7 +25,7 @@ function toggleCasinoUserField(){
   const input = document.getElementById("usuario_casino");
   if(!wrap || !input) return;
 
-  const show = ETIQUETAS_CON_USUARIO_CASINO.has(etiqueta);
+  const show = getEtiquetaFlags(etiqueta).usuario_casino;
   wrap.classList.toggle("hidden", !show);
   if(!show) input.value = "";
 }
@@ -46,8 +46,9 @@ function toggleCamposPremio(){
   const etiqueta = document.getElementById("etiqueta")?.value || "";
 
   // Detectar tipo de etiqueta
-  const esPremio = ETIQUETAS_CON_USUARIO_CASINO.has(etiqueta);
-  const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(etiqueta);
+  const flags = getEtiquetaFlags(etiqueta);
+  const esPremio = flags.usuario_casino;
+  const esCierreCaja = flags.cierre_caja;
 
   // Campos de premios
   const wrapSolicitud = document.getElementById("wrap_hora_solicitud");
@@ -237,7 +238,7 @@ function wireSinIdTransferencia(){
       // Restaurar required solo si no es ENTRADA ni Cierre de Caja
       const etiqueta = document.getElementById("etiqueta")?.value || "";
       const tipo = document.getElementById("tipo_transaccion")?.value || "";
-      if(!ETIQUETAS_CIERRE_CAJA.has(etiqueta) && tipo !== "ENTRADA"){
+      if(!getEtiquetaFlags(etiqueta).cierre_caja && tipo !== "ENTRADA"){
         input.setAttribute("required", "required");
       }
     }
@@ -1001,7 +1002,7 @@ async function handleEgresoSubmit(e){
 
     // Determine if cierre de caja
     const etiquetaActual = document.getElementById("etiqueta").value;
-    const esCierreCajaActual = ETIQUETAS_CIERRE_CAJA.has(etiquetaActual);
+    const esCierreCajaActual = getEtiquetaFlags(etiquetaActual).cierre_caja;
     // Hora: si cierre de caja, usar hora actual
     let horaValue = document.getElementById("hora")?.value || "";
     if (esCierreCajaActual) {
@@ -1050,7 +1051,7 @@ async function handleEgresoSubmit(e){
     }
 
     // Detectar si es cierre de caja
-    const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(payload.etiqueta);
+    const esCierreCaja = getEtiquetaFlags(payload.etiqueta).cierre_caja;
 
     // Validaciones básicas
     if(!payload.fecha) throw new Error("Completá FECHA.");
@@ -1090,7 +1091,7 @@ async function handleEgresoSubmit(e){
     if(!payload.empresa_cuenta_salida) throw new Error("Seleccioná EMPRESA DE SALIDA.");
     if(!payload.etiqueta) throw new Error("Seleccioná ETIQUETA.");
 
-    if(ETIQUETAS_CON_USUARIO_CASINO.has(payload.etiqueta) && !payload.usuario_casino){
+    if(getEtiquetaFlags(payload.etiqueta).usuario_casino && !payload.usuario_casino){
       throw new Error("Para ese concepto, completá USUARIO DEL CASINO.");
     }
     if(payload.etiqueta === "Otro" && !payload.otro_concepto){
@@ -1146,7 +1147,7 @@ function mostrarModalConfirmacion(payload, montoNum, file){
   const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
   // Detectar si es cierre de caja
-  const esCierreCaja = ETIQUETAS_CIERRE_CAJA.has(payload.etiqueta);
+  const esCierreCaja = getEtiquetaFlags(payload.etiqueta).cierre_caja;
 
   body.innerHTML = `
     <p style="margin-bottom:16px; color:var(--muted);">
