@@ -566,7 +566,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!location.pathname.includes("cierres-caja.html")) return;
   if (!requireAuth()) return;
 
-  initCommonUI();
+  await initCommonUI();
 
   populateEmpresas();
   setDefaultRange();

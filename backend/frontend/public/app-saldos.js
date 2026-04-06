@@ -788,10 +788,10 @@ function cerrarModalSaldos() {
 /* =========================
    DOMCONTENTLOADED - Saldos page
    ========================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if(!location.pathname.includes("saldos.html")) return;
   if(!requireAuth()) return;
-  initCommonUI();
+  await initCommonUI();
   initSaldosPage();
   const cuentaSel = document.getElementById('filtro_cuenta');
   if(cuentaSel) cuentaSel.addEventListener('change', () => {

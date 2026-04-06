@@ -198,10 +198,10 @@ function setupPasswordMatchValidation(){
 /* =========================
    DOMCONTENTLOADED - Usuarios page
    ========================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("usersTable")) return;
   if(!requireAuth()) return;
-  initCommonUI();
+  await initCommonUI();
   setupPasswordMatchValidation();
   document.getElementById("btnCreateUser")?.addEventListener("click", createUser);
   document.getElementById("btnReloadUsers")?.addEventListener("click", loadUsers);

@@ -88,10 +88,10 @@ function clearLogsFilters(){
 /* =========================
    DOMCONTENTLOADED - Logs page
    ========================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("logsTable")) return;
   if(!requireAuth()) return;
-  initCommonUI();
+  await initCommonUI();
   document.getElementById("btnLoadLogs")?.addEventListener("click", () => { logsOffset = 0; loadLogs(); });
   document.getElementById("btnClearLogsFilters")?.addEventListener("click", clearLogsFilters);
   document.getElementById("btnPrevLogs")?.addEventListener("click", logsPrev);

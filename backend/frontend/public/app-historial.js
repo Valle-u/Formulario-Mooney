@@ -988,10 +988,10 @@ function mostrarHistorialModal(egresoId, changes){
 /* =========================
    DOMCONTENTLOADED - Historial page
    ========================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("egresosTable")) return;
   if(!requireAuth()) return;
-  initCommonUI();
+  await initCommonUI();
 
   populateFiltrosSelects();
 

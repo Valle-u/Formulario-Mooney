@@ -1405,10 +1405,10 @@ async function confirmarYEnviarEgreso(){
 /* =========================
    DOMCONTENTLOADED - Egreso page
    ========================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("egresoForm")) return;
   if(!requireAuth()) return;
-  initCommonUI();
+  await initCommonUI();
 
   populateEtiquetas();
   populateEmpresasSalida();
