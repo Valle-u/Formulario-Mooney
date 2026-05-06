@@ -865,9 +865,9 @@ function conectarValidacionTiempoReal(){
 
 /**
  * Calcula el turno según la hora del comprobante
- * - Turno noche: 00:00 - 07:59 (12am a 8am)
- * - Turno mañana: 08:00 - 15:59 (8am a 4pm)
- * - Turno tarde: 16:00 - 23:59 (4pm a 12am)
+ * - Turno mañana: 06:00 - 13:59 (6am a 2pm)
+ * - Turno tarde: 14:00 - 21:59 (2pm a 10pm)
+ * - Turno noche: 22:00 - 05:59 (10pm a 6am, cruza medianoche)
  */
 function calcularTurnoSegunHora(horaStr) {
   if (!horaStr) return null;
@@ -877,12 +877,12 @@ function calcularTurnoSegunHora(horaStr) {
 
   const hora = parseInt(match[1], 10);
 
-  if (hora >= 0 && hora < 8) {
-    return "Turno noche";
-  } else if (hora >= 8 && hora < 16) {
+  if (hora >= 6 && hora < 14) {
     return "Turno mañana";
-  } else if (hora >= 16 && hora < 24) {
+  } else if (hora >= 14 && hora < 22) {
     return "Turno tarde";
+  } else if ((hora >= 22 && hora < 24) || (hora >= 0 && hora < 6)) {
+    return "Turno noche";
   }
 
   return null;

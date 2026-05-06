@@ -77,11 +77,18 @@ function populateEmpresas() {
 function recomendarFechaSegunTurno(turno) {
   const now = new Date();
   const suggested = new Date(now.getTime());
+  const h = now.getHours();
   let detail = "Fecha sugerida por horario actual.";
 
-  if (turno === "Turno tarde" && now.getHours() < 8) {
+  // Turnos: mañana 06-14, tarde 14-22, noche 22-06 (cruza medianoche)
+  if (turno === "Turno tarde" && h < 6) {
+    // Cerrando turno tarde pasada la medianoche → fue ayer
     suggested.setDate(suggested.getDate() - 1);
-    detail = "Turno tarde en madrugada: se sugiere AYER para evitar cargar el cierre en el dia incorrecto.";
+    detail = "Turno tarde cerrado pasada la medianoche: se sugiere AYER.";
+  } else if (turno === "Turno noche" && h >= 6 && h < 22) {
+    // Turno noche arranca a las 22:00. Si cierra entre 06:00 y 21:59, el turno empezó ayer.
+    suggested.setDate(suggested.getDate() - 1);
+    detail = "Turno noche empezo ayer: se sugiere fecha de AYER.";
   }
 
   return {
