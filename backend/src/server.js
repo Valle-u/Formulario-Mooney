@@ -13,8 +13,11 @@ import logsRoutes from "./routes/logs.js";
 import initRoutes from "./routes/init.js";
 import notificationsRoutes from "./routes/notifications.js";
 import optionsRoutes from "./routes/options.js";
+import apiKeysRoutes from "./routes/apiKeys.js";
+import exportRoutes from "./routes/export.js";
 import checkMigrationsRoutes from "./routes/check-migrations.js";
 import runMigrationsRoutes from "./routes/run-migrations.js";
+import { exportLimiter } from "./middleware/rateLimiter.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
@@ -88,13 +91,13 @@ const corsOptions =
         origin: true,
         credentials: false,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
       }
     : {
         origin: CORS_ORIGIN.split(",").map(o => o.trim()),
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
       };
 
 app.use(cors(corsOptions));
@@ -180,6 +183,8 @@ app.use("/api/egresos", egresosRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationsRoutes); // Notificaciones en tiempo real (SSE)
 app.use("/api/options", optionsRoutes); // Opciones dinámicas de selects
+app.use("/api/api-keys", apiKeysRoutes); // Gestión de API keys (admin)
+app.use("/api/export", exportLimiter, exportRoutes); // Export para apps externas via API key
 app.use("/api", initRoutes); // Endpoint temporal para inicializar admin
 app.use("/api", checkMigrationsRoutes); // Endpoint temporal para verificar migraciones
 app.use("/api", runMigrationsRoutes); // Endpoint temporal para ejecutar migraciones
