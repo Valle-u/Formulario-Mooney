@@ -6,6 +6,7 @@ let currentTab = "empresas";
 let empresasList = [];
 let etiquetasList = [];
 let categoriesList = [];
+let apiKeysList = [];
 
 // ===== INIT =====
 document.addEventListener("DOMContentLoaded", async () => {
@@ -22,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initCommonUI();
   initTabs();
   initModal();
+  initApiKeyUi();
   await loadEmpresas();
   await loadCategories();
 });
@@ -36,9 +38,13 @@ function initTabs() {
 
       document.getElementById("panel-empresas").style.display = currentTab === "empresas" ? "" : "none";
       document.getElementById("panel-etiquetas").style.display = currentTab === "etiquetas" ? "" : "none";
+      document.getElementById("panel-apikeys").style.display = currentTab === "apikeys" ? "" : "none";
 
       if (currentTab === "etiquetas" && etiquetasList.length === 0) {
         loadEtiquetas();
+      }
+      if (currentTab === "apikeys") {
+        loadApiKeys();
       }
     });
   });
@@ -285,6 +291,158 @@ async function saveOption() {
     closeModal();
     if (type === "empresa") await loadEmpresas(); else { await loadEtiquetas(); await loadCategories(); }
     reloadSelectOptions();
+  } catch (err) {
+    toast("Error", err.message, "error");
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+async function loadApiKeys() {
+  try {
+    const { api_keys } = await api("/api/api-keys");
+    apiKeysList = api_keys || [];
+    renderApiKeys();
+  } catch (err) {
+    toast("Error", err.message, "error");
+  }
+}
+
+function renderApiKeys() {
+  const tbody = document.getElementById("tbodyApiKeys");
+  if (!tbody) return;
+
+  if (!apiKeysList.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="note">Todavía no hay API keys. Creá una para exportar datos a otra app.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = apiKeysList.map((key) => {
+    const statusClass = key.status === "activa" ? "api-key-status-ok" : "api-key-status-off";
+    const canRevoke = key.status === "activa";
+    return `
+      <tr class="${canRevoke ? "" : "row-inactive"}">
+        <td>${escapeHtml(key.name)}</td>
+        <td><code>${escapeHtml(key.key_prefix)}…</code></td>
+        <td>${escapeHtml((key.scopes || []).join(", "))}</td>
+        <td>${escapeHtml(formatDateTime(key.created_at))}</td>
+        <td>${escapeHtml(formatDateTime(key.last_used_at))}</td>
+        <td>${escapeHtml(key.expires_at ? formatDateTime(key.expires_at) : "Nunca")}</td>
+        <td><span class="api-key-status ${statusClass}">${escapeHtml(key.status)}</span></td>
+        <td class="row-actions">
+          ${canRevoke
+            ? `<button class="btn btn-danger btn-small" data-revoke-key="${key.id}">Revocar</button>`
+            : "—"}
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.querySelectorAll("[data-revoke-key]").forEach((btn) => {
+    btn.addEventListener("click", () => revokeApiKey(Number(btn.dataset.revokeKey)));
+  });
+}
+
+function initApiKeyUi() {
+  const example = document.getElementById("apiKeyExample");
+  if (example && typeof API_BASE !== "undefined") {
+    example.textContent = `curl -H "X-API-Key: TU_API_KEY" "${API_BASE}/api/export/egresos?limit=100"`;
+  }
+
+  document.getElementById("btnAddApiKey").addEventListener("click", openApiKeyModal);
+  document.getElementById("apiKeyModalClose").addEventListener("click", closeApiKeyModal);
+  document.getElementById("apiKeyModalCancel").addEventListener("click", closeApiKeyModal);
+  document.getElementById("apiKeyModalSave").addEventListener("click", createApiKey);
+  document.getElementById("apiKeyModal").addEventListener("click", (e) => {
+    if (e.target.id === "apiKeyModal") closeApiKeyModal();
+  });
+
+  document.getElementById("apiKeyCreatedClose").addEventListener("click", closeApiKeyCreatedModal);
+  document.getElementById("apiKeyCreatedOk").addEventListener("click", closeApiKeyCreatedModal);
+  document.getElementById("apiKeyCreatedModal").addEventListener("click", (e) => {
+    if (e.target.id === "apiKeyCreatedModal") closeApiKeyCreatedModal();
+  });
+  document.getElementById("apiKeyCopyBtn").addEventListener("click", copyCreatedApiKey);
+}
+
+function openApiKeyModal() {
+  document.getElementById("apiKeyName").value = "";
+  document.getElementById("apiKeyExpires").value = "never";
+  document.getElementById("apiKeyModal").style.display = "flex";
+  document.getElementById("apiKeyName").focus();
+}
+
+function closeApiKeyModal() {
+  document.getElementById("apiKeyModal").style.display = "none";
+}
+
+function closeApiKeyCreatedModal() {
+  document.getElementById("apiKeyCreatedModal").style.display = "none";
+  document.getElementById("apiKeyRawValue").textContent = "";
+}
+
+function showCreatedApiKey(rawKey) {
+  document.getElementById("apiKeyRawValue").textContent = rawKey;
+  document.getElementById("apiKeyCreatedModal").style.display = "flex";
+}
+
+async function copyCreatedApiKey() {
+  const value = document.getElementById("apiKeyRawValue").textContent;
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    toast("Copiada", "La API key se copió al portapapeles", "success");
+  } catch {
+    toast("Error", "No se pudo copiar. Seleccioná la clave y copiala a mano.", "error");
+  }
+}
+
+async function createApiKey() {
+  const name = document.getElementById("apiKeyName").value.trim();
+  const expires = document.getElementById("apiKeyExpires").value;
+  if (!name || name.length < 2) {
+    toast("Error", "El nombre es obligatorio", "warning");
+    return;
+  }
+
+  try {
+    const result = await api("/api/api-keys", {
+      method: "POST",
+      body: {
+        name,
+        expires_in_days: expires === "never" ? "never" : Number(expires),
+        scopes: ["export:egresos"]
+      }
+    });
+    closeApiKeyModal();
+    await loadApiKeys();
+    showCreatedApiKey(result.raw_key);
+    toast("Creada", "API key generada. Copiala ahora.", "success");
+  } catch (err) {
+    toast("Error", err.message, "error");
+  }
+}
+
+async function revokeApiKey(id) {
+  const key = apiKeysList.find((item) => item.id === id);
+  const label = key ? key.name : "esta API key";
+  if (!confirm(`¿Revocar ${label}? La otra app va a dejar de poder exportar datos.`)) return;
+
+  try {
+    await api(`/api/api-keys/${id}/revoke`, { method: "POST" });
+    toast("Revocada", "La API key ya no sirve para exportar", "success");
+    await loadApiKeys();
   } catch (err) {
     toast("Error", err.message, "error");
   }

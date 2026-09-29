@@ -81,6 +81,7 @@
         <div class="config-tabs">
           <button class="config-tab active" data-tab="empresas">Empresas de Salida</button>
           <button class="config-tab" data-tab="etiquetas">Etiquetas / Conceptos</button>
+          <button class="config-tab" data-tab="apikeys">API Keys</button>
         </div>
 
         <!-- ===== EMPRESAS ===== -->
@@ -133,6 +134,41 @@
           </div>
         </section>
 
+        <!-- ===== API KEYS ===== -->
+        <section class="card config-panel" id="panel-apikeys" style="display:none">
+          <div class="card-header">
+            API Keys
+            <button class="btn btn-primary btn-small" id="btnAddApiKey">+ Crear API key</button>
+          </div>
+          <div class="card-body">
+            <p class="note api-key-intro">
+              Generá una API key para que otra aplicación consulte egresos en solo lectura.
+              La clave completa se muestra una sola vez. Después solo vas a ver el prefijo.
+            </p>
+            <div class="api-key-example">
+              <div class="api-key-example-label">Ejemplo de consumo</div>
+              <code id="apiKeyExample">curl -H "X-API-Key: TU_API_KEY" ORIGIN/api/export/egresos?limit=100</code>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="tableApiKeys">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Prefijo</th>
+                    <th>Permisos</th>
+                    <th>Creada</th>
+                    <th>Último uso</th>
+                    <th>Expira</th>
+                    <th>Estado</th>
+                    <th style="width:120px">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyApiKeys"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
       </div>
     </main>
 
@@ -174,6 +210,62 @@
       <div class="modal-footer">
         <button class="btn btn-ghost" id="optionModalCancel">Cancelar</button>
         <button class="btn btn-primary" id="optionModalSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal crear API key -->
+  <div id="apiKeyModal" class="modal-backdrop" style="display:none">
+    <div class="modal-content" style="max-width:480px;width:90%">
+      <div class="modal-header">
+        <h3>Crear API key</h3>
+        <button class="btn-close" id="apiKeyModalClose">X</button>
+      </div>
+      <div class="modal-body">
+        <div class="field" style="margin-bottom:12px">
+          <label>NOMBRE *</label>
+          <input id="apiKeyName" placeholder="Ej: App de reportes"/>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label>EXPIRACIÓN</label>
+          <select id="apiKeyExpires">
+            <option value="never">Sin vencimiento</option>
+            <option value="30">30 días</option>
+            <option value="90">90 días</option>
+            <option value="365">1 año</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>PERMISOS</label>
+          <label class="config-check">
+            <input type="checkbox" id="apiKeyScopeEgresos" checked disabled/>
+            export:egresos — leer egresos (JSON o CSV)
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="apiKeyModalCancel">Cancelar</button>
+        <button class="btn btn-primary" id="apiKeyModalSave">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal key creada (se muestra una sola vez) -->
+  <div id="apiKeyCreatedModal" class="modal-backdrop" style="display:none">
+    <div class="modal-content" style="max-width:560px;width:90%">
+      <div class="modal-header">
+        <h3>API key creada</h3>
+        <button class="btn-close" id="apiKeyCreatedClose">X</button>
+      </div>
+      <div class="modal-body">
+        <p class="api-key-warning">Copiá esta clave ahora. No se vuelve a mostrar por seguridad.</p>
+        <div class="api-key-secret-wrap">
+          <code id="apiKeyRawValue" class="api-key-secret"></code>
+          <button class="btn btn-small" id="apiKeyCopyBtn" type="button">Copiar</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="apiKeyCreatedOk">Ya la guardé</button>
       </div>
     </div>
   </div>
