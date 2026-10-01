@@ -22,14 +22,13 @@ backend/
 │   ├── middleware/
 │   │   ├── auth.js            # JWT authentication + checks de rol
 │   │   ├── fileValidator.js   # Validación de uploads por magic numbers
-│   │   ├── maintenance.js     # Gate de los endpoints que ejecutan DDL
 │   │   └── rateLimiter.js     # Rate limiting
 │   ├── routes/
 │   │   ├── auth.js            # POST /api/auth/login
 │   │   ├── users.js           # CRUD usuarios
 │   │   ├── egresos.js         # CRUD egresos + CSV + saldos + cierres
 │   │   ├── notifications.js   # Stream SSE de notificaciones
-│   │   ├── init.js            # Bootstrap de admin + fixes (mantenimiento)
+│   │   ├── options.js         # Opciones de selects (select_options)
 │   │   └── logs.js            # Audit logs (readonly)
 │   ├── utils/
 │   │   ├── audit.js           # Helper para audit logs
@@ -78,9 +77,6 @@ CORS_ORIGIN=http://localhost:5500
 # Uploads
 UPLOAD_DIR=uploads
 IMGBB_API_KEY=
-
-# Endpoints de mantenimiento que ejecutan DDL
-ENABLE_MAINTENANCE_ENDPOINTS=false
 ```
 
 `.env.example` tiene la lista completa con los defaults reales de cada variable.
@@ -202,12 +198,10 @@ Requisitos:
   `GET /api/egresos/:id/comprobante`, que exige token y que el usuario sea el
   dueño del egreso o admin/dirección
 
-### Endpoints de mantenimiento
+### Cambios de esquema
 
-`/api/run-migrations`, `/api/init-admin` y `/api/fix-id-transferencia` ejecutan
-DDL. Están cerrados: devuelven 404 salvo que `ENABLE_MAINTENANCE_ENDPOINTS=true`,
-y además exigen token de admin (`/api/init-admin` no puede exigirlo porque corre
-antes de que exista un usuario). Volver la variable a `false` al terminar.
+No hay endpoints HTTP que ejecuten DDL. Todo cambio de esquema va como archivo
+`.sql` en `src/migrations/`, y el primer admin se crea con `npm run seed:admin`.
 
 ## 🗄️ Migraciones
 
@@ -314,7 +308,6 @@ BASE_URL=https://tu-dominio.com
 CORS_ORIGIN=https://tu-dominio.com
 UPLOAD_DIR=uploads
 IMGBB_API_KEY=<key>
-ENABLE_MAINTENANCE_ENDPOINTS=false
 ```
 
 ## 🧪 Testing

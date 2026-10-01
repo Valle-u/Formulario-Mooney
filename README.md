@@ -73,9 +73,6 @@ UPLOAD_DIR=uploads
 
 # Almacenamiento externo de comprobantes (si está vacío se usa UPLOAD_DIR)
 IMGBB_API_KEY=
-
-# Endpoints de mantenimiento que ejecutan DDL (dejar en false)
-ENABLE_MAINTENANCE_ENDPOINTS=false
 ```
 
 La lista completa y comentada está en `backend/.env.example`.
@@ -135,7 +132,7 @@ El sistema implementa:
 - ✅ **XSS Protection**: Escapado de todo dato del servidor antes de inyectarlo en el DOM, más CSP sin `unsafe-inline` en `script-src`
 - ✅ **Validación por magic numbers**: El contenido del archivo subido debe coincidir con JPG, PNG o PDF
 - ✅ **Archivos protegidos**: Solo usuarios autenticados pueden descargar comprobantes guardados en disco local
-- ✅ **Mantenimiento cerrado**: Los endpoints que ejecutan DDL requieren `ENABLE_MAINTENANCE_ENDPOINTS=true` + token de admin
+- ✅ **Sin DDL por HTTP**: Ningún endpoint modifica el esquema; los cambios van solo por migraciones versionadas
 - ✅ **Validación de variables de entorno**: El servidor no arranca si faltan variables críticas
 - ✅ **CORS configurado**: Solo orígenes permitidos
 - ✅ **Audit logs**: Registro inmutable de todas las acciones
@@ -166,8 +163,7 @@ PostgreSQL con las siguientes tablas:
 1. **Conectar repositorio GitHub** y apuntar al directorio `backend/`
 2. **Build Command**: `npm install` · **Start Command**: `npm start`
 3. **Variables de entorno**: `DATABASE_URL`, `JWT_SECRET`, `PGSSL=true`,
-   `NODE_ENV=production`, `BASE_URL`, `IMGBB_API_KEY`
-4. **Dejar `ENABLE_MAINTENANCE_ENDPOINTS` sin definir o en `false`**
+   `NODE_ENV=production`, `BASE_URL`, `CORS_ORIGIN`, `IMGBB_API_KEY`
 
 El filesystem es efímero: sin `IMGBB_API_KEY` los comprobantes guardados en
 `UPLOAD_DIR` se pierden en cada deploy. Guías detalladas en

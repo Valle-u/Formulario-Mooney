@@ -7,9 +7,9 @@ import { query } from "../config/db.js";
  * - Verifica firma y expiración
  * - Valida que el usuario siga activo en la BD
  * - Protege contra tokens robados de usuarios desactivados
- * - Solo acepta el token por header Authorization. Las rutas que no pueden
- *   enviar headers (EventSource, navegación directa del navegador) usan
- *   authAllowQueryToken.
+ * - Solo acepta el token por header Authorization. La única excepción es el
+ *   stream SSE, que usa authAllowQueryToken porque EventSource no permite
+ *   enviar headers.
  */
 async function authenticate(req, res, next, { allowQueryToken = false } = {}) {
   let token = null;
@@ -112,8 +112,8 @@ export function auth(req, res, next) {
 }
 
 /**
- * Autenticación que además acepta ?token=. Reservada para SSE (EventSource no
- * permite headers) y para endpoints que se abren a mano en el navegador.
+ * Autenticación que además acepta ?token=. Reservada para el stream SSE:
+ * EventSource no permite enviar headers.
  */
 export function authAllowQueryToken(req, res, next) {
   return authenticate(req, res, next, { allowQueryToken: true });
