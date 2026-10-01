@@ -50,7 +50,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      // Sin 'unsafe-inline': todo el JS del frontend está en archivos propios,
+      // así que un payload inyectado en un campo no puede ejecutarse.
+      // styleSrc sí lo mantiene porque las vistas usan atributos style=.
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://i.ibb.co", "https://*.ibb.co"],
       connectSrc: ["'self'", "https://api.imgbb.com"],
