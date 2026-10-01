@@ -248,7 +248,7 @@ async function start() {
 }
 
 // Graceful shutdown: cerrar conexiones limpiamente cuando el proceso termina
-async function gracefulShutdown(signal) {
+async function gracefulShutdown(signal, exitCode = 0) {
   console.log(`\n🛑 ${signal} recibido, cerrando servidor...`);
 
   // Dejar de aceptar nuevas conexiones
@@ -264,7 +264,7 @@ async function gracefulShutdown(signal) {
     await pool.end();
     console.log('✅ Pool de PostgreSQL cerrado');
 
-    process.exit(0);
+    process.exit(exitCode);
   } catch (err) {
     console.error('❌ Error durante graceful shutdown:', err);
     process.exit(1);
@@ -276,9 +276,11 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Manejar errores no capturados
+// Salir con código distinto de 0 para que el orquestador lo registre como caída
+// y reinicie el proceso, en lugar de interpretarlo como un cierre limpio.
 process.on('uncaughtException', (err) => {
   console.error('💥 Uncaught Exception:', err);
-  gracefulShutdown('uncaughtException');
+  gracefulShutdown('uncaughtException', 1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
