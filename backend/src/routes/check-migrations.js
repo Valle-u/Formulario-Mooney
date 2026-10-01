@@ -1,10 +1,11 @@
 import express from "express";
 import { query } from "../config/db.js";
+import { maintenanceGuard } from "../middleware/maintenance.js";
 
 const router = express.Router();
 
 // Endpoint para VERIFICAR el estado de las migraciones sin ejecutarlas
-router.get('/check-migrations', async (req, res) => {
+router.get('/check-migrations', maintenanceGuard, async (req, res) => {
   try {
     const results = {
       timestamp: new Date().toISOString(),

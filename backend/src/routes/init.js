@@ -1,15 +1,19 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import { query } from "../config/db.js";
+import { bootstrapGuard, maintenanceGuard } from "../middleware/maintenance.js";
+import { validatePasswordStrength } from "../utils/validators.js";
 
 const router = express.Router();
 
 /**
  * ENDPOINT TEMPORAL - ELIMINAR DESPUÉS DE CREAR EL ADMIN
  * POST /api/init-admin
- * Crea el usuario admin inicial si no existe
+ * Crea el usuario admin inicial si no existe.
+ * Requiere ENABLE_MAINTENANCE_ENDPOINTS=true (no se puede autenticar: todavía
+ * no hay usuarios). Alternativa recomendada: `npm run seed:admin`.
  */
-router.post("/init-admin", async (req, res) => {
+router.post("/init-admin", bootstrapGuard, async (req, res) => {
   try {
     // Verificar si ya existe un admin
     const existing = await query(
@@ -22,10 +26,19 @@ router.post("/init-admin", async (req, res) => {
       });
     }
 
-    // Crear admin con credenciales por defecto
-    const username = "admin";
-    const password = "MooneyAdmin2025!";
-    const fullName = "Administrador";
+    // La contraseña se toma de INIT_ADMIN_PASSWORD si está definida, para no
+    // dejarla escrita en el código ni devolverla en la respuesta.
+    const username = process.env.INIT_ADMIN_USERNAME || "admin";
+    const fullName = process.env.INIT_ADMIN_FULLNAME || "Administrador";
+    const passwordFromEnv = process.env.INIT_ADMIN_PASSWORD || null;
+    const password = passwordFromEnv || "MooneyAdmin2025!";
+
+    if (passwordFromEnv) {
+      const passwordError = validatePasswordStrength(passwordFromEnv);
+      if (passwordError) {
+        return res.status(400).json({ message: `INIT_ADMIN_PASSWORD inválida: ${passwordError}` });
+      }
+    }
 
     const hash = await bcrypt.hash(password, 12);
 
@@ -42,7 +55,9 @@ router.post("/init-admin", async (req, res) => {
       user: result.rows[0],
       credentials: {
         username: username,
-        password: password,
+        // Solo se devuelve la contraseña por defecto; la de INIT_ADMIN_PASSWORD
+        // ya la conoce quien configuró la variable.
+        password: passwordFromEnv ? "(definida en INIT_ADMIN_PASSWORD)" : password,
         warning: "⚠️ CAMBIAR CONTRASEÑA INMEDIATAMENTE DESPUÉS DEL PRIMER LOGIN"
       }
     });
@@ -60,7 +75,7 @@ router.post("/init-admin", async (req, res) => {
  * POST /api/fix-id-transferencia
  * Ejecuta la migración para permitir IDs alfanuméricos
  */
-router.post("/fix-id-transferencia", async (req, res) => {
+router.post("/fix-id-transferencia", maintenanceGuard, async (req, res) => {
   try {
     console.log("🔧 Ejecutando fix para id_transferencia...");
 

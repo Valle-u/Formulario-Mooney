@@ -2,11 +2,12 @@ import express from "express";
 import { query } from "../config/db.js";
 import fs from "fs";
 import path from "path";
+import { maintenanceGuard } from "../middleware/maintenance.js";
 
 const router = express.Router();
 
 // Endpoint para EJECUTAR las migraciones
-router.get('/run-migrations', async (req, res) => {
+router.get('/run-migrations', maintenanceGuard, async (req, res) => {
   try {
     const results = {
       timestamp: new Date().toISOString(),
