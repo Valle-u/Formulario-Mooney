@@ -310,7 +310,7 @@ function renderKPIRows(rows) {
 
     const cierre = row.cierre;
     const detail = cierre
-      ? `${formatMoney(cierre.monto, cierre.moneda || "ARS")} | ${escapeHtml(cierre.empresa_salida || "-")} | ${escapeHtml(cierre.cuenta_salida || "-")} | cargado: ${formatCreatedAt(cierre.created_at)}${cierre.created_by_username ? ` | usuario: ${escapeHtml(cierre.created_by_username)}` : ""}`
+      ? `${formatMoney(cierre.monto, cierre.moneda || "ARS")} | ${escapeHtml(cierre.empresa_salida || "-")} | ${escapeHtml(cierre.cuenta_salida || "-")} | cargado: ${escapeHtml(formatCreatedAt(cierre.created_at))}${cierre.created_by_username ? ` | usuario: ${escapeHtml(cierre.created_by_username)}` : ""}`
       : "Sin cierre cargado para este turno.";
 
     const action = row.status === "PENDIENTE"

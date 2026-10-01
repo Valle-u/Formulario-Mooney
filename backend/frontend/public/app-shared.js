@@ -818,7 +818,7 @@ function updateNotificationPanel() {
   list.innerHTML = notifications.map(n => {
     const timeAgo = getTimeAgo(n.timestamp);
     return `
-      <div class="notification-item ${n.read ? "" : "unread"} ${n.category}" data-id="${n.id}">
+      <div class="notification-item ${n.read ? "" : "unread"} ${escapeHtml(n.category)}" data-id="${escapeHtml(n.id)}">
         <div class="notification-title">${escapeHtml(n.title)}</div>
         <div class="notification-message">${escapeHtml(n.message)}</div>
         <div class="notification-time">${timeAgo}</div>

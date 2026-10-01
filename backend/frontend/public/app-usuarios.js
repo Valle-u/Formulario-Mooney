@@ -10,7 +10,7 @@ async function loadUsers(){
     const { users } = await api("/api/users");
     renderUsers(users);
   }catch(err){
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

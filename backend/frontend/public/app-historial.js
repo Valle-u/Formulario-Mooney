@@ -28,12 +28,12 @@ async function populateFiltrosSelects(){
 
   if(selEmpresa){
     selEmpresa.innerHTML = `<option value="">Todas</option>` +
-      getEmpresas().map(e => `<option value="${e}">${e}</option>`).join("");
+      getEmpresas().map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 
   if(selEtiqueta){
     selEtiqueta.innerHTML = `<option value="">Todas</option>` +
-      getEtiquetas_dynamic().map(e => `<option value="${e}">${e}</option>`).join("");
+      getEtiquetas_dynamic().map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 
   // Cargar lista de usuarios para el filtro "Creado por" según jerarquía
@@ -42,7 +42,7 @@ async function populateFiltrosSelects(){
       const response = await api("/api/users/for-filter");
       const users = response.users || [];
       selCreatedBy.innerHTML = `<option value="">Todos</option>` +
-        users.map(u => `<option value="${u.id}">${u.full_name || u.username} (${u.role})</option>`).join("");
+        users.map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.full_name || u.username)} (${escapeHtml(u.role)})</option>`).join("");
     }catch(err){
       console.error("Error cargando usuarios:", err);
       // Fall back: rellenar con el usuario actual si es posible
@@ -109,7 +109,7 @@ async function buscarEgresos(){
     const { egresos, pagination, sumas } = await api(`/api/egresos?${qs.toString()}`);
     renderEgresos(egresos, pagination, sumas);
   }catch(err){
-    tbody.innerHTML = `<tr><td colspan="11" class="muted">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="muted">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -156,18 +156,18 @@ function renderEgresos(egresos, pagination, sumas){
 
     return `
       <tr>
-        <td>${e.fecha}</td>
-        <td>${e.hora || "-"}</td>
-        <td>${e.empresa_salida}</td>
-        <td>${e.id_transferencia}</td>
-        <td>${e.etiqueta}${e.etiqueta_otro ? ` (${e.etiqueta_otro})` : ""}</td>
-        <td>${e.usuario_casino || "-"}</td>
+        <td>${escapeHtml(e.fecha)}</td>
+        <td>${escapeHtml(e.hora || "-")}</td>
+        <td>${escapeHtml(e.empresa_salida)}</td>
+        <td>${escapeHtml(e.id_transferencia)}</td>
+        <td>${escapeHtml(e.etiqueta)}${e.etiqueta_otro ? ` (${escapeHtml(e.etiqueta_otro)})` : ""}</td>
+        <td>${escapeHtml(e.usuario_casino || "-")}</td>
         <td>$${montoFormatted}</td>
         <td>${monedaBadge}</td>
         <td>${statusBadge}</td>
-        <td>${e.created_by_username}</td>
+        <td>${escapeHtml(e.created_by_username)}</td>
         <td>
-          <button class="btn btn-small btn-primary" data-ver-detalle="${e.id}">Ver</button>
+          <button class="btn btn-small btn-primary" data-ver-detalle="${escapeHtml(e.id)}">Ver</button>
         </td>
       </tr>
     `;
@@ -258,7 +258,7 @@ function mostrarDetalle(e){
 
   const comprobantePreview = isPdf
     ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Ver PDF en nueva ventana</a>`
-    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='Error cargando imagen'"></a>`;
+    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" data-comprobante-img="1"></a>`;
 
   // Estado visual
   const status = e.status || 'activo';
@@ -394,6 +394,12 @@ function mostrarDetalle(e){
   console.log('HTML generado, mostrando modal...');
   console.log('Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
+
+  // El fallback del comprobante se engancha por JS: el CSP bloquea onerror inline.
+  body.querySelector('[data-comprobante-img]')?.addEventListener('error', (ev) => {
+    const link = ev.target.parentElement;
+    if (link) link.textContent = 'Error cargando imagen';
+  });
 
   console.log('Modal mostrado con display:', modal.style.display);
 
@@ -585,7 +591,7 @@ function editarEgresoModal(){
       <div class="field span6">
         <label>CONCEPTO/ETIQUETA *</label>
         <select id="edit_etiqueta" required>
-          ${getEtiquetas_dynamic().map(et => `<option value="${et}" ${egreso.etiqueta === et ? 'selected' : ''}>${et}</option>`).join('')}
+          ${getEtiquetas_dynamic().map(et => `<option value="${escapeHtml(et)}" ${egreso.etiqueta === et ? 'selected' : ''}>${escapeHtml(et)}</option>`).join('')}
           ${!getEtiquetas_dynamic().includes(egreso.etiqueta) ? `<option value="${escapeHtml(egreso.etiqueta)}" selected>${escapeHtml(egreso.etiqueta)} (Inactiva)</option>` : ''}
         </select>
       </div>
@@ -637,7 +643,7 @@ function editarEgresoModal(){
       <div class="field span6">
         <label>EMPRESA SALIDA *</label>
         <select id="edit_empresa_salida" required>
-          ${getEmpresas().map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
+          ${getEmpresas().map(emp => `<option value="${escapeHtml(emp)}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${escapeHtml(emp)}</option>`).join('')}
           ${!getEmpresas().includes(egreso.empresa_salida) ? `<option value="${escapeHtml(egreso.empresa_salida)}" selected>${escapeHtml(egreso.empresa_salida)} (Inactiva)</option>` : ''}
         </select>
       </div>
@@ -932,15 +938,15 @@ function mostrarHistorialModal(egresoId, changes){
     return `
       <div style="border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 12px; background: var(--bg-alt); border-radius: 4px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <strong>${changeTypeLabel}</strong>
-          <span class="note">${c.created_at_formatted}</span>
+          <strong>${escapeHtml(changeTypeLabel)}</strong>
+          <span class="note">${escapeHtml(c.created_at_formatted)}</span>
         </div>
         <div class="note" style="margin-bottom: 4px;">
-          <strong>Por:</strong> ${escapeHtml(c.changed_by_username)} (${c.changed_by_role})
+          <strong>Por:</strong> ${escapeHtml(c.changed_by_username)} (${escapeHtml(c.changed_by_role)})
         </div>
         ${c.field_name ? `
           <div class="note" style="margin-bottom: 4px;">
-            <strong>Campo:</strong> ${fieldLabel}
+            <strong>Campo:</strong> ${escapeHtml(fieldLabel)}
           </div>
           <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-top: 8px;">
             <div style="background: #fee2e2; padding: 8px; border-radius: 4px;">
@@ -966,7 +972,7 @@ function mostrarHistorialModal(egresoId, changes){
   body.innerHTML = `
     <div style="margin-bottom: 16px;">
       <h3 style="margin: 0 0 8px 0;">Historial de cambios</h3>
-      <div class="note">Egreso #${egresoId} - ${changes.length} cambio(s) registrado(s)</div>
+      <div class="note">Egreso #${escapeHtml(egresoId)} - ${changes.length} cambio(s) registrado(s)</div>
     </div>
     <div style="max-height: 500px; overflow-y: auto;">
       ${rows}
