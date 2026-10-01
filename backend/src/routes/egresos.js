@@ -175,6 +175,36 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 function isDigitsOnly(v){ return /^[0-9]+$/.test(String(v || "").trim()); }
 
 /**
+ * Nombre real del archivo en disco.
+ * comprobante_filename guarda el nombre original de la subida, mientras que en
+ * disco se escribe con prefijo de timestamp, así que el nombre hay que sacarlo
+ * de la URL. Se usa basename para que no se pueda salir de UPLOAD_DIR.
+ */
+function resolveLocalComprobanteName(egreso) {
+  const candidates = [];
+
+  if (egreso.comprobante_url) {
+    try {
+      const raw = String(egreso.comprobante_url).startsWith("http")
+        ? new URL(egreso.comprobante_url).pathname
+        : egreso.comprobante_url;
+      candidates.push(decodeURIComponent(raw));
+    } catch {
+      // URL inválida: se ignora y se prueba con el filename guardado
+    }
+  }
+
+  if (egreso.comprobante_filename) candidates.push(egreso.comprobante_filename);
+
+  for (const candidate of candidates) {
+    const name = path.basename(String(candidate).trim());
+    if (name && name !== "." && name !== "..") return name;
+  }
+
+  return null;
+}
+
+/**
  * Convierte fecha ISO (aaaa-mm-dd) o Date a formato dd/mm/aaaa
  */
 function formatFechaDDMMAAAA(fecha) {
@@ -1875,11 +1905,12 @@ router.get("/:id/comprobante", auth, async (req, res) => {
     }
 
     // Si está en disco local, servir el archivo
-    const filePath = path.join(process.cwd(), UPLOAD_DIR, egreso.comprobante_filename);
+    const localName = resolveLocalComprobanteName(egreso);
+    const filePath = localName ? path.join(process.cwd(), UPLOAD_DIR, localName) : null;
     console.log(`  - Ruta completa del archivo: ${filePath}`);
-    console.log(`  - Archivo existe: ${fs.existsSync(filePath)}`);
+    console.log(`  - Archivo existe: ${filePath ? fs.existsSync(filePath) : false}`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!filePath || !fs.existsSync(filePath)) {
       console.log(`  ❌ Archivo no encontrado en disco`);
 
       // Listar archivos en el directorio de uploads para debugging
@@ -1899,7 +1930,7 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       entity_id: id,
       success: true,
       status_code: 200,
-      details: { filename: egreso.comprobante_filename }
+      details: { filename: egreso.comprobante_filename, stored_as: localName }
     });
 
     console.log(`  ✅ Sirviendo archivo desde disco`);
@@ -1911,7 +1942,7 @@ router.get("/:id/comprobante", auth, async (req, res) => {
 });
 
 // ENDPOINT DE DEBUGGING - Temporal para diagnosticar el problema
-router.get("/debug/uploads", auth, async (req, res) => {
+router.get("/debug/uploads", auth, requireAdmin, async (req, res) => {
   try {
     const uploadDir = path.join(process.cwd(), UPLOAD_DIR);
 
