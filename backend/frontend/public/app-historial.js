@@ -256,9 +256,13 @@ function mostrarDetalle(e){
   });
 
   const hasComprobante = !!(e.comprobante_url || e.comprobante_filename);
-  const isPdf = e.comprobante_mime === "application/pdf"
+  const urlLooksImage = /\.(jpe?g|png|gif|webp)(\?|$)/i.test(e.comprobante_url || "")
+    || /\.(jpe?g|png|gif|webp)$/i.test(e.comprobante_filename || "");
+  const isPdf = !urlLooksImage && (
+    e.comprobante_mime === "application/pdf"
     || /\.pdf$/i.test(e.comprobante_filename || "")
-    || (e.comprobante_url && /\.pdf(\?|$)/i.test(e.comprobante_url));
+    || (e.comprobante_url && /\.pdf(\?|$)/i.test(e.comprobante_url))
+  );
 
   const comprobantePreview = !hasComprobante
     ? `<div class="note">Sin comprobante adjunto</div>`
@@ -450,30 +454,44 @@ async function hydrateComprobantePreview(egreso) {
 
   const kind = container.dataset.comprobanteKind;
   const token = getToken();
-  const url = `${API_BASE}/api/egresos/${encodeURIComponent(egreso.id)}/comprobante`;
+  const apiUrl = `${API_BASE}/api/egresos/${encodeURIComponent(egreso.id)}/comprobante`;
+  const externalUrl = (egreso.comprobante_url && /^https?:\/\//i.test(egreso.comprobante_url))
+    ? egreso.comprobante_url
+    : null;
+
+  const applyPreview = (src) => {
+    if (kind === "pdf") {
+      const iframe = container.querySelector("iframe");
+      if (iframe) iframe.src = src;
+    } else {
+      const img = container.querySelector(".comprobante-img");
+      if (img) img.src = src;
+    }
+    container.querySelector(".btn-comprobante-tab")?.addEventListener("click", () => {
+      window.open(src, "_blank", "noopener,noreferrer");
+    });
+  };
+
+  // ImgBB / URLs públicas: embeber directo (evita CSP al seguir redirects en fetch)
+  if (externalUrl && /ibb\.co|imgbb\.com/i.test(externalUrl)) {
+    applyPreview(externalUrl);
+    return;
+  }
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(apiUrl, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (!res.ok) {
       throw new Error("No se pudo cargar el comprobante");
     }
     const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-
-    if (kind === "pdf") {
-      const iframe = container.querySelector("iframe");
-      if (iframe) iframe.src = objectUrl;
-    } else {
-      const img = container.querySelector(".comprobante-img");
-      if (img) img.src = objectUrl;
-    }
-
-    container.querySelector(".btn-comprobante-tab")?.addEventListener("click", () => {
-      window.open(objectUrl, "_blank", "noopener,noreferrer");
-    });
+    applyPreview(URL.createObjectURL(blob));
   } catch (err) {
+    if (externalUrl) {
+      applyPreview(externalUrl);
+      return;
+    }
     container.innerHTML = `<div class="note" style="color:#ef4444;">${escapeHtml(err.message)}</div>`;
   }
 }
