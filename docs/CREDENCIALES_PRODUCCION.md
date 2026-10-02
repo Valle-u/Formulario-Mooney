@@ -17,7 +17,12 @@ https://web-5u1r2nxoi92m.up-de-fra1-k8s-1.apps.run-on-seenode.com
 ## 👤 CREDENCIALES DE ADMINISTRADOR
 
 **Usuario:** `admin`
-**Contraseña:** `MooneyAdmin2025!`
+**Contraseña:** no se guarda en este repositorio.
+
+Crear o rotar el admin con `npm run seed:admin` definiendo
+`SEED_ADMIN_PASSWORD` en el entorno del servidor (fuera de OneDrive y fuera
+del git). Si esta contraseña llegó a aparecer en un commit o en un chat,
+rotarla de inmediato.
 
 ⚠️ **IMPORTANTE:**
 - Esta es la cuenta de **ADMINISTRADOR PRINCIPAL**
@@ -43,10 +48,10 @@ https://web-5u1r2nxoi92m.up-de-fra1-k8s-1.apps.run-on-seenode.com
 
 | Rol | Permisos | ¿Para quién? |
 |-----|----------|--------------|
-| **admin** | Acceso total, crear/editar/eliminar usuarios, anular egresos, exportar CSV, ver todos los logs | Administradores del sistema |
-| **direccion** | Igual que admin pero distinguible en logs | Directores, Gerentes |
-| **encargado** | Ver egresos de empleados y encargados, ver logs (sin editar) | Supervisores, Encargados de turno |
-| **empleado** | Crear egresos, ver solo egresos de empleados | Cajeros, Operadores |
+| **admin** | Acceso total, crear/editar usuarios, anular o borrar egresos, exportar CSV, ver todos los logs | Administradores del sistema |
+| **direccion** | Crear/editar usuarios, editar cualquier egreso, exportar CSV, ver logs | Directores, Gerentes |
+| **encargado** | Crear/editar egresos propios, ver logs | Supervisores, Encargados de turno |
+| **empleado** | Crear egresos, ver/editar solo los propios | Cajeros, Operadores |
 
 ### Paso 3: Entregar Credenciales
 - Crear un usuario para cada persona

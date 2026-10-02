@@ -32,16 +32,16 @@ async function loadLogs(){
       const detail = l.details ? JSON.stringify(l.details) : "";
       return `
         <tr>
-          <td>${dt}</td>
-          <td>${l.actor_username || "-"}</td>
-          <td>${l.actor_role || "-"}</td>
-          <td>${l.action}</td>
-          <td>${l.entity || "-"}</td>
-          <td>${l.entity_id || "-"}</td>
+          <td>${escapeHtml(dt)}</td>
+          <td>${escapeHtml(l.actor_username || "-")}</td>
+          <td>${escapeHtml(l.actor_role || "-")}</td>
+          <td>${escapeHtml(l.action)}</td>
+          <td>${escapeHtml(l.entity || "-")}</td>
+          <td>${escapeHtml(l.entity_id || "-")}</td>
           <td>${ok}</td>
-          <td>${l.ip || "-"}</td>
-          <td style="max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${detail.replace(/"/g,"&quot;")}">
-            ${detail}
+          <td>${escapeHtml(l.ip || "-")}</td>
+          <td style="max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(detail)}">
+            ${escapeHtml(detail)}
           </td>
         </tr>
       `;
@@ -64,7 +64,7 @@ async function loadLogs(){
     if(btnNext) btnNext.disabled = offset + logs.length >= total;
 
   }catch(err){
-    tbody.innerHTML = `<tr><td colspan="9" class="muted">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="muted">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

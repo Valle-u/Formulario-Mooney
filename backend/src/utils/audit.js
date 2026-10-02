@@ -1,10 +1,13 @@
 import { query } from "../config/db.js";
 
 function getIp(req){
-  // soporte proxy si existe, sino req.ip
+  // req.ip ya resuelve X-Forwarded-For según el 'trust proxy' configurado, así
+  // que no se puede falsear agregando el header a mano. Solo se lee el header
+  // crudo si Express no pudo resolver nada.
+  if (req.ip) return req.ip;
   const xf = req.headers["x-forwarded-for"];
   if (xf) return String(xf).split(",")[0].trim();
-  return req.ip || req.connection?.remoteAddress || "";
+  return req.connection?.remoteAddress || "";
 }
 
 export async function auditLog(req, {

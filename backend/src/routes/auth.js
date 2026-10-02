@@ -12,6 +12,11 @@ const router = express.Router();
 const MAX_LOGIN_ATTEMPTS = 999; // Efectivamente ilimitado
 const LOCK_DURATION_MINUTES = 0; // Sin bloqueo
 
+// Mientras el bloqueo esté desactivado no se informa la cantidad de intentos
+// restantes: ese dato revela si el username existe o no.
+const LOCKOUT_ENABLED = LOCK_DURATION_MINUTES > 0 && MAX_LOGIN_ATTEMPTS < 100;
+const INVALID_CREDENTIALS_MESSAGE = "Credenciales inválidas";
+
 // Aplicar rate limiting al endpoint de login
 router.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
@@ -44,7 +49,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         details: { username, reason: "invalid_credentials" },
         actor: { id: null, username, role: null }
       });
-      return res.status(401).json({ message: "Credenciales inválidas" });
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MESSAGE });
     }
 
     const user = r.rows[0];
@@ -155,10 +160,14 @@ router.post("/login", loginLimiter, async (req, res) => {
           actor: { id: user.id, username: user.username, role: user.role }
         });
 
-        return res.status(401).json({
-          message: `Credenciales inválidas. ${remainingAttempts} intento(s) restante(s).`,
-          remaining_attempts: remainingAttempts
-        });
+        return res.status(401).json(
+          LOCKOUT_ENABLED
+            ? {
+                message: `${INVALID_CREDENTIALS_MESSAGE}. ${remainingAttempts} intento(s) restante(s).`,
+                remaining_attempts: remainingAttempts
+              }
+            : { message: INVALID_CREDENTIALS_MESSAGE }
+        );
       }
     }
 

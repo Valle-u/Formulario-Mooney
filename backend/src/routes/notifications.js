@@ -1,16 +1,20 @@
 import { Router } from "express";
-import { auth } from "../middleware/auth.js";
+import { authAllowQueryToken } from "../middleware/auth.js";
 
 const router = Router();
 
 // Almacenar clientes conectados
 const clients = new Map();
 
+// Comentario periódico para que proxies y balanceadores no corten la conexión
+// por inactividad (EventSource reconectaría en loop).
+const HEARTBEAT_MS = 25_000;
+
 /**
  * GET /api/notifications/stream
  * Establece conexión SSE (Server-Sent Events) para notificaciones en tiempo real
  */
-router.get("/stream", auth, (req, res) => {
+router.get("/stream", authAllowQueryToken, (req, res) => {
   const userId = req.user.id;
   const userRole = req.user.role;
 
@@ -19,9 +23,10 @@ router.get("/stream", auth, (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no"); // Nginx compatibility
+  res.flushHeaders?.();
 
   // Enviar comentario inicial para mantener conexión
-  res.write(":ok\\n\\n");
+  res.write(":ok\n\n");
 
   // Almacenar cliente
   const clientId = `${userId}_${Date.now()}`;
@@ -39,10 +44,20 @@ router.get("/stream", auth, (req, res) => {
     type: "connected",
     message: "Conectado a notificaciones en tiempo real",
     timestamp: new Date().toISOString()
-  })}\\n\\n`);
+  })}\n\n`);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(":hb\n\n");
+    } catch {
+      clearInterval(heartbeat);
+      clients.delete(clientId);
+    }
+  }, HEARTBEAT_MS);
 
   // Cleanup cuando se desconecta
   req.on("close", () => {
+    clearInterval(heartbeat);
     clients.delete(clientId);
     console.log(`📡 Cliente desconectado: User ${userId} - Total: ${clients.size}`);
   });
@@ -72,7 +87,7 @@ function sendNotification(notification, targetUserIds = null, targetRoles = null
       client.response.write(`data: ${JSON.stringify({
         ...notification,
         timestamp: new Date().toISOString()
-      })}\\n\\n`);
+      })}\n\n`);
       count++;
     } catch (error) {
       console.error(`❌ Error enviando notificación a cliente ${clientId}:`, error.message);

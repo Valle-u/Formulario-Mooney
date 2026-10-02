@@ -4,6 +4,7 @@
 let egresosOffset = 0;
 const EGRESOS_LIMIT = 50;
 let currentFilters = {};
+let egresosReqSerial = 0;
 
 // Toggle de filtros (mostrar/ocultar)
 function toggleFiltros(){
@@ -28,12 +29,12 @@ async function populateFiltrosSelects(){
 
   if(selEmpresa){
     selEmpresa.innerHTML = `<option value="">Todas</option>` +
-      getEmpresas().map(e => `<option value="${e}">${e}</option>`).join("");
+      getEmpresas().map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 
   if(selEtiqueta){
     selEtiqueta.innerHTML = `<option value="">Todas</option>` +
-      getEtiquetas_dynamic().map(e => `<option value="${e}">${e}</option>`).join("");
+      getEtiquetas_dynamic().map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
   }
 
   // Cargar lista de usuarios para el filtro "Creado por" según jerarquía
@@ -42,7 +43,7 @@ async function populateFiltrosSelects(){
       const response = await api("/api/users/for-filter");
       const users = response.users || [];
       selCreatedBy.innerHTML = `<option value="">Todos</option>` +
-        users.map(u => `<option value="${u.id}">${u.full_name || u.username} (${u.role})</option>`).join("");
+        users.map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.full_name || u.username)} (${escapeHtml(u.role)})</option>`).join("");
     }catch(err){
       console.error("Error cargando usuarios:", err);
       // Fall back: rellenar con el usuario actual si es posible
@@ -64,6 +65,7 @@ async function buscarEgresos(){
   const tbody = document.getElementById("egresosTbody");
   if(!tbody) return;
 
+  const reqId = ++egresosReqSerial;
   tbody.innerHTML = `<tr><td colspan="11" class="muted">Cargando…</td></tr>`;
 
   const fecha_desde = document.getElementById("fecha_desde")?.value || "";
@@ -107,9 +109,12 @@ async function buscarEgresos(){
 
   try{
     const { egresos, pagination, sumas } = await api(`/api/egresos?${qs.toString()}`);
+    // Descartar respuestas viejas si el usuario cambió filtros mientras cargaba
+    if (reqId !== egresosReqSerial) return;
     renderEgresos(egresos, pagination, sumas);
   }catch(err){
-    tbody.innerHTML = `<tr><td colspan="11" class="muted">${err.message}</td></tr>`;
+    if (reqId !== egresosReqSerial) return;
+    tbody.innerHTML = `<tr><td colspan="11" class="muted">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -146,28 +151,29 @@ function renderEgresos(egresos, pagination, sumas){
       : '<span style="background: #5a5a5a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ARS</span>';
 
     const status = e.status || 'activo';
-    const statusBadge = status === 'activo'
-      ? '<span style="background: #444444; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ACTIVO</span>'
-      : status === 'anulado'
+    const wasEdited = !!e.edited_at || status === 'editada';
+    const statusBadge = status === 'anulado'
       ? '<span style="background: #2a2a2a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ANULADO</span>'
-      : status === 'editada'
+      : wasEdited
       ? '<span style="background: #666666; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">EDITADA</span>'
-      : '<span style="background: #7a7a7a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">PENDIENTE</span>';
+      : status === 'pendiente'
+      ? '<span style="background: #7a7a7a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">PENDIENTE</span>'
+      : '<span style="background: #444444; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ACTIVO</span>';
 
     return `
       <tr>
-        <td>${e.fecha}</td>
-        <td>${e.hora || "-"}</td>
-        <td>${e.empresa_salida}</td>
-        <td>${e.id_transferencia}</td>
-        <td>${e.etiqueta}${e.etiqueta_otro ? ` (${e.etiqueta_otro})` : ""}</td>
-        <td>${e.usuario_casino || "-"}</td>
+        <td>${escapeHtml(e.fecha)}</td>
+        <td>${escapeHtml(e.hora || "-")}</td>
+        <td>${escapeHtml(e.empresa_salida)}</td>
+        <td>${escapeHtml(e.id_transferencia)}</td>
+        <td>${escapeHtml(e.etiqueta)}${e.etiqueta_otro ? ` (${escapeHtml(e.etiqueta_otro)})` : ""}</td>
+        <td>${escapeHtml(e.usuario_casino || "-")}</td>
         <td>$${montoFormatted}</td>
         <td>${monedaBadge}</td>
         <td>${statusBadge}</td>
-        <td>${e.created_by_username}</td>
+        <td>${escapeHtml(e.created_by_username)}</td>
         <td>
-          <button class="btn btn-small btn-primary" data-ver-detalle="${e.id}">Ver</button>
+          <button class="btn btn-small btn-primary" data-ver-detalle="${escapeHtml(e.id)}">Ver</button>
         </td>
       </tr>
     `;
@@ -249,33 +255,40 @@ function mostrarDetalle(e){
     maximumFractionDigits: 2
   });
 
-  const isPdf = e.comprobante_mime === "application/pdf";
+  const hasComprobante = !!(e.comprobante_url || e.comprobante_filename);
+  const isPdf = e.comprobante_mime === "application/pdf"
+    || /\.pdf$/i.test(e.comprobante_filename || "")
+    || (e.comprobante_url && /\.pdf(\?|$)/i.test(e.comprobante_url));
 
-  // Usar directamente la URL de ImgBB si está disponible, sino usar el endpoint del backend
-  const comprobanteUrl = e.comprobante_url && e.comprobante_url.startsWith('http')
-    ? e.comprobante_url // URL directa de ImgBB o R2
-    : `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`; // Fallback al endpoint del backend
+  const comprobantePreview = !hasComprobante
+    ? `<div class="note">Sin comprobante adjunto</div>`
+    : isPdf
+    ? `<div class="comprobante-inline" data-egreso-id="${escapeHtml(String(e.id))}" data-comprobante-kind="pdf">
+        <iframe class="comprobante-pdf-frame" title="Comprobante PDF" style="width:100%;min-height:420px;border:1px solid var(--border);border-radius:8px;background:#111;"></iframe>
+        <button type="button" class="btn btn-ghost btn-comprobante-tab" style="margin-top:8px;">Abrir en nueva pestaña</button>
+      </div>`
+    : `<div class="comprobante-inline" data-egreso-id="${escapeHtml(String(e.id))}" data-comprobante-kind="image">
+        <img class="comprobante-img" style="max-width:100%;max-height:400px;border-radius:8px;" alt="Comprobante">
+        <button type="button" class="btn btn-ghost btn-comprobante-tab" style="margin-top:8px;">Abrir en nueva pestaña</button>
+      </div>`;
 
-  const comprobantePreview = isPdf
-    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Ver PDF en nueva ventana</a>`
-    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" onerror="this.parentElement.innerHTML='Error cargando imagen'"></a>`;
-
-  // Estado visual
+  // Estado visual: la marca de edición vive en edited_at, no en status
   const status = e.status || 'activo';
-  const statusBadge = status === 'activo'
-    ? '<span style="background: #444444; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ACTIVO</span>'
-    : status === 'anulado'
+  const wasEdited = !!e.edited_at || status === 'editada';
+  const statusBadge = status === 'anulado'
     ? '<span style="background: #2a2a2a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ANULADO</span>'
-    : status === 'editada'
+    : wasEdited
     ? '<span style="background: #666666; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">EDITADA</span>'
-    : '<span style="background: #7a7a7a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">PENDIENTE</span>';
+    : status === 'pendiente'
+    ? '<span style="background: #7a7a7a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">PENDIENTE</span>'
+    : '<span style="background: #444444; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ACTIVO</span>';
 
   const user = getUser();
   // Admin/Direccion pueden editar cualquier egreso, otros usuarios solo los propios
   const isAdminOrDireccion = (user.role === 'admin' || user.role === 'direccion');
   const isOwner = e.created_by === user.id;
   const canEdit = isAdminOrDireccion || isOwner;
-  const canDelete = isAdminOrDireccion || isOwner;
+  const canAnular = user.role === 'admin';
 
   body.innerHTML = `
     <div class="grid">
@@ -377,9 +390,9 @@ function mostrarDetalle(e){
             <button class="btn btn-primary btn-editar-egreso" style="flex: 1; min-width: 140px;">
               Editar
             </button>
-            ${canDelete ? `
-              <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
-                Eliminar
+            ${canAnular ? `
+              <button type="button" class="btn btn-anular-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+                Anular
               </button>
             ` : ''}
           ` : ''}
@@ -395,12 +408,16 @@ function mostrarDetalle(e){
   console.log('Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
 
+  if (hasComprobante) {
+    hydrateComprobantePreview(e);
+  }
+
   console.log('Modal mostrado con display:', modal.style.display);
 
   // Agregar event listeners a los botones de acción
   setTimeout(() => {
     const btnEditar = document.querySelector('.btn-editar-egreso');
-    const btnEliminar = document.querySelector('.btn-eliminar-egreso');
+    const btnAnular = document.querySelector('.btn-anular-egreso');
     const btnHistorial = document.querySelector('.btn-ver-historial');
 
     if (btnEditar) {
@@ -410,11 +427,10 @@ function mostrarDetalle(e){
       });
     }
 
-    if (btnEliminar) {
-      btnEliminar.addEventListener('click', () => {
-        const egresoId = btnEliminar.dataset.egresoId;
-        console.log('Boton Eliminar clickeado, ID:', egresoId);
-        mostrarModalEliminar(egresoId);
+    if (btnAnular) {
+      btnAnular.addEventListener('click', () => {
+        const egresoId = btnAnular.dataset.egresoId;
+        mostrarFormAnular(egresoId);
       });
     }
 
@@ -428,20 +444,107 @@ function mostrarDetalle(e){
   }, 100);
 }
 
+async function hydrateComprobantePreview(egreso) {
+  const container = document.querySelector("#detalleBody .comprobante-inline");
+  if (!container || !egreso?.id) return;
+
+  const kind = container.dataset.comprobanteKind;
+  const token = getToken();
+  const url = `${API_BASE}/api/egresos/${encodeURIComponent(egreso.id)}/comprobante`;
+
+  try {
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      throw new Error("No se pudo cargar el comprobante");
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    if (kind === "pdf") {
+      const iframe = container.querySelector("iframe");
+      if (iframe) iframe.src = objectUrl;
+    } else {
+      const img = container.querySelector(".comprobante-img");
+      if (img) img.src = objectUrl;
+    }
+
+    container.querySelector(".btn-comprobante-tab")?.addEventListener("click", () => {
+      window.open(objectUrl, "_blank", "noopener,noreferrer");
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="note" style="color:#ef4444;">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function mostrarFormAnular(egresoId) {
+  const modal = document.getElementById("detalleModal");
+  const body = document.getElementById("detalleBody");
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div style="max-width: 520px;">
+      <h3 style="margin: 0 0 8px 0;">Anular egreso #${escapeHtml(egresoId)}</h3>
+      <p class="note" style="margin: 0 0 16px 0;">El movimiento quedará marcado como anulado y se conservará en el historial para auditoría.</p>
+      <div class="field">
+        <label for="anular_motivo">Motivo de anulación *</label>
+        <textarea id="anular_motivo" rows="4" placeholder="Describí por qué se anula este egreso"></textarea>
+        <div id="anular_motivo_error" class="field-error" style="display:none;" role="alert"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost" id="btnCancelAnular">Volver</button>
+        <button type="button" class="btn" id="btnConfirmAnular" style="background:#ef4444;color:#fff;">Confirmar anulación</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+
+  document.getElementById("anular_motivo")?.addEventListener("input", () => clearFieldError("anular_motivo"));
+
+  document.getElementById("btnCancelAnular")?.addEventListener("click", () => {
+    if (currentEgreso) mostrarDetalle(currentEgreso);
+    else cerrarModal();
+  });
+
+  document.getElementById("btnConfirmAnular")?.addEventListener("click", async () => {
+    const motivo = document.getElementById("anular_motivo")?.value?.trim() || "";
+    clearFieldError("anular_motivo");
+    if (!motivo) {
+      setFieldError("anular_motivo", "El motivo de anulación es obligatorio.");
+      return;
+    }
+    await anularEgreso(egresoId, motivo);
+  });
+}
+
+async function anularEgreso(id, motivo) {
+  try {
+    await api(`/api/egresos/${id}/anular`, { method: "POST", body: { motivo } });
+    toast("Anulado", "Egreso anulado correctamente", "success", 5000);
+    cerrarModal();
+    buscarEgresos();
+  } catch (err) {
+    setFieldError("anular_motivo", err.message || "No se pudo anular el egreso.");
+  }
+}
+
 function limpiarFiltros(){
-  document.getElementById("fecha_desde").value = "";
-  document.getElementById("fecha_hasta").value = "";
-  document.getElementById("empresa_salida").value = "";
-  document.getElementById("etiqueta").value = "";
-  document.getElementById("usuario_casino").value = "";
-  document.getElementById("id_transferencia").value = "";
-  document.getElementById("monto_min").value = "";
-  document.getElementById("monto_max").value = "";
+  const clearIds = [
+    "fecha_desde", "fecha_hasta", "empresa_salida", "etiqueta", "status",
+    "moneda", "usuario_casino", "id_transferencia", "monto_min", "monto_max",
+    "turno", "cuenta_receptora", "created_by"
+  ];
+  for (const id of clearIds) {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  }
   egresosOffset = 0;
   currentFilters = {};
 
   const tbody = document.getElementById("egresosTbody");
-  if(tbody) tbody.innerHTML = `<tr><td colspan="9" class="muted">Usá los filtros para buscar transferencias</td></tr>`;
+  if(tbody) tbody.innerHTML = `<tr><td colspan="11" class="muted">Usá los filtros para buscar transferencias</td></tr>`;
 
   const info = document.getElementById("resultadosInfo");
   if(info) info.textContent = "—";
@@ -475,11 +578,12 @@ async function downloadCSVFiltrado(){
     const token = getToken();
     if(!token){ toast("Sin sesión","Iniciá sesión"); return; }
 
-    // Leer los filtros directamente del formulario
+    // Mismos filtros que la búsqueda en pantalla (incluye status)
     const fecha_desde = document.getElementById("fecha_desde")?.value || "";
     const fecha_hasta = document.getElementById("fecha_hasta")?.value || "";
     const empresa_salida = document.getElementById("empresa_salida")?.value || "";
     const etiqueta = document.getElementById("etiqueta")?.value || "";
+    const status = document.getElementById("status")?.value || "";
     const usuario_casino = document.getElementById("usuario_casino")?.value?.trim() || "";
     const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
     const monto_min = document.getElementById("monto_min")?.value || "";
@@ -495,6 +599,7 @@ async function downloadCSVFiltrado(){
     if(fecha_hasta) qs.set("fecha_hasta", fecha_hasta);
     if(empresa_salida) qs.set("empresa_salida", empresa_salida);
     if(etiqueta) qs.set("etiqueta", etiqueta);
+    if(status) qs.set("status", status);
     if(usuario_casino) qs.set("usuario_casino", usuario_casino);
     if(id_transferencia) qs.set("id_transferencia", id_transferencia);
     if(monto_min) qs.set("monto_min", monto_min);
@@ -585,7 +690,7 @@ function editarEgresoModal(){
       <div class="field span6">
         <label>CONCEPTO/ETIQUETA *</label>
         <select id="edit_etiqueta" required>
-          ${getEtiquetas_dynamic().map(et => `<option value="${et}" ${egreso.etiqueta === et ? 'selected' : ''}>${et}</option>`).join('')}
+          ${getEtiquetas_dynamic().map(et => `<option value="${escapeHtml(et)}" ${egreso.etiqueta === et ? 'selected' : ''}>${escapeHtml(et)}</option>`).join('')}
           ${!getEtiquetas_dynamic().includes(egreso.etiqueta) ? `<option value="${escapeHtml(egreso.etiqueta)}" selected>${escapeHtml(egreso.etiqueta)} (Inactiva)</option>` : ''}
         </select>
       </div>
@@ -637,7 +742,7 @@ function editarEgresoModal(){
       <div class="field span6">
         <label>EMPRESA SALIDA *</label>
         <select id="edit_empresa_salida" required>
-          ${getEmpresas().map(emp => `<option value="${emp}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${emp}</option>`).join('')}
+          ${getEmpresas().map(emp => `<option value="${escapeHtml(emp)}" ${egreso.empresa_salida === emp ? 'selected' : ''}>${escapeHtml(emp)}</option>`).join('')}
           ${!getEmpresas().includes(egreso.empresa_salida) ? `<option value="${escapeHtml(egreso.empresa_salida)}" selected>${escapeHtml(egreso.empresa_salida)} (Inactiva)</option>` : ''}
         </select>
       </div>
@@ -871,31 +976,12 @@ function editarEgresoModal(){
   modal.style.display = "flex";
 }
 
-function mostrarModalEliminar(id){
-  const confirmacion = confirm(`Estas seguro que queres ELIMINAR el egreso #${id}?\n\nEsta accion NO se puede deshacer.\nEl egreso sera eliminado permanentemente de la base de datos.`);
-
-  if(!confirmacion) return;
-
-  eliminarEgreso(id);
-}
-
-async function eliminarEgreso(id){
-  try{
-    await api(`/api/egresos/${id}`, { method: 'DELETE' });
-    toast("Eliminado", "Egreso eliminado correctamente", "success", 5000);
-    cerrarModal();
-    buscarEgresos(); // Recargar listado
-  }catch(err){
-    toast("Error", err.message, "error");
-  }
-}
-
 async function verHistorial(id){
   try{
     const data = await api(`/api/egresos/${id}/history`);
 
     if(!data.changes || data.changes.length === 0){
-      toast("Sin cambios", "Este egreso no tiene historial de modificaciones", "info");
+      mostrarHistorialVacio(id);
       return;
     }
 
@@ -904,6 +990,31 @@ async function verHistorial(id){
   }catch(err){
     toast("Error", err.message, "error");
   }
+}
+
+function mostrarHistorialVacio(egresoId) {
+  const modal = document.getElementById("detalleModal");
+  const body = document.getElementById("detalleBody");
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div style="text-align:center;padding:28px 12px;">
+      <h3 style="margin:0 0 12px 0;">Sin historial de cambios</h3>
+      <p class="note" style="margin:0 0 24px 0;">El egreso #${escapeHtml(egresoId)} no tiene modificaciones registradas.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" id="btnHistorialVacioVolver">Volver al detalle</button>
+        <button type="button" class="btn btn-ghost" id="btnHistorialVacioCerrar">Cerrar</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+
+  document.getElementById("btnHistorialVacioCerrar")?.addEventListener("click", cerrarModal);
+  document.getElementById("btnHistorialVacioVolver")?.addEventListener("click", () => {
+    if (currentEgreso) mostrarDetalle(currentEgreso);
+    else cerrarModal();
+  });
 }
 
 function mostrarHistorialModal(egresoId, changes){
@@ -922,25 +1033,39 @@ function mostrarHistorialModal(egresoId, changes){
 
     const fieldLabel = {
       'monto': 'Monto',
+      'monto_raw': 'Monto (texto)',
+      'moneda': 'Moneda',
+      'tipo_transaccion': 'Tipo de transacción',
       'status': 'Estado',
       'fecha': 'Fecha',
+      'hora': 'Hora',
+      'turno': 'Turno',
       'etiqueta': 'Etiqueta',
-      'cuenta_receptora': 'Cuenta Receptora',
+      'etiqueta_otro': 'Otro concepto',
+      'cuenta_receptora': 'Cuenta receptora',
+      'usuario_casino': 'Usuario casino',
+      'hora_solicitud_cliente': 'Hora solicitud cliente',
+      'hora_quema_fichas': 'Hora quema de fichas',
+      'cuenta_salida': 'Cuenta salida',
+      'empresa_salida': 'Empresa salida',
+      'id_transferencia': 'ID transferencia',
+      'codigo_operacion': 'Código de operación',
+      'comprobante': 'Comprobante',
       'notas': 'Notas'
     }[c.field_name] || c.field_name;
 
     return `
       <div style="border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 12px; background: var(--bg-alt); border-radius: 4px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <strong>${changeTypeLabel}</strong>
-          <span class="note">${c.created_at_formatted}</span>
+          <strong>${escapeHtml(changeTypeLabel)}</strong>
+          <span class="note">${escapeHtml(c.created_at_formatted)}</span>
         </div>
         <div class="note" style="margin-bottom: 4px;">
-          <strong>Por:</strong> ${escapeHtml(c.changed_by_username)} (${c.changed_by_role})
+          <strong>Por:</strong> ${escapeHtml(c.changed_by_username)} (${escapeHtml(c.changed_by_role)})
         </div>
         ${c.field_name ? `
           <div class="note" style="margin-bottom: 4px;">
-            <strong>Campo:</strong> ${fieldLabel}
+            <strong>Campo:</strong> ${escapeHtml(fieldLabel)}
           </div>
           <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-top: 8px;">
             <div style="background: #fee2e2; padding: 8px; border-radius: 4px;">
@@ -966,7 +1091,7 @@ function mostrarHistorialModal(egresoId, changes){
   body.innerHTML = `
     <div style="margin-bottom: 16px;">
       <h3 style="margin: 0 0 8px 0;">Historial de cambios</h3>
-      <div class="note">Egreso #${egresoId} - ${changes.length} cambio(s) registrado(s)</div>
+      <div class="note">Egreso #${escapeHtml(egresoId)} - ${changes.length} cambio(s) registrado(s)</div>
     </div>
     <div style="max-height: 500px; overflow-y: auto;">
       ${rows}
@@ -976,7 +1101,7 @@ function mostrarHistorialModal(egresoId, changes){
     </div>
   `;
 
-  modal.style.display = "block";
+  modal.style.display = "flex";
 
   // Agregar event listener al botón Cerrar
   setTimeout(() => {

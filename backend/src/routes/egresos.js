@@ -7,11 +7,14 @@ import https from "https";
 import { query } from "../config/db.js";
 import { auth, requireAdminOrDireccion, requireAdmin } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
+import { writeLimiter, exportLimiter } from "../middleware/rateLimiter.js";
 import {
   isFutureDateISO,
   parseMontoARSStrict,
   montoToCommaString,
-  requireNonEmpty
+  requireNonEmpty,
+  TURNOS_CIERRE,
+  TURNOS_CIERRE_ORDER
 } from "../utils/validators.js";
 import {
   isValidEmpresa,
@@ -59,13 +62,6 @@ function setSaldosCache(cacheKey, payload) {
 function clearSaldosCache() {
   if (saldosCache.size) saldosCache.clear();
 }
-
-const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
-const TURNOS_CIERRE_ORDER = {
-  "Turno mañana": 1,
-  "Turno tarde": 2,
-  "Turno noche": 3
-};
 
 function normalizeTurnoLabel(turnoValue) {
   const raw = String(turnoValue || "").trim();
@@ -173,6 +169,36 @@ const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 10);
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 function isDigitsOnly(v){ return /^[0-9]+$/.test(String(v || "").trim()); }
+
+/**
+ * Nombre real del archivo en disco.
+ * comprobante_filename guarda el nombre original de la subida, mientras que en
+ * disco se escribe con prefijo de timestamp, así que el nombre hay que sacarlo
+ * de la URL. Se usa basename para que no se pueda salir de UPLOAD_DIR.
+ */
+function resolveLocalComprobanteName(egreso) {
+  const candidates = [];
+
+  if (egreso.comprobante_url) {
+    try {
+      const raw = String(egreso.comprobante_url).startsWith("http")
+        ? new URL(egreso.comprobante_url).pathname
+        : egreso.comprobante_url;
+      candidates.push(decodeURIComponent(raw));
+    } catch {
+      // URL inválida: se ignora y se prueba con el filename guardado
+    }
+  }
+
+  if (egreso.comprobante_filename) candidates.push(egreso.comprobante_filename);
+
+  for (const candidate of candidates) {
+    const name = path.basename(String(candidate).trim());
+    if (name && name !== "." && name !== "..") return name;
+  }
+
+  return null;
+}
 
 /**
  * Convierte fecha ISO (aaaa-mm-dd) o Date a formato dd/mm/aaaa
@@ -378,7 +404,7 @@ router.get("/check-id-transferencia", auth, async (req, res) => {
   }
 });
 
-router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async (req, res) => {
+router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploadedFile, async (req, res) => {
   try {
     const dataStr = req.body?.data;
     if (!dataStr) return res.status(400).json({ message: "Falta campo data" });
@@ -726,34 +752,21 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
 
   const nextIdx = baseParams.length + 1;
 
-  // Función SQL reutilizable para parsear fecha de forma segura
-  // Filtra filas con fechas inválidas (NULL, vacías, formato desconocido)
-  const FECHA_VALIDA = `(fecha IS NOT NULL AND fecha::text <> '' AND (fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' OR fecha::text ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'))`;
-  const PARSE_FECHA = `(CASE WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD') ELSE TO_DATE(fecha::text, 'DD/MM/YYYY') END)`;
-
-  // 1) Cierre de Caja anterior al mes seleccionado
+  // egresos.fecha es DATE desde la migración 001: comparar directo para que
+  // idx_egresos_fecha sea usable. El CAST a text + TO_DATE anterior hacía un
+  // scan completo en cada cálculo de saldos.
   const cierreSql = `
-    WITH base AS (
-      SELECT
-        empresa_salida,
-        cuenta_salida,
-        moneda,
-        monto,
-        ${PARSE_FECHA} AS fecha_parsed
-      FROM egresos
-      WHERE status <> 'anulado'
-        AND etiqueta = 'Cierre de Caja'
-        AND ${FECHA_VALIDA}
-        ${commonFilter}
-    )
     SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
       empresa_salida,
       cuenta_salida,
       moneda,
       monto
-    FROM base
-    WHERE fecha_parsed < $${nextIdx}::date
-    ORDER BY empresa_salida, cuenta_salida, moneda, fecha_parsed DESC
+    FROM egresos
+    WHERE status <> 'anulado'
+      AND etiqueta = 'Cierre de Caja'
+      AND fecha < $${nextIdx}::date
+      ${commonFilter}
+    ORDER BY empresa_salida, cuenta_salida, moneda, fecha DESC
   `;
   const cierreResult = await query(cierreSql, [...baseParams, primerDiaMesISO]);
 
@@ -765,22 +778,6 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
   // 2) Movimientos del mes (con o sin desglose por etiqueta)
   const movSql = includeBreakdown
     ? `
-      WITH base AS (
-        SELECT
-          empresa_salida,
-          cuenta_salida,
-          moneda,
-          etiqueta,
-          tipo_transaccion,
-          monto,
-          created_at,
-          ${PARSE_FECHA} AS fecha_parsed
-        FROM egresos
-        WHERE status <> 'anulado'
-          AND etiqueta != 'Cierre de Caja'
-          AND ${FECHA_VALIDA}
-          ${commonFilter}
-      )
       SELECT
         empresa_salida,
         cuenta_salida,
@@ -790,28 +787,16 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
         COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
         MAX(created_at) AS ultima_transaccion,
         COUNT(*) AS cnt
-      FROM base
-      WHERE fecha_parsed >= $${nextIdx}::date
-        AND fecha_parsed < $${nextIdx + 1}::date
+      FROM egresos
+      WHERE status <> 'anulado'
+        AND etiqueta != 'Cierre de Caja'
+        AND fecha >= $${nextIdx}::date
+        AND fecha < $${nextIdx + 1}::date
+        ${commonFilter}
       GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
       ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
     `
     : `
-      WITH base AS (
-        SELECT
-          empresa_salida,
-          cuenta_salida,
-          moneda,
-          tipo_transaccion,
-          monto,
-          created_at,
-          ${PARSE_FECHA} AS fecha_parsed
-        FROM egresos
-        WHERE status <> 'anulado'
-          AND etiqueta != 'Cierre de Caja'
-          AND ${FECHA_VALIDA}
-          ${commonFilter}
-      )
       SELECT
         empresa_salida,
         cuenta_salida,
@@ -820,9 +805,12 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
         COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
         MAX(created_at) AS ultima_transaccion,
         COUNT(*) AS cnt
-      FROM base
-      WHERE fecha_parsed >= $${nextIdx}::date
-        AND fecha_parsed < $${nextIdx + 1}::date
+      FROM egresos
+      WHERE status <> 'anulado'
+        AND etiqueta != 'Cierre de Caja'
+        AND fecha >= $${nextIdx}::date
+        AND fecha < $${nextIdx + 1}::date
+        ${commonFilter}
       GROUP BY empresa_salida, cuenta_salida, moneda
       ORDER BY empresa_salida, cuenta_salida, moneda
     `;
@@ -1049,7 +1037,7 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/egresos/saldos/csv - Exportar saldos a CSV
-router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
+router.get("/saldos/csv", auth, requireAdmin, exportLimiter, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
@@ -1226,7 +1214,7 @@ router.get("/cierres/kpi", auth, async (req, res) => {
 });
 
 // GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados (incluye legacy)
-router.get("/cierres/csv", auth, async (req, res) => {
+router.get("/cierres/csv", auth, exportLimiter, async (req, res) => {
   try {
     const todayISO = localDateToISO(new Date());
     const defaultDesde = shiftISODate(todayISO, -2);
@@ -1424,8 +1412,19 @@ router.get("/", auth, async (req, res) => {
     }
 
     if (status) {
-      params.push(status);
-      where.push(`e.status = $${params.length}`);
+      // "editada" dejó de ser un valor de status: ahora se filtra por edited_at.
+      // Se mantiene el valor del query para no romper los selects del frontend.
+      // Activo/Pendiente excluyen los editados para que las opciones del select
+      // sigan siendo mutuamente excluyentes en la UI.
+      if (String(status) === "editada") {
+        where.push(`e.edited_at IS NOT NULL AND COALESCE(e.status, 'activo') <> 'anulado'`);
+      } else if (String(status) === "activo" || String(status) === "pendiente") {
+        params.push(status);
+        where.push(`e.status = $${params.length} AND e.edited_at IS NULL`);
+      } else {
+        params.push(status);
+        where.push(`e.status = $${params.length}`);
+      }
     }
 
     if (moneda) {
@@ -1563,6 +1562,7 @@ router.get("/", auth, async (req, res) => {
       comprobante_mime: e.comprobante_mime,
       notas: e.notas,
       status: e.status || 'activo',
+      edited_at: e.edited_at || null,
       motivo_anulacion: e.motivo_anulacion || null,
       anulado_at: e.anulado_at || null,
       updated_at: e.updated_at || null,
@@ -1571,14 +1571,9 @@ router.get("/", auth, async (req, res) => {
       created_at: e.created_at
     }));
 
-    await auditLog(req, {
-      action: "EGRESO_LIST",
-      entity: "egresos",
-      entity_id: null,
-      success: true,
-      status_code: 200,
-      details: { rows: r.rowCount, filters: req.query }
-    });
+    // No se audita el listado: con filtros y paginación genera ruido que tapa
+    // los eventos que importan (CREATE/UPDATE/ANULAR). Sí se auditan CSV y
+    // descarga de comprobantes, que son extracción de datos.
 
     return res.json({
       egresos,
@@ -1601,7 +1596,7 @@ router.get("/", auth, async (req, res) => {
 });
 
 // CSV con filtros (solo admin y direccion)
-router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
+router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res) => {
   try {
 
     const {
@@ -1609,6 +1604,8 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       fecha_hasta,
       empresa_salida,
       etiqueta,
+      status,
+      moneda,
       usuario_casino,
       id_transferencia,
       monto_min,
@@ -1649,6 +1646,23 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
       }
     }
 
+    if (status) {
+      if (String(status) === "editada") {
+        where.push(`e.edited_at IS NOT NULL AND COALESCE(e.status, 'activo') <> 'anulado'`);
+      } else if (String(status) === "activo" || String(status) === "pendiente") {
+        params.push(status);
+        where.push(`e.status = $${params.length} AND e.edited_at IS NULL`);
+      } else {
+        params.push(status);
+        where.push(`e.status = $${params.length}`);
+      }
+    }
+
+    if (moneda) {
+      params.push(String(moneda).toUpperCase());
+      where.push(`e.moneda = $${params.length}`);
+    }
+
     if (usuario_casino) {
       params.push(`%${usuario_casino}%`);
       where.push(`e.usuario_casino ILIKE $${params.length}`);
@@ -1682,11 +1696,6 @@ router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
     if (created_by) {
       params.push(Number(created_by));
       where.push(`e.created_by = $${params.length}`);
-    }
-
-    if (req.query.moneda) {
-      params.push(req.query.moneda.toUpperCase());
-      where.push(`e.moneda = $${params.length}`);
     }
 
     if (req.query.tipo_transaccion) {
@@ -1875,11 +1884,12 @@ router.get("/:id/comprobante", auth, async (req, res) => {
     }
 
     // Si está en disco local, servir el archivo
-    const filePath = path.join(process.cwd(), UPLOAD_DIR, egreso.comprobante_filename);
+    const localName = resolveLocalComprobanteName(egreso);
+    const filePath = localName ? path.join(process.cwd(), UPLOAD_DIR, localName) : null;
     console.log(`  - Ruta completa del archivo: ${filePath}`);
-    console.log(`  - Archivo existe: ${fs.existsSync(filePath)}`);
+    console.log(`  - Archivo existe: ${filePath ? fs.existsSync(filePath) : false}`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!filePath || !fs.existsSync(filePath)) {
       console.log(`  ❌ Archivo no encontrado en disco`);
 
       // Listar archivos en el directorio de uploads para debugging
@@ -1899,7 +1909,7 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       entity_id: id,
       success: true,
       status_code: 200,
-      details: { filename: egreso.comprobante_filename }
+      details: { filename: egreso.comprobante_filename, stored_as: localName }
     });
 
     console.log(`  ✅ Sirviendo archivo desde disco`);
@@ -1911,7 +1921,7 @@ router.get("/:id/comprobante", auth, async (req, res) => {
 });
 
 // ENDPOINT DE DEBUGGING - Temporal para diagnosticar el problema
-router.get("/debug/uploads", auth, async (req, res) => {
+router.get("/debug/uploads", auth, requireAdmin, async (req, res) => {
   try {
     const uploadDir = path.join(process.cwd(), UPLOAD_DIR);
 
@@ -1957,7 +1967,7 @@ router.get("/debug/uploads", auth, async (req, res) => {
 // PUT /api/egresos/:id - Editar egreso
 // Admin/Direccion: puede editar cualquier egreso
 // Empleado/Encargado: solo puede editar sus propios egresos
-router.put("/:id", auth, async (req, res) => {
+router.put("/:id", auth, writeLimiter, async (req, res) => {
   try {
     // Cargar egreso existente para validaciones previas
     const { id } = req.params;
@@ -2277,8 +2287,11 @@ router.put("/:id", auth, async (req, res) => {
     if (sendsEmpresaSalida) setField("empresa_salida", empresaSalidaNorm);
     if (sendsNotas) setField("notas", notasNorm);
 
-    // Marcar siempre como editado y registrar auditoría de quién editó
-    setClauses.push("status = 'editada'");
+    // Marcar edición sin pisar status (activo/pendiente se conservan).
+    // last_change_reason lo lee el trigger y lo copia a egresos_history.
+    params.push(changeReasonNorm);
+    setClauses.push(`last_change_reason = $${params.length}`);
+    setClauses.push("edited_at = CURRENT_TIMESTAMP");
     params.push(req.user.id);
     setClauses.push(`updated_by = $${params.length}`);
     setClauses.push("updated_at = CURRENT_TIMESTAMP");
@@ -2289,12 +2302,6 @@ router.put("/:id", auth, async (req, res) => {
       `UPDATE egresos SET ${setClauses.join(", ")} WHERE id = $${params.length}`,
       params
     );
-
-    // Si no hay campos explícitos para cambio, al menos dejar trazabilidad por estado/updated_by
-    if (setClauses.length === 3) {
-      // status + updated_by + updated_at
-      // no-op: ya quedó trazabilidad
-    }
 
     // Registrar en audit logs
     await auditLog(req, {
@@ -2331,7 +2338,7 @@ router.put("/:id", auth, async (req, res) => {
 });
 
 // POST /api/egresos/:id/anular - Anular egreso (solo admin)
-router.post("/:id/anular", auth, async (req, res) => {
+router.post("/:id/anular", auth, writeLimiter, async (req, res) => {
   try {
     // Solo admin puede anular
     if (req.user.role !== "admin") {
@@ -2436,61 +2443,11 @@ router.get("/:id/history", auth, async (req, res) => {
   }
 });
 
-// DELETE /api/egresos/:id - Eliminar egreso completamente
-// Admin/Direccion: puede eliminar cualquier egreso
-// Empleado/Encargado: solo puede eliminar sus propios egresos
-router.delete("/:id", auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Verificar que el egreso existe
-    const checkEgreso = await query(
-      `SELECT * FROM egresos WHERE id = $1`,
-      [id]
-    );
-
-    if (checkEgreso.rows.length === 0) {
-      return res.status(404).json({ message: "Egreso no encontrado" });
-    }
-
-    const egreso = checkEgreso.rows[0];
-
-    // Verificar permisos: admin/direccion pueden eliminar cualquiera, otros solo los propios
-    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
-    const isOwner = egreso.created_by === req.user.id;
-
-    if (!isAdminOrDireccion && !isOwner) {
-      return res.status(403).json({ message: "Solo podés eliminar tus propios egresos" });
-    }
-
-    // Eliminar el egreso de la base de datos
-    await query(
-      `DELETE FROM egresos WHERE id = $1`,
-      [id]
-    );
-
-    // Registrar en audit logs
-    await auditLog(req, {
-      action: "EGRESO_DELETE",
-      entity: "egresos",
-      entity_id: id,
-      success: true,
-      status_code: 200,
-      details: {
-        monto: Number(egreso.monto),
-        empresa_salida: egreso.empresa_salida,
-        id_transferencia: egreso.id_transferencia,
-        fecha: egreso.fecha
-      }
-    });
-
-    clearSaldosCache();
-    return res.json({ message: "Egreso eliminado correctamente" });
-
-  } catch (error) {
-    console.error("🔥 Error eliminando egreso:", error);
-    return res.status(500).json({ message: "Error eliminando egreso" });
-  }
+// DELETE deshabilitado: usar POST /:id/anular con motivo (auditoría completa).
+router.delete("/:id", auth, (_req, res) => {
+  return res.status(405).json({
+    message: "El borrado físico no está permitido. Use anular con motivo obligatorio."
+  });
 });
 
 export default router;

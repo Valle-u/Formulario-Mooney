@@ -4,15 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Usuarios</title>
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
-          document.documentElement.classList.add('sidebar-collapsed');
-        }
-      } catch (_) {}
-    })();
-  </script>
+  <script src="boot-sidebar.js?v=AUTO"></script>
   <!-- Build: 2026-01-02-23-03-19 -->
   <link rel="stylesheet" href="styles.css?v=AUTO"/>
 </head>
@@ -209,6 +201,7 @@
             <button type="button" class="password-toggle" data-target="reset_password" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 8px; top: 34px; background: none; border: none; cursor: pointer; font-size: 11px; padding: 4px; opacity: 0.6; transition: opacity 0.2s; font-weight: 700; letter-spacing: .3px;">
               VER
             </button>
+            <div id="reset_password_error" class="field-error" style="display:none;" role="alert"></div>
             <small class="note" style="display:block; margin-top:4px; font-size:11px;">
               Mín 8 caracteres, mayúscula, minúscula, número y carácter especial
             </small>

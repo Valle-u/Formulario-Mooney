@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initCommonUI();
   initTabs();
   initModal();
+  setupConfigTableActions();
   initApiKeyUi();
   await loadEmpresas();
   await loadCategories();
@@ -91,8 +92,8 @@ function renderEmpresas() {
   tbody.innerHTML = empresasList.map((opt, i) => `
     <tr class="${opt.is_active ? '' : 'row-inactive'}">
       <td class="config-order">
-        <button class="btn-order" data-dir="up" data-id="${opt.id}" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
-        <button class="btn-order" data-dir="down" data-id="${opt.id}" ${i === empresasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
+        <button class="btn-order" data-dir="up" data-id="${opt.id}" data-order-type="empresa" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
+        <button class="btn-order" data-dir="down" data-id="${opt.id}" data-order-type="empresa" ${i === empresasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
       </td>
       <td>${escapeHtml(opt.value)}</td>
       <td>
@@ -107,7 +108,6 @@ function renderEmpresas() {
     </tr>
   `).join("");
 
-  bindTableActions("empresa");
 }
 
 // ===== RENDER ETIQUETAS =====
@@ -118,8 +118,8 @@ function renderEtiquetas() {
   tbody.innerHTML = etiquetasList.map((opt, i) => `
     <tr class="${opt.is_active ? '' : 'row-inactive'}">
       <td class="config-order">
-        <button class="btn-order" data-dir="up" data-id="${opt.id}" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
-        <button class="btn-order" data-dir="down" data-id="${opt.id}" ${i === etiquetasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
+        <button class="btn-order" data-dir="up" data-id="${opt.id}" data-order-type="etiqueta" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
+        <button class="btn-order" data-dir="down" data-id="${opt.id}" data-order-type="etiqueta" ${i === etiquetasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
       </td>
       <td>${escapeHtml(opt.category || '—')}</td>
       <td>${escapeHtml(opt.value)}</td>
@@ -137,18 +137,26 @@ function renderEtiquetas() {
       </td>
     </tr>
   `).join("");
-
-  bindTableActions("etiqueta");
 }
 
-// ===== BIND TABLE ACTIONS =====
-function bindTableActions(type) {
-  const list = type === "empresa" ? empresasList : etiquetasList;
+// ===== TABLE ACTIONS (delegación, una sola vez) =====
+let configActionsBound = false;
 
-  // Toggle active
-  document.querySelectorAll(`[data-toggle-type="${type}"]`).forEach(input => {
-    input.addEventListener("change", async () => {
+function setupConfigTableActions() {
+  if (configActionsBound) return;
+  configActionsBound = true;
+
+  const panels = [
+    document.getElementById("tbodyEmpresas"),
+    document.getElementById("tbodyEtiquetas")
+  ].filter(Boolean);
+
+  for (const tbody of panels) {
+    tbody.addEventListener("change", async (e) => {
+      const input = e.target.closest("[data-toggle-id]");
+      if (!input) return;
       const id = input.dataset.toggleId;
+      const type = input.dataset.toggleType;
       try {
         await api(`/api/options/${id}`, { method: "PUT", body: { is_active: input.checked } });
         toast("Actualizado", `Opción ${input.checked ? 'activada' : 'desactivada'}`, "success");
@@ -159,29 +167,31 @@ function bindTableActions(type) {
         input.checked = !input.checked;
       }
     });
-  });
 
-  // Edit
-  document.querySelectorAll(`[data-edit-type="${type}"]`).forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = parseInt(btn.dataset.editId);
-      const opt = list.find(o => o.id === id);
-      if (opt) openModal(type, opt);
-    });
-  });
+    tbody.addEventListener("click", async (e) => {
+      const editBtn = e.target.closest("[data-edit-id]");
+      if (editBtn) {
+        const type = editBtn.dataset.editType;
+        const list = type === "empresa" ? empresasList : etiquetasList;
+        const id = parseInt(editBtn.dataset.editId, 10);
+        const opt = list.find(o => o.id === id);
+        if (opt) openModal(type, opt);
+        return;
+      }
 
-  // Reorder
-  document.querySelectorAll(`[data-dir]`).forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const id = parseInt(btn.dataset.id);
-      const dir = btn.dataset.dir;
+      const orderBtn = e.target.closest("[data-dir]");
+      if (!orderBtn || orderBtn.disabled) return;
+      const type = orderBtn.dataset.orderType || orderBtn.dataset.editType ||
+        (tbody.id === "tbodyEmpresas" ? "empresa" : "etiqueta");
+      const list = type === "empresa" ? empresasList : etiquetasList;
+      const id = parseInt(orderBtn.dataset.id, 10);
+      const dir = orderBtn.dataset.dir;
       const idx = list.findIndex(o => o.id === id);
       if (idx < 0) return;
 
       const swapIdx = dir === "up" ? idx - 1 : idx + 1;
       if (swapIdx < 0 || swapIdx >= list.length) return;
 
-      // Swap in array
       [list[idx], list[swapIdx]] = [list[swapIdx], list[idx]];
       const ids = list.map(o => o.id);
 
@@ -194,7 +204,7 @@ function bindTableActions(type) {
         if (type === "empresa") await loadEmpresas(); else await loadEtiquetas();
       }
     });
-  });
+  }
 }
 
 // ===== MODAL =====

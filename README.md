@@ -26,14 +26,18 @@ Formulario-Mooney/
 │   │   ├── utils/          # Utilidades y validators
 │   │   ├── migrations/     # SQL migrations
 │   │   └── server.js       # Entry point
+│   ├── frontend/
+│   │   └── public/         # HTML + CSS + JS vanilla (servido por Express)
 │   ├── scripts/            # Mantenimiento
 │   ├── uploads/            # Archivos (gitignored)
 │   └── package.json
-├── frontend/
-│   └── public/             # HTML + CSS + JS vanilla
 ├── docs/                   # Documentación técnica
 └── README.md
 ```
+
+> El frontend no tiene build ni servidor propio: `backend/src/server.js` lo sirve
+> como estático desde `backend/frontend/public`, así que backend y frontend
+> comparten origen y puerto.
 
 ## 🚀 Instalación y Configuración
 
@@ -61,12 +65,17 @@ DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/mooney_db
 # Security
 JWT_SECRET=tu_secreto_super_largo_de_al_menos_32_caracteres_aqui
 
-# CORS
+# CORS (vacío = mismo origen que el backend)
 CORS_ORIGIN=http://localhost:5500
 
 # Uploads
 UPLOAD_DIR=uploads
+
+# Almacenamiento externo de comprobantes (si está vacío se usa UPLOAD_DIR)
+IMGBB_API_KEY=
 ```
+
+La lista completa y comentada está en `backend/.env.example`.
 
 3. **Crear base de datos**
 
@@ -80,15 +89,16 @@ CREATE DATABASE mooney_db;
 
 4. **Crear usuario administrador**
 
+Definir primero las credenciales en `.env` (`SEED_ADMIN_USERNAME`,
+`SEED_ADMIN_PASSWORD`, `SEED_ADMIN_FULLNAME`) y después:
+
 ```bash
 npm run seed:admin
 ```
 
-Por defecto crea:
-- Usuario: `admin`
-- Contraseña: `admin123`
-
-⚠️ **IMPORTANTE**: Cambiar la contraseña inmediatamente después del primer login.
+⚠️ **IMPORTANTE**: Si no se define `SEED_ADMIN_PASSWORD`, el script cae a una
+contraseña por defecto débil y pública. Definirla siempre, y cambiarla desde la
+app después del primer login.
 
 5. **Iniciar servidor**
 
@@ -104,36 +114,25 @@ El servidor arrancará en `http://localhost:4000` y ejecutará las migraciones a
 
 ### Frontend
 
-1. **Abrir con Live Server**
+No requiere pasos aparte: el mismo proceso de Node sirve las páginas estáticas.
+Con el backend levantado, abrir `http://localhost:4000` en el navegador.
 
-Si usás VS Code:
-- Instalar extensión "Live Server"
-- Clic derecho en `frontend/public/index.html`
-- Seleccionar "Open with Live Server"
-
-2. **O usar cualquier servidor estático**
-
-```bash
-cd frontend/public
-python -m http.server 5500
-# O
-npx serve
-```
-
-3. **Acceder a la aplicación**
-
-Abrir navegador en `http://localhost:5500`
+Los archivos viven en `backend/frontend/public/`. Al editarlos basta con
+recargar el navegador (los `<script>` usan un parámetro de versión que el
+servidor reescribe para evitar caché vieja).
 
 ## 🔐 Seguridad
 
 El sistema implementa:
 
-- ✅ **JWT con expiración**: Tokens de 24 horas
-- ✅ **Rate Limiting**: 5 intentos de login por 15 minutos
+- ✅ **JWT con expiración**: Tokens de 12 horas (HS256)
+- ✅ **Rate Limiting**: 10 login/min, 300 lecturas/min, 60 escrituras/min, 30 CSV/15 min (por IP)
 - ✅ **Contraseñas fuertes**: Mínimo 8 caracteres, mayúsculas, números, especiales
 - ✅ **Bcrypt**: Hash de contraseñas con salt rounds 12
-- ✅ **XSS Protection**: Sanitización de inputs en frontend
-- ✅ **Archivos protegidos**: Solo usuarios autenticados pueden descargar comprobantes
+- ✅ **XSS Protection**: Escapado de todo dato del servidor antes de inyectarlo en el DOM, más CSP sin `unsafe-inline` en `script-src`
+- ✅ **Validación por magic numbers**: El contenido del archivo subido debe coincidir con JPG, PNG o PDF
+- ✅ **Archivos protegidos**: Solo usuarios autenticados pueden descargar comprobantes guardados en disco local
+- ✅ **Sin DDL por HTTP**: Ningún endpoint modifica el esquema; los cambios van solo por migraciones versionadas
 - ✅ **Validación de variables de entorno**: El servidor no arranca si faltan variables críticas
 - ✅ **CORS configurado**: Solo orígenes permitidos
 - ✅ **Audit logs**: Registro inmutable de todas las acciones
@@ -142,19 +141,33 @@ El sistema implementa:
 
 PostgreSQL con las siguientes tablas:
 
-- `users`: Usuarios del sistema (admin/user)
+- `users`: Usuarios del sistema (roles: `admin`, `direccion`, `encargado`, `empleado`)
 - `egresos`: Registro de transferencias salientes
-- `audit_logs`: Logs de auditoría (retención 6 meses)
+- `egresos_history`: Historial de cambios por egreso (lo escribe un trigger)
+- `audit_logs`: Logs de auditoría
+- `select_options`: Empresas y etiquetas de los desplegables
+- `health_log`: Chequeos de salud
 - `schema_migrations`: Control de migraciones
 
 ### Optimizaciones
 
 - Índices B-tree en campos de búsqueda frecuente
 - Índices GIN trigram para búsquedas ILIKE
-- Pool de conexiones optimizado (min: 10, max: 40)
+- Pool de conexiones configurable por `PG_POOL_MIN` / `PG_POOL_MAX` (default: 2 / 20)
 - Constraint único compuesto (empresa + ID transferencia)
 
 ## 🌐 Deploy a Producción
+
+### Seenode (plataforma en uso)
+
+1. **Conectar repositorio GitHub** y apuntar al directorio `backend/`
+2. **Build Command**: `npm install` · **Start Command**: `npm start`
+3. **Variables de entorno**: `DATABASE_URL`, `JWT_SECRET`, `PGSSL=true`,
+   `NODE_ENV=production`, `BASE_URL`, `CORS_ORIGIN`, `IMGBB_API_KEY`
+
+El filesystem es efímero: sin `IMGBB_API_KEY` los comprobantes guardados en
+`UPLOAD_DIR` se pierden en cada deploy. Guías detalladas en
+`docs/DEPLOYMENT_SEENODE_FINAL.md` y `docs/DEPLOYMENT_IMGBB_SEENODE.md`.
 
 ### Render.com
 
@@ -189,16 +202,30 @@ El proyecto es compatible con:
 
 ### Roles
 
-**Administrador**:
-- Crear/editar/eliminar usuarios
-- Ver todos los egresos
-- Exportar CSV
+Jerarquía: `admin` > `direccion` > `encargado` > `empleado`.
+
+**Administrador** (`admin`):
+- Todo lo de Dirección
+- Saldos y su exportación (`/api/egresos/saldos`)
+- Diagnóstico de uploads y endpoints de mantenimiento
+
+**Dirección** (`direccion`):
+- Crear, editar y resetear contraseñas de usuarios
+- Ver y editar cualquier egreso
+- Exportar el CSV de egresos
 - Ver logs de auditoría
 
-**Usuario**:
+**Encargado** (`encargado`):
+- Crear y editar egresos
+- Ver logs de auditoría
+
+**Empleado** (`empleado`):
 - Crear egresos
-- Ver sus propios egresos
+- Ver y editar sus propios egresos
 - Descargar comprobantes propios
+
+El borrado físico de un egreso es exclusivo de `admin`. El resto de roles
+usa la anulación, que conserva la fila y el historial.
 
 ### Flujo de trabajo
 
@@ -229,6 +256,8 @@ Ver `docs/OPTIMIZACION.md` para detalles sobre:
 
 ## 📚 Documentación Adicional
 
+- [Auditoría técnica y mejoras pendientes](docs/AUDITORIA_2026-10.md)
+- [Arquitectura](docs/ARQUITECTURA.md)
 - [Optimización para Alto Volumen](docs/OPTIMIZACION.md)
 - [Guía de Limpieza Automática](docs/LIMPIEZA_AUTOMATICA.md)
 
