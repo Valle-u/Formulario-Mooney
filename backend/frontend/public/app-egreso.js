@@ -9,14 +9,14 @@ function populateEtiquetas(){
   const etiquetasFormulario = getEtiquetas_dynamic().filter(e => !getEtiquetaFlags(e).cierre_caja);
 
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    etiquetasFormulario.map(e => `<option value="${e}">${e}</option>`).join("");
+    etiquetasFormulario.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
 }
 
 function populateEmpresasSalida(){
   const sel = document.getElementById("empresa_salida");
   if(!sel) return;
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    getEmpresas().map(x => `<option value="${x}">${x}</option>`).join("");
+    getEmpresas().map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
 }
 
 function toggleCasinoUserField(){
@@ -412,7 +412,7 @@ function actualizarDatalist(datalistId, historyKey) {
   if (!dl) return;
   try {
     const arr = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    dl.innerHTML = arr.map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
+    dl.innerHTML = arr.map(v => `<option value="${escapeHtml(v)}">`).join('');
   } catch { dl.innerHTML = ''; }
 }
 

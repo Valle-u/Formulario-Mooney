@@ -60,6 +60,17 @@ async function initSaldosPage() {
   // Cargar empresas en el filtro
   await cargarEmpresasFiltroSaldos();
 
+  // El form de filtros no se envía al servidor: Enter en un input recarga la
+  // página y se pierden los filtros. (El onsubmit inline del HTML no corría
+  // porque el CSP bloquea los handlers inline.)
+  const formFiltros = document.getElementById("filtrosSaldos");
+  if (formFiltros) {
+    formFiltros.addEventListener("submit", (e) => {
+      e.preventDefault();
+      cargarSaldos({ showLoading: true, force: true });
+    });
+  }
+
   // Event listeners principales
   const btnCargar = document.getElementById("btnCargarSaldos");
   if (btnCargar) {
@@ -202,7 +213,7 @@ async function cargarSaldos({ showLoading = true, force = false } = {}) {
     if (requestSerial !== saldosReqSerial) return;
     console.error("Error cargando saldos:", err);
     if (container) {
-      container.innerHTML = `<div class="muted" style="text-align: center; padding: 40px; color: #ef4444;">Error: ${err.message}</div>`;
+      container.innerHTML = `<div class="muted" style="text-align: center; padding: 40px; color: #ef4444;">Error: ${escapeHtml(err.message)}</div>`;
     }
   }
 }
@@ -533,7 +544,7 @@ async function verOperacionesCuenta(empresa, cuenta, moneda) {
 
   } catch (err) {
     console.error("Error cargando operaciones:", err);
-    detalleBody.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Error: ${err.message}</div>`;
+    detalleBody.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Error: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -660,12 +671,12 @@ function renderFilasOperaciones(egresos) {
     const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "IN" : "OUT";
 
     let statusBadge = '';
-    if (e.status === 'activo') {
-      statusBadge = '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>';
-    } else if (e.status === 'anulado') {
+    if (e.status === 'anulado') {
       statusBadge = '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Anulado</span>';
-    } else {
+    } else if (e.edited_at || e.status === 'editada') {
       statusBadge = '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Editado</span>';
+    } else {
+      statusBadge = '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>';
     }
 
     const rowStyle = e.status === 'anulado' ? 'opacity: 0.5;' : '';
@@ -674,7 +685,7 @@ function renderFilasOperaciones(egresos) {
       <tr style="${rowStyle}">
         <td>${escapeHtml(e.fecha || "-")}</td>
         <td>${escapeHtml(e.hora || "-")}</td>
-        <td style="color: ${tipoColor}; font-weight: 600;">${tipoIcon} ${e.tipo_transaccion}</td>
+        <td style="color: ${tipoColor}; font-weight: 600;">${tipoIcon} ${escapeHtml(e.tipo_transaccion)}</td>
         <td>${escapeHtml(e.etiqueta || "-")}</td>
         <td style="text-align: right; font-weight: 600; color: ${tipoColor};">
           ${e.tipo_transaccion === "ENTRADA" ? "+" : "-"}$${monto}
@@ -719,7 +730,13 @@ function aplicarFiltrosModal(etiquetasUnicas) {
   // Filtrar egresos
   let filtrados = modalSaldosData.egresos.filter(e => {
     if (tipo && e.tipo_transaccion !== tipo) return false;
-    if (estado && e.status !== estado) return false;
+    if (estado === "editada") {
+      if (!(e.edited_at || e.status === "editada") || e.status === "anulado") return false;
+    } else if (estado === "activo") {
+      if (e.status === "anulado" || e.edited_at || e.status === "editada") return false;
+    } else if (estado && e.status !== estado) {
+      return false;
+    }
     if (etiqueta && e.etiqueta !== etiqueta) return false;
 
     const monto = Number(e.monto);

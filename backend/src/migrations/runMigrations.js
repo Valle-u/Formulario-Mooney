@@ -55,14 +55,24 @@ export async function runMigrations() {
     console.log(`➡️ Applying migration: ${file}`);
     const sql = fs.readFileSync(path.join(sqlDir, file), "utf-8");
 
+    // El DDL y el registro en schema_migrations van en la misma transacción:
+    // si algo falla, el esquema no queda a medio aplicar ni marcado como hecho.
+    const client = await pool.connect();
     try {
-      await pool.query(sql);
-      await pool.query(
+      await client.query("BEGIN");
+      await client.query(sql);
+      await client.query(
         "INSERT INTO schema_migrations (filename) VALUES ($1)",
         [file]
       );
+      await client.query("COMMIT");
       console.log(`✅ Migration applied: ${file}`);
     } catch (err) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackErr) {
+        console.error("⚠️  ROLLBACK falló:", rollbackErr?.message);
+      }
       console.error(`❌ Migration failed: ${file}`);
       console.error("Code:", err?.code);
       console.error("Message:", err?.message);
@@ -70,6 +80,8 @@ export async function runMigrations() {
       console.error("Hint:", err?.hint);
       console.error("Where:", err?.where);
       throw err;
+    } finally {
+      client.release();
     }
   }
 

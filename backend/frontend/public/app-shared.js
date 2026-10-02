@@ -28,13 +28,21 @@ const API_BASE = (() => {
 const STORAGE_KEY_TOKEN = "mm_token";
 const STORAGE_KEY_USER = "mm_user";
 const STORAGE_KEY_SIDEBAR_COLLAPSED = "mm_sidebar_collapsed";
+const STORAGE_KEY_REMEMBER_LOGIN = "mm_remember_login";
+const STORAGE_KEY_SAVED_LOGIN = "mm_saved_login";
+const STORAGE_KEY_NOTIFICATIONS = "mm_notifications_v1";
+const NOTIFICATION_HISTORY_MAX = 100;
 
 console.log('API_BASE:', API_BASE);
 
 /* =========================
    DATOS (selects)
    ========================= */
+// Fallbacks si /api/options no responde. Origen de verdad: tabla select_options.
 const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Lohas", "Banco Nacion", "Otra (Especificar en notas)"];
+
+/** Turnos de cierre de caja — única definición del frontend. */
+const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
 
 const ETIQUETAS = [
   // Unidad M
@@ -188,6 +196,33 @@ function handleTipoTransaccionChange() {
     const idTransferenciaInput = document.getElementById("id_transferencia");
     if (idTransferenciaInput) idTransferenciaInput.setAttribute('required', 'required');
   }
+}
+
+/* =========================
+   ERRORES EN CAMPOS (inline)
+   ========================= */
+function setFieldError(inputId, message) {
+  const input = document.getElementById(inputId);
+  const errEl = document.getElementById(`${inputId}_error`);
+  if (!input && !errEl) return;
+
+  if (input) {
+    if (message) input.classList.add("input-invalid");
+    else input.classList.remove("input-invalid");
+  }
+
+  if (errEl) {
+    errEl.textContent = message || "";
+    errEl.style.display = message ? "block" : "none";
+  }
+}
+
+function clearFieldError(inputId) {
+  setFieldError(inputId, "");
+}
+
+function clearFieldErrors(inputIds) {
+  (inputIds || []).forEach(clearFieldError);
 }
 
 /* =========================
@@ -518,9 +553,13 @@ async function handleLogin(e){
   e.preventDefault();
   const username = document.getElementById("username")?.value?.trim() || "";
   const password = document.getElementById("password")?.value || "";
+  const rememberMe = document.getElementById("rememberMe")?.checked;
+
+  clearFieldErrors(["username", "password"]);
 
   if(!username || !password){
-    toast("Faltan datos", "Usuario y contrasena son obligatorios.", "warning");
+    if (!username) setFieldError("username", "El usuario es obligatorio.");
+    if (!password) setFieldError("password", "La contraseña es obligatoria.");
     return;
   }
 
@@ -528,10 +567,40 @@ async function handleLogin(e){
     const data = await api("/api/auth/login", { method:"POST", body:{ username, password }, auth:false });
     setToken(data.token);
     setUser(data.user);
+
+    if (rememberMe) {
+      localStorage.setItem(STORAGE_KEY_REMEMBER_LOGIN, "1");
+      localStorage.setItem(STORAGE_KEY_SAVED_LOGIN, JSON.stringify({ username, password }));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_REMEMBER_LOGIN);
+      localStorage.removeItem(STORAGE_KEY_SAVED_LOGIN);
+    }
+
     toast("Sesion iniciada", "Redirigiendo...", "success");
     setTimeout(()=> window.location.href = "egreso.html", 250);
   }catch(err){
-    toast("Login fallido", err.message, "error");
+    setFieldError("password", err.message || "No se pudo iniciar sesión.");
+  }
+}
+
+function initRememberLoginForm() {
+  const rememberCheckbox = document.getElementById("rememberMe");
+  if (!rememberCheckbox) return;
+
+  const shouldRemember = localStorage.getItem(STORAGE_KEY_REMEMBER_LOGIN) === "1";
+  rememberCheckbox.checked = shouldRemember;
+
+  if (!shouldRemember) return;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_SAVED_LOGIN) || "null");
+    if (!saved) return;
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    if (usernameInput && saved.username) usernameInput.value = saved.username;
+    if (passwordInput && saved.password) passwordInput.value = saved.password;
+  } catch {
+    localStorage.removeItem(STORAGE_KEY_SAVED_LOGIN);
   }
 }
 
@@ -668,6 +737,112 @@ let notificationEventSource = null;
 let notifications = [];
 let unreadCount = 0;
 
+function loadNotificationsFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_NOTIFICATIONS);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    notifications = parsed.map((n) => ({
+      ...n,
+      timestamp: new Date(n.timestamp),
+      read: !!n.read
+    }));
+    unreadCount = notifications.filter((n) => !n.read).length;
+  } catch {
+    notifications = [];
+    unreadCount = 0;
+  }
+}
+
+function persistNotificationsToStorage() {
+  try {
+    const payload = notifications.slice(0, NOTIFICATION_HISTORY_MAX).map((n) => ({
+      ...n,
+      timestamp: n.timestamp instanceof Date ? n.timestamp.toISOString() : n.timestamp
+    }));
+    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(payload));
+  } catch {
+    // localStorage lleno o bloqueado — no bloquear la UI
+  }
+}
+
+function notificationBellIconHtml() {
+  // Campana SVG inline (sin dependencia de fuentes/emojis; cumple CSP script-src self)
+  return `<svg class="notif-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="currentColor" d="M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22zm7-6.2V11a7 7 0 1 0-14 0v4.8L3.4 17.4a1 1 0 0 0 .7 1.7h15.8a1 1 0 0 0 .7-1.7L19 15.8z"/>
+  </svg>`;
+}
+
+function ensureNotificationUI() {
+  const topbarRight = document.querySelector(".topbar-right.nav-desktop");
+  if (topbarRight && !document.getElementById("notificationBtn")) {
+    const btn = document.createElement("button");
+    btn.id = "notificationBtn";
+    btn.type = "button";
+    btn.className = "btn-notification";
+    btn.setAttribute("aria-label", "Notificaciones");
+    btn.setAttribute("title", "Historial de notificaciones");
+    btn.innerHTML = `${notificationBellIconHtml()}<span class="notif-label">Avisos</span><span id="notificationBadge" class="notification-badge" style="display:none">0</span>`;
+    topbarRight.insertBefore(btn, topbarRight.firstChild);
+  }
+
+  const mobileActions = document.querySelector(".mobile-actions");
+  if (mobileActions && !document.getElementById("notificationBtnMobile")) {
+    const btnMobile = document.createElement("button");
+    btnMobile.id = "notificationBtnMobile";
+    btnMobile.type = "button";
+    btnMobile.className = "btn-notification";
+    btnMobile.setAttribute("aria-label", "Notificaciones");
+    btnMobile.setAttribute("title", "Historial de notificaciones");
+    btnMobile.innerHTML = `${notificationBellIconHtml()}<span class="notif-label">Avisos</span>`;
+    mobileActions.insertBefore(btnMobile, mobileActions.firstChild);
+  }
+
+  if (!document.getElementById("notificationPanel")) {
+    const panel = document.createElement("div");
+    panel.id = "notificationPanel";
+    panel.className = "notification-panel";
+    panel.style.display = "none";
+    panel.innerHTML = `
+      <div class="notification-panel-header">
+        <h3>Notificaciones</h3>
+        <button id="closeNotificationPanel" type="button" class="close-notification-panel" aria-label="Cerrar">X</button>
+      </div>
+      <div id="notificationList" class="notification-list">
+        <div class="notification-empty">No hay notificaciones</div>
+      </div>
+      <div class="notification-panel-footer">
+        <button id="clearAllNotifications" type="button" class="btn-clear-notifications">Limpiar historial</button>
+      </div>
+    `;
+    document.body.appendChild(panel);
+  }
+
+  if (!document.getElementById("toastContainer")) {
+    const toastContainer = document.createElement("div");
+    toastContainer.id = "toastContainer";
+    toastContainer.className = "toast-container";
+    document.body.appendChild(toastContainer);
+  }
+}
+
+function toggleNotificationPanel(forceOpen) {
+  const panel = document.getElementById("notificationPanel");
+  if (!panel) return;
+
+  const shouldOpen = typeof forceOpen === "boolean"
+    ? forceOpen
+    : panel.style.display !== "flex";
+
+  panel.style.display = shouldOpen ? "flex" : "none";
+
+  if (shouldOpen) {
+    markAllAsRead();
+    updateNotificationPanel();
+  }
+}
+
 // Conectar a SSE (Server-Sent Events)
 function connectToNotifications() {
   const token = getToken();
@@ -730,7 +905,12 @@ function handleNewNotification(data) {
 
   // Agregar a la lista
   notifications.unshift(notification);
+  if (notifications.length > NOTIFICATION_HISTORY_MAX) {
+    notifications.length = NOTIFICATION_HISTORY_MAX;
+  }
   unreadCount++;
+
+  persistNotificationsToStorage();
 
   // Actualizar UI
   updateNotificationBadge();
@@ -818,7 +998,7 @@ function updateNotificationPanel() {
   list.innerHTML = notifications.map(n => {
     const timeAgo = getTimeAgo(n.timestamp);
     return `
-      <div class="notification-item ${n.read ? "" : "unread"} ${n.category}" data-id="${n.id}">
+      <div class="notification-item ${n.read ? "" : "unread"} ${escapeHtml(n.category)}" data-id="${escapeHtml(n.id)}">
         <div class="notification-title">${escapeHtml(n.title)}</div>
         <div class="notification-message">${escapeHtml(n.message)}</div>
         <div class="notification-time">${timeAgo}</div>
@@ -841,6 +1021,7 @@ function markNotificationAsRead(id) {
   if (notification && !notification.read) {
     notification.read = true;
     unreadCount = Math.max(0, unreadCount - 1);
+    persistNotificationsToStorage();
     updateNotificationBadge();
     updateNotificationPanel();
   }
@@ -850,6 +1031,7 @@ function markNotificationAsRead(id) {
 function markAllAsRead() {
   notifications.forEach(n => n.read = true);
   unreadCount = 0;
+  persistNotificationsToStorage();
   updateNotificationBadge();
   updateNotificationPanel();
 }
@@ -858,6 +1040,7 @@ function markAllAsRead() {
 function clearAllNotifications() {
   notifications = [];
   unreadCount = 0;
+  persistNotificationsToStorage();
   updateNotificationBadge();
   updateNotificationPanel();
 }
@@ -879,6 +1062,11 @@ function getTimeAgo(date) {
    (setup común de todas las páginas autenticadas)
    ========================= */
 async function initCommonUI() {
+  ensureNotificationUI();
+  loadNotificationsFromStorage();
+  updateNotificationBadge();
+  updateNotificationPanel();
+
   // Cargar opciones dinámicas de la DB
   await loadSelectOptions();
 
@@ -921,27 +1109,23 @@ async function initCommonUI() {
   if(drawerOverlay) drawerOverlay.addEventListener("click", toggleMenu);
 
   // Event listeners para el panel de notificaciones
-  const notificationBtn = document.getElementById("notificationBtn");
   const notificationPanel = document.getElementById("notificationPanel");
   const closePanel = document.getElementById("closeNotificationPanel");
   const clearAllBtn = document.getElementById("clearAllNotifications");
 
-  if (notificationBtn) {
-    notificationBtn.addEventListener("click", () => {
-      const isVisible = notificationPanel.style.display === "flex";
-      notificationPanel.style.display = isVisible ? "none" : "flex";
-
-      if (!isVisible) {
-        // Marcar todas como leídas al abrir el panel
-        markAllAsRead();
-      }
+  const bindNotificationToggle = (btn) => {
+    if (!btn) return;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleNotificationPanel();
     });
-  }
+  };
+
+  bindNotificationToggle(document.getElementById("notificationBtn"));
+  bindNotificationToggle(document.getElementById("notificationBtnMobile"));
 
   if (closePanel) {
-    closePanel.addEventListener("click", () => {
-      notificationPanel.style.display = "none";
-    });
+    closePanel.addEventListener("click", () => toggleNotificationPanel(false));
   }
 
   if (clearAllBtn) {
@@ -953,8 +1137,12 @@ async function initCommonUI() {
   // Cerrar panel al hacer click fuera
   document.addEventListener("click", (e) => {
     if (notificationPanel && notificationPanel.style.display === "flex") {
-      if (!notificationPanel.contains(e.target) && !notificationBtn.contains(e.target)) {
-        notificationPanel.style.display = "none";
+      const desktopBtn = document.getElementById("notificationBtn");
+      const mobileBtn = document.getElementById("notificationBtnMobile");
+      const clickedTrigger = (desktopBtn && desktopBtn.contains(e.target))
+        || (mobileBtn && mobileBtn.contains(e.target));
+      if (!notificationPanel.contains(e.target) && !clickedTrigger) {
+        toggleNotificationPanel(false);
       }
     }
   });
@@ -1027,6 +1215,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if(loginForm){
     loginForm.addEventListener("submit", handleLogin);
     initPasswordToggles();
+    initRememberLoginForm();
+    ["username", "password"].forEach((id) => {
+      document.getElementById(id)?.addEventListener("input", () => clearFieldError(id));
+    });
     return;
   }
   if(!requireAuth()) return;

@@ -628,6 +628,37 @@ body{
   font-weight:700;
   margin:0 0 16px;
 }
+.login-field{
+  margin: 10px 0;
+}
+.login-field-error{
+  margin-top: 6px;
+  margin-left: 2px;
+  line-height: 1.35;
+  font-size: 12px;
+  font-weight: 600;
+}
+.login-field .input.input-invalid,
+.login-card .input:has(input.input-invalid){
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35);
+}
+.remember-login{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:12px 0 14px;
+  cursor:pointer;
+  font-size:13px;
+  color:var(--muted);
+  user-select:none;
+}
+.remember-login input{
+  width:16px;
+  height:16px;
+  cursor:pointer;
+  flex: 0 0 auto;
+}
 .input{
   width:100%;
   display:flex;
@@ -636,8 +667,8 @@ body{
   border-radius: 2px;
   border: 1px solid rgba(0,0,0,.28);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
-  overflow:visible;
-  margin: 10px 0;
+  overflow:hidden;
+  margin: 0;
   position: relative;
 }
 .input span{
@@ -646,6 +677,7 @@ body{
   align-items:center;
   justify-content:center;
   color:#6b7280;
+  flex: 0 0 auto;
 }
 .input input{
   width:100%;
@@ -653,6 +685,10 @@ body{
   padding:12px 10px;
   outline:none;
   background:transparent;
+  min-width: 0;
+}
+.login-input-password input{
+  padding-right: 48px;
 }
 
 /* Botón de mostrar/ocultar contraseña */
@@ -878,6 +914,13 @@ label{
   font-size: 12px;
   margin-top: 4px;
   display: block;
+}
+
+.field input.input-invalid,
+.field textarea.input-invalid,
+.login-card input.input-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35);
 }
 
 .field-success {
@@ -1718,31 +1761,63 @@ label{
 /* Sistema de notificaciones */
 .btn-notification {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: transparent;
-  border: none;
-  font-size: 24px;
+  border: 1px solid transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
   cursor: pointer;
-  padding: 8px;
+  padding: 8px 10px;
   border-radius: 8px;
-  transition: all 0.2s;
+  transition: background .2s, border-color .2s, color .2s;
+  min-height: 36px;
+  line-height: 1;
+}
+
+.btn-notification .notif-bell {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: block;
+}
+
+.btn-notification .notif-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .92;
 }
 
 .btn-notification:hover {
   background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="light"] .btn-notification:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 .notification-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 2px;
+  right: 2px;
   background: #dc3545;
   color: white;
   font-size: 10px;
   font-weight: bold;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 10px;
-  min-width: 18px;
+  min-width: 16px;
   text-align: center;
+  line-height: 1.2;
+  box-shadow: 0 0 0 2px rgba(0,0,0,.25);
 }
 
 .notification-panel {
@@ -1884,7 +1959,7 @@ label{
   position: fixed;
   top: 80px;
   right: 20px;
-  z-index: 2000;
+  z-index: 10050;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2383,11 +2458,23 @@ body {
 
   .app-nosidebar .topbar-right.nav-desktop .btn-theme,
   .app-nosidebar .topbar-right.nav-desktop .btn-logout,
+  .app-nosidebar .topbar-right.nav-desktop .btn-notification,
   .app-nosidebar .topbar-right.nav-desktop .user-badge {
     width: 100%;
     justify-content: center;
     min-height: 36px;
     border-radius: 8px;
+  }
+
+  .app-nosidebar .topbar-right.nav-desktop .btn-notification {
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.04);
+    order: -1;
+  }
+
+  [data-theme="light"] .app-nosidebar .topbar-right.nav-desktop .btn-notification {
+    border-color: rgba(0,0,0,.14);
+    background: rgba(0,0,0,.03);
   }
 
   .app-nosidebar .content-wrap {
