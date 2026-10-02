@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 import authRoutes from "./routes/auth.js";
 import usersRoutes from "./routes/users.js";
 import egresosRoutes from "./routes/egresos.js";
+import receiptsRoutes from "./routes/receipts.js";
 import logsRoutes from "./routes/logs.js";
 import notificationsRoutes from "./routes/notifications.js";
 import optionsRoutes from "./routes/options.js";
@@ -18,6 +19,7 @@ import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
 import { apiLimiter, apiKeyExportLimiter } from "./middleware/rateLimiter.js";
+import { isReceiptGateConfigured } from "./services/receiptGate.js";
 
 dotenv.config();
 validateRequiredEnv();
@@ -30,6 +32,7 @@ console.log("  - JWT_SECRET:", process.env.JWT_SECRET ? "✅ Set" : "❌ Missing
 console.log("  - PGSSL:", process.env.PGSSL || "not set");
 console.log("  - PORT:", process.env.PORT || "not set (will use 4000)");
 console.log("  - BASE_URL:", process.env.BASE_URL || "not set");
+console.log("  - RECEIPT_GATE:", isReceiptGateConfigured() ? "✅ configured" : "○ not set (autofill off)");
 
 // Log de configuración de almacenamiento
 console.log("📦 Storage: ImgBB (principal) + Local Disk (fallback)");
@@ -184,6 +187,7 @@ app.use(express.static(frontendPath));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/egresos", egresosRoutes);
+app.use("/api/receipts", receiptsRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationsRoutes); // Notificaciones en tiempo real (SSE)
 app.use("/api/options", optionsRoutes); // Opciones dinámicas de selects
@@ -206,6 +210,7 @@ app.get("/health", async (req, res) => {
       database: 'connected',
       response_time_ms: responseTimeMs,
       dbTime: dbCheck.rows[0].time,
+      receipt_gate: isReceiptGateConfigured() ? 'configured' : 'off',
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
