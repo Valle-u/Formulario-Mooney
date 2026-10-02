@@ -6,6 +6,7 @@ let currentTab = "empresas";
 let empresasList = [];
 let etiquetasList = [];
 let categoriesList = [];
+let apiKeysList = [];
 
 // ===== INIT =====
 document.addEventListener("DOMContentLoaded", async () => {
@@ -22,6 +23,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initCommonUI();
   initTabs();
   initModal();
+  setupConfigTableActions();
+  initApiKeyUi();
   await loadEmpresas();
   await loadCategories();
 });
@@ -36,9 +39,13 @@ function initTabs() {
 
       document.getElementById("panel-empresas").style.display = currentTab === "empresas" ? "" : "none";
       document.getElementById("panel-etiquetas").style.display = currentTab === "etiquetas" ? "" : "none";
+      document.getElementById("panel-apikeys").style.display = currentTab === "apikeys" ? "" : "none";
 
       if (currentTab === "etiquetas" && etiquetasList.length === 0) {
         loadEtiquetas();
+      }
+      if (currentTab === "apikeys") {
+        loadApiKeys();
       }
     });
   });
@@ -85,8 +92,8 @@ function renderEmpresas() {
   tbody.innerHTML = empresasList.map((opt, i) => `
     <tr class="${opt.is_active ? '' : 'row-inactive'}">
       <td class="config-order">
-        <button class="btn-order" data-dir="up" data-id="${opt.id}" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
-        <button class="btn-order" data-dir="down" data-id="${opt.id}" ${i === empresasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
+        <button class="btn-order" data-dir="up" data-id="${opt.id}" data-order-type="empresa" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
+        <button class="btn-order" data-dir="down" data-id="${opt.id}" data-order-type="empresa" ${i === empresasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
       </td>
       <td>${escapeHtml(opt.value)}</td>
       <td>
@@ -101,7 +108,6 @@ function renderEmpresas() {
     </tr>
   `).join("");
 
-  bindTableActions("empresa");
 }
 
 // ===== RENDER ETIQUETAS =====
@@ -112,8 +118,8 @@ function renderEtiquetas() {
   tbody.innerHTML = etiquetasList.map((opt, i) => `
     <tr class="${opt.is_active ? '' : 'row-inactive'}">
       <td class="config-order">
-        <button class="btn-order" data-dir="up" data-id="${opt.id}" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
-        <button class="btn-order" data-dir="down" data-id="${opt.id}" ${i === etiquetasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
+        <button class="btn-order" data-dir="up" data-id="${opt.id}" data-order-type="etiqueta" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button>
+        <button class="btn-order" data-dir="down" data-id="${opt.id}" data-order-type="etiqueta" ${i === etiquetasList.length - 1 ? 'disabled' : ''} title="Bajar">▼</button>
       </td>
       <td>${escapeHtml(opt.category || '—')}</td>
       <td>${escapeHtml(opt.value)}</td>
@@ -131,18 +137,26 @@ function renderEtiquetas() {
       </td>
     </tr>
   `).join("");
-
-  bindTableActions("etiqueta");
 }
 
-// ===== BIND TABLE ACTIONS =====
-function bindTableActions(type) {
-  const list = type === "empresa" ? empresasList : etiquetasList;
+// ===== TABLE ACTIONS (delegación, una sola vez) =====
+let configActionsBound = false;
 
-  // Toggle active
-  document.querySelectorAll(`[data-toggle-type="${type}"]`).forEach(input => {
-    input.addEventListener("change", async () => {
+function setupConfigTableActions() {
+  if (configActionsBound) return;
+  configActionsBound = true;
+
+  const panels = [
+    document.getElementById("tbodyEmpresas"),
+    document.getElementById("tbodyEtiquetas")
+  ].filter(Boolean);
+
+  for (const tbody of panels) {
+    tbody.addEventListener("change", async (e) => {
+      const input = e.target.closest("[data-toggle-id]");
+      if (!input) return;
       const id = input.dataset.toggleId;
+      const type = input.dataset.toggleType;
       try {
         await api(`/api/options/${id}`, { method: "PUT", body: { is_active: input.checked } });
         toast("Actualizado", `Opción ${input.checked ? 'activada' : 'desactivada'}`, "success");
@@ -153,29 +167,31 @@ function bindTableActions(type) {
         input.checked = !input.checked;
       }
     });
-  });
 
-  // Edit
-  document.querySelectorAll(`[data-edit-type="${type}"]`).forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = parseInt(btn.dataset.editId);
-      const opt = list.find(o => o.id === id);
-      if (opt) openModal(type, opt);
-    });
-  });
+    tbody.addEventListener("click", async (e) => {
+      const editBtn = e.target.closest("[data-edit-id]");
+      if (editBtn) {
+        const type = editBtn.dataset.editType;
+        const list = type === "empresa" ? empresasList : etiquetasList;
+        const id = parseInt(editBtn.dataset.editId, 10);
+        const opt = list.find(o => o.id === id);
+        if (opt) openModal(type, opt);
+        return;
+      }
 
-  // Reorder
-  document.querySelectorAll(`[data-dir]`).forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const id = parseInt(btn.dataset.id);
-      const dir = btn.dataset.dir;
+      const orderBtn = e.target.closest("[data-dir]");
+      if (!orderBtn || orderBtn.disabled) return;
+      const type = orderBtn.dataset.orderType || orderBtn.dataset.editType ||
+        (tbody.id === "tbodyEmpresas" ? "empresa" : "etiqueta");
+      const list = type === "empresa" ? empresasList : etiquetasList;
+      const id = parseInt(orderBtn.dataset.id, 10);
+      const dir = orderBtn.dataset.dir;
       const idx = list.findIndex(o => o.id === id);
       if (idx < 0) return;
 
       const swapIdx = dir === "up" ? idx - 1 : idx + 1;
       if (swapIdx < 0 || swapIdx >= list.length) return;
 
-      // Swap in array
       [list[idx], list[swapIdx]] = [list[swapIdx], list[idx]];
       const ids = list.map(o => o.id);
 
@@ -188,7 +204,7 @@ function bindTableActions(type) {
         if (type === "empresa") await loadEmpresas(); else await loadEtiquetas();
       }
     });
-  });
+  }
 }
 
 // ===== MODAL =====
@@ -285,6 +301,158 @@ async function saveOption() {
     closeModal();
     if (type === "empresa") await loadEmpresas(); else { await loadEtiquetas(); await loadCategories(); }
     reloadSelectOptions();
+  } catch (err) {
+    toast("Error", err.message, "error");
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+async function loadApiKeys() {
+  try {
+    const { api_keys } = await api("/api/api-keys");
+    apiKeysList = api_keys || [];
+    renderApiKeys();
+  } catch (err) {
+    toast("Error", err.message, "error");
+  }
+}
+
+function renderApiKeys() {
+  const tbody = document.getElementById("tbodyApiKeys");
+  if (!tbody) return;
+
+  if (!apiKeysList.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="note">Todavía no hay API keys. Creá una para exportar datos a otra app.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = apiKeysList.map((key) => {
+    const statusClass = key.status === "activa" ? "api-key-status-ok" : "api-key-status-off";
+    const canRevoke = key.status === "activa";
+    return `
+      <tr class="${canRevoke ? "" : "row-inactive"}">
+        <td>${escapeHtml(key.name)}</td>
+        <td><code>${escapeHtml(key.key_prefix)}…</code></td>
+        <td>${escapeHtml((key.scopes || []).join(", "))}</td>
+        <td>${escapeHtml(formatDateTime(key.created_at))}</td>
+        <td>${escapeHtml(formatDateTime(key.last_used_at))}</td>
+        <td>${escapeHtml(key.expires_at ? formatDateTime(key.expires_at) : "Nunca")}</td>
+        <td><span class="api-key-status ${statusClass}">${escapeHtml(key.status)}</span></td>
+        <td class="row-actions">
+          ${canRevoke
+            ? `<button class="btn btn-danger btn-small" data-revoke-key="${key.id}">Revocar</button>`
+            : "—"}
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.querySelectorAll("[data-revoke-key]").forEach((btn) => {
+    btn.addEventListener("click", () => revokeApiKey(Number(btn.dataset.revokeKey)));
+  });
+}
+
+function initApiKeyUi() {
+  const example = document.getElementById("apiKeyExample");
+  if (example && typeof API_BASE !== "undefined") {
+    example.textContent = `curl -H "X-API-Key: TU_API_KEY" "${API_BASE}/api/export/egresos?limit=100"`;
+  }
+
+  document.getElementById("btnAddApiKey").addEventListener("click", openApiKeyModal);
+  document.getElementById("apiKeyModalClose").addEventListener("click", closeApiKeyModal);
+  document.getElementById("apiKeyModalCancel").addEventListener("click", closeApiKeyModal);
+  document.getElementById("apiKeyModalSave").addEventListener("click", createApiKey);
+  document.getElementById("apiKeyModal").addEventListener("click", (e) => {
+    if (e.target.id === "apiKeyModal") closeApiKeyModal();
+  });
+
+  document.getElementById("apiKeyCreatedClose").addEventListener("click", closeApiKeyCreatedModal);
+  document.getElementById("apiKeyCreatedOk").addEventListener("click", closeApiKeyCreatedModal);
+  document.getElementById("apiKeyCreatedModal").addEventListener("click", (e) => {
+    if (e.target.id === "apiKeyCreatedModal") closeApiKeyCreatedModal();
+  });
+  document.getElementById("apiKeyCopyBtn").addEventListener("click", copyCreatedApiKey);
+}
+
+function openApiKeyModal() {
+  document.getElementById("apiKeyName").value = "";
+  document.getElementById("apiKeyExpires").value = "never";
+  document.getElementById("apiKeyModal").style.display = "flex";
+  document.getElementById("apiKeyName").focus();
+}
+
+function closeApiKeyModal() {
+  document.getElementById("apiKeyModal").style.display = "none";
+}
+
+function closeApiKeyCreatedModal() {
+  document.getElementById("apiKeyCreatedModal").style.display = "none";
+  document.getElementById("apiKeyRawValue").textContent = "";
+}
+
+function showCreatedApiKey(rawKey) {
+  document.getElementById("apiKeyRawValue").textContent = rawKey;
+  document.getElementById("apiKeyCreatedModal").style.display = "flex";
+}
+
+async function copyCreatedApiKey() {
+  const value = document.getElementById("apiKeyRawValue").textContent;
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    toast("Copiada", "La API key se copió al portapapeles", "success");
+  } catch {
+    toast("Error", "No se pudo copiar. Seleccioná la clave y copiala a mano.", "error");
+  }
+}
+
+async function createApiKey() {
+  const name = document.getElementById("apiKeyName").value.trim();
+  const expires = document.getElementById("apiKeyExpires").value;
+  if (!name || name.length < 2) {
+    toast("Error", "El nombre es obligatorio", "warning");
+    return;
+  }
+
+  try {
+    const result = await api("/api/api-keys", {
+      method: "POST",
+      body: {
+        name,
+        expires_in_days: expires === "never" ? "never" : Number(expires),
+        scopes: ["export:egresos"]
+      }
+    });
+    closeApiKeyModal();
+    await loadApiKeys();
+    showCreatedApiKey(result.raw_key);
+    toast("Creada", "API key generada. Copiala ahora.", "success");
+  } catch (err) {
+    toast("Error", err.message, "error");
+  }
+}
+
+async function revokeApiKey(id) {
+  const key = apiKeysList.find((item) => item.id === id);
+  const label = key ? key.name : "esta API key";
+  if (!confirm(`¿Revocar ${label}? La otra app va a dejar de poder exportar datos.`)) return;
+
+  try {
+    await api(`/api/api-keys/${id}/revoke`, { method: "POST" });
+    toast("Revocada", "La API key ya no sirve para exportar", "success");
+    await loadApiKeys();
   } catch (err) {
     toast("Error", err.message, "error");
   }

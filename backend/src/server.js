@@ -9,15 +9,17 @@ import { fileURLToPath } from "url";
 import authRoutes from "./routes/auth.js";
 import usersRoutes from "./routes/users.js";
 import egresosRoutes from "./routes/egresos.js";
+import receiptsRoutes from "./routes/receipts.js";
 import logsRoutes from "./routes/logs.js";
-import initRoutes from "./routes/init.js";
 import notificationsRoutes from "./routes/notifications.js";
 import optionsRoutes from "./routes/options.js";
-import checkMigrationsRoutes from "./routes/check-migrations.js";
-import runMigrationsRoutes from "./routes/run-migrations.js";
+import apiKeysRoutes from "./routes/apiKeys.js";
+import exportRoutes from "./routes/export.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
+import { apiLimiter, apiKeyExportLimiter } from "./middleware/rateLimiter.js";
+import { isReceiptGateConfigured } from "./services/receiptGate.js";
 
 dotenv.config();
 validateRequiredEnv();
@@ -30,6 +32,7 @@ console.log("  - JWT_SECRET:", process.env.JWT_SECRET ? "✅ Set" : "❌ Missing
 console.log("  - PGSSL:", process.env.PGSSL || "not set");
 console.log("  - PORT:", process.env.PORT || "not set (will use 4000)");
 console.log("  - BASE_URL:", process.env.BASE_URL || "not set");
+console.log("  - RECEIPT_GATE:", isReceiptGateConfigured() ? "✅ configured" : "○ not set (autofill off)");
 
 // Log de configuración de almacenamiento
 console.log("📦 Storage: ImgBB (principal) + Local Disk (fallback)");
@@ -50,14 +53,18 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      // Sin 'unsafe-inline': todo el JS del frontend está en archivos propios,
+      // así que un payload inyectado en un campo no puede ejecutarse.
+      // styleSrc sí lo mantiene porque las vistas usan atributos style=.
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://i.ibb.co", "https://*.ibb.co"],
-      connectSrc: ["'self'", "https://api.imgbb.com"],
+      // i.ibb.co: fetch del comprobante puede seguir un redirect de ImgBB
+      connectSrc: ["'self'", "https://api.imgbb.com", "https://i.ibb.co", "https://*.ibb.co"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", "blob:"],
-      frameSrc: ["'self'", "blob:"]
+      frameSrc: ["'self'", "blob:", "https://i.ibb.co", "https://*.ibb.co"]
     }
   },
   // Prevent clickjacking
@@ -88,18 +95,21 @@ const corsOptions =
         origin: true,
         credentials: false,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
       }
     : {
         origin: CORS_ORIGIN.split(",").map(o => o.trim()),
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
       };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
+
+// Rate limiting de lectura general; login/escritura/CSV tienen límites propios
+app.use("/api", apiLimiter);
 
 // Servir archivos estáticos del frontend
 const __filename = fileURLToPath(import.meta.url);
@@ -177,12 +187,12 @@ app.use(express.static(frontendPath));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/egresos", egresosRoutes);
+app.use("/api/receipts", receiptsRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationsRoutes); // Notificaciones en tiempo real (SSE)
 app.use("/api/options", optionsRoutes); // Opciones dinámicas de selects
-app.use("/api", initRoutes); // Endpoint temporal para inicializar admin
-app.use("/api", checkMigrationsRoutes); // Endpoint temporal para verificar migraciones
-app.use("/api", runMigrationsRoutes); // Endpoint temporal para ejecutar migraciones
+app.use("/api/api-keys", apiKeysRoutes); // Gestión de API keys (admin)
+app.use("/api/export", apiKeyExportLimiter, exportRoutes); // Export para apps externas via API key
 
 // Health check endpoint mejorado
 import { query } from "./config/db.js";
@@ -200,6 +210,7 @@ app.get("/health", async (req, res) => {
       database: 'connected',
       response_time_ms: responseTimeMs,
       dbTime: dbCheck.rows[0].time,
+      receipt_gate: isReceiptGateConfigured() ? 'configured' : 'off',
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
@@ -248,7 +259,7 @@ async function start() {
 }
 
 // Graceful shutdown: cerrar conexiones limpiamente cuando el proceso termina
-async function gracefulShutdown(signal) {
+async function gracefulShutdown(signal, exitCode = 0) {
   console.log(`\n🛑 ${signal} recibido, cerrando servidor...`);
 
   // Dejar de aceptar nuevas conexiones
@@ -264,7 +275,7 @@ async function gracefulShutdown(signal) {
     await pool.end();
     console.log('✅ Pool de PostgreSQL cerrado');
 
-    process.exit(0);
+    process.exit(exitCode);
   } catch (err) {
     console.error('❌ Error durante graceful shutdown:', err);
     process.exit(1);
@@ -276,9 +287,11 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Manejar errores no capturados
+// Salir con código distinto de 0 para que el orquestador lo registre como caída
+// y reinicie el proceso, en lugar de interpretarlo como un cierre limpio.
 process.on('uncaughtException', (err) => {
   console.error('💥 Uncaught Exception:', err);
-  gracefulShutdown('uncaughtException');
+  gracefulShutdown('uncaughtException', 1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
