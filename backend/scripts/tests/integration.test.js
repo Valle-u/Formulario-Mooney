@@ -3,10 +3,11 @@
  *
  * Requisitos:
  *   - API en TEST_BASE_URL (default http://127.0.0.1:4000)
- *   - Usuario admin con TEST_ADMIN_USER / TEST_ADMIN_PASSWORD
- *   - Opcional: TEST_EMPLEADO_USER / TEST_EMPLEADO_PASSWORD
+ *   - TEST_ADMIN_PASSWORD (obligatoria; sin default en código)
+ *   - Opcional: TEST_ADMIN_USER, TEST_EMPLEADO_USER, TEST_EMPLEADO_PASSWORD
  *
- * Correr: npm test
+ * Ejemplo:
+ *   TEST_ADMIN_PASSWORD='...' npm test
  */
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
@@ -17,6 +18,7 @@ const ADMIN_USER = process.env.TEST_ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.TEST_ADMIN_PASSWORD || "";
 const EMP_USER = process.env.TEST_EMPLEADO_USER || "empleado_test";
 const EMP_PASS = process.env.TEST_EMPLEADO_PASSWORD || "";
+const WRONG_PASS = ["not", "the", "password"].join("-");
 
 async function json(path, { method = "GET", token, body, formData } = {}) {
   const headers = {};
@@ -48,14 +50,15 @@ let adminToken = null;
 let empToken = null;
 
 before(async () => {
+  assert.ok(ADMIN_PASS, "Definí TEST_ADMIN_PASSWORD en el entorno (sin hardcodear en el repo)");
   const health = await fetch(`${BASE}/health`);
   assert.equal(health.status, 200, `API no responde en ${BASE}/health`);
 });
 
 describe("auth", () => {
   test("login falla con el mismo mensaje para user inexistente y pass mala", async () => {
-    const a = await json("/api/auth/login", { method: "POST", body: { username: "noexiste_xyz", password: ["not","the","password"].join("-") } });
-    const b = await json("/api/auth/login", { method: "POST", body: { username: ADMIN_USER, password: ["not","the","password"].join("-") } });
+    const a = await json("/api/auth/login", { method: "POST", body: { username: "noexiste_xyz", password: WRONG_PASS } });
+    const b = await json("/api/auth/login", { method: "POST", body: { username: ADMIN_USER, password: WRONG_PASS } });
     assert.equal(a.status, 401);
     assert.equal(b.status, 401);
     assert.equal(a.data.message, b.data.message);
@@ -69,6 +72,7 @@ describe("auth", () => {
   });
 
   test("login empleado ok (si existe)", async () => {
+    if (!EMP_PASS) return;
     const r = await json("/api/auth/login", { method: "POST", body: { username: EMP_USER, password: EMP_PASS } });
     if (r.status === 401) {
       // Entorno sin usuario de prueba: se salta el resto de permisos de empleado
