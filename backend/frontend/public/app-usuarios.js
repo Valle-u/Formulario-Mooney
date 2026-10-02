@@ -48,22 +48,25 @@ function renderUsers(users){
       </td>
     </tr>
   `).join("");
-
-  bindUserRowActions();
 }
 
-function bindUserRowActions(){
-  document.querySelectorAll("[data-save-user]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const id = btn.dataset.saveUser;
+let resetUserId = null;
+let usersActionsBound = false;
 
-      // Obtener valores del formulario
+function setupUsersActions(){
+  if (usersActionsBound) return;
+  usersActionsBound = true;
+
+  const tbody = document.getElementById("usersTbody");
+  tbody?.addEventListener("click", async (e) => {
+    const saveBtn = e.target.closest("[data-save-user]");
+    if (saveBtn) {
+      const id = saveBtn.dataset.saveUser;
       const usernameInput = document.querySelector(`[data-edit-username="${id}"]`);
       const full_name = document.querySelector(`[data-edit-name="${id}"]`)?.value ?? "";
       const role = document.querySelector(`[data-edit-role="${id}"]`)?.value ?? "empleado";
       const is_active = !!document.querySelector(`[data-edit-active="${id}"]`)?.checked;
 
-      // Construir body - solo incluir username si el input existe (admin)
       const body = { full_name, role, is_active };
       if (usernameInput) {
         const username = usernameInput.value.trim();
@@ -77,23 +80,16 @@ function bindUserRowActions(){
       try{
         await api(`/api/users/${id}`, { method:"PUT", body });
         toast("Guardado","Usuario actualizado correctamente", "success");
-        // Recargar la lista de usuarios para mostrar los cambios
         loadUsers();
       }catch(err){
         toast("Error", err.message, "error");
       }
-    });
-  });
+      return;
+    }
 
-  // Variable para guardar el ID del usuario a resetear
-  let resetUserId = null;
-
-  document.querySelectorAll("[data-reset-pass]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const id = btn.dataset.resetPass;
-      resetUserId = id;
-
-      // Mostrar modal
+    const resetBtn = e.target.closest("[data-reset-pass]");
+    if (resetBtn) {
+      resetUserId = resetBtn.dataset.resetPass;
       const modal = document.getElementById("resetPasswordModal");
       const input = document.getElementById("reset_password");
       if(modal && input) {
@@ -101,10 +97,9 @@ function bindUserRowActions(){
         input.value = "";
         input.focus();
       }
-    });
+    }
   });
 
-  // Cerrar modal
   const closeResetModal = () => {
     const modal = document.getElementById("resetPasswordModal");
     if(modal) modal.style.display = "none";
@@ -114,7 +109,6 @@ function bindUserRowActions(){
   document.getElementById("btnCloseResetModal")?.addEventListener("click", closeResetModal);
   document.getElementById("btnCancelReset")?.addEventListener("click", closeResetModal);
 
-  // Confirmar reset
   document.getElementById("btnConfirmReset")?.addEventListener("click", async ()=>{
     const pass = document.getElementById("reset_password")?.value || "";
     if(!pass || !resetUserId) return;
@@ -128,7 +122,6 @@ function bindUserRowActions(){
     }
   });
 
-  // Cerrar modal al hacer click fuera
   document.getElementById("resetPasswordModal")?.addEventListener("click", (e)=>{
     if(e.target.id === "resetPasswordModal") closeResetModal();
   });
@@ -203,6 +196,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if(!requireAuth()) return;
   await initCommonUI();
   setupPasswordMatchValidation();
+  setupUsersActions();
   document.getElementById("btnCreateUser")?.addEventListener("click", createUser);
   document.getElementById("btnReloadUsers")?.addEventListener("click", loadUsers);
   loadUsers();

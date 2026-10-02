@@ -4,6 +4,7 @@
 let egresosOffset = 0;
 const EGRESOS_LIMIT = 50;
 let currentFilters = {};
+let egresosReqSerial = 0;
 
 // Toggle de filtros (mostrar/ocultar)
 function toggleFiltros(){
@@ -64,6 +65,7 @@ async function buscarEgresos(){
   const tbody = document.getElementById("egresosTbody");
   if(!tbody) return;
 
+  const reqId = ++egresosReqSerial;
   tbody.innerHTML = `<tr><td colspan="11" class="muted">Cargando…</td></tr>`;
 
   const fecha_desde = document.getElementById("fecha_desde")?.value || "";
@@ -107,8 +109,11 @@ async function buscarEgresos(){
 
   try{
     const { egresos, pagination, sumas } = await api(`/api/egresos?${qs.toString()}`);
+    // Descartar respuestas viejas si el usuario cambió filtros mientras cargaba
+    if (reqId !== egresosReqSerial) return;
     renderEgresos(egresos, pagination, sumas);
   }catch(err){
+    if (reqId !== egresosReqSerial) return;
     tbody.innerHTML = `<tr><td colspan="11" class="muted">${escapeHtml(err.message)}</td></tr>`;
   }
 }
@@ -438,19 +443,20 @@ function mostrarDetalle(e){
 }
 
 function limpiarFiltros(){
-  document.getElementById("fecha_desde").value = "";
-  document.getElementById("fecha_hasta").value = "";
-  document.getElementById("empresa_salida").value = "";
-  document.getElementById("etiqueta").value = "";
-  document.getElementById("usuario_casino").value = "";
-  document.getElementById("id_transferencia").value = "";
-  document.getElementById("monto_min").value = "";
-  document.getElementById("monto_max").value = "";
+  const clearIds = [
+    "fecha_desde", "fecha_hasta", "empresa_salida", "etiqueta", "status",
+    "moneda", "usuario_casino", "id_transferencia", "monto_min", "monto_max",
+    "turno", "cuenta_receptora", "created_by"
+  ];
+  for (const id of clearIds) {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  }
   egresosOffset = 0;
   currentFilters = {};
 
   const tbody = document.getElementById("egresosTbody");
-  if(tbody) tbody.innerHTML = `<tr><td colspan="9" class="muted">Usá los filtros para buscar transferencias</td></tr>`;
+  if(tbody) tbody.innerHTML = `<tr><td colspan="11" class="muted">Usá los filtros para buscar transferencias</td></tr>`;
 
   const info = document.getElementById("resultadosInfo");
   if(info) info.textContent = "—";
@@ -484,11 +490,12 @@ async function downloadCSVFiltrado(){
     const token = getToken();
     if(!token){ toast("Sin sesión","Iniciá sesión"); return; }
 
-    // Leer los filtros directamente del formulario
+    // Mismos filtros que la búsqueda en pantalla (incluye status)
     const fecha_desde = document.getElementById("fecha_desde")?.value || "";
     const fecha_hasta = document.getElementById("fecha_hasta")?.value || "";
     const empresa_salida = document.getElementById("empresa_salida")?.value || "";
     const etiqueta = document.getElementById("etiqueta")?.value || "";
+    const status = document.getElementById("status")?.value || "";
     const usuario_casino = document.getElementById("usuario_casino")?.value?.trim() || "";
     const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
     const monto_min = document.getElementById("monto_min")?.value || "";
@@ -504,6 +511,7 @@ async function downloadCSVFiltrado(){
     if(fecha_hasta) qs.set("fecha_hasta", fecha_hasta);
     if(empresa_salida) qs.set("empresa_salida", empresa_salida);
     if(etiqueta) qs.set("etiqueta", etiqueta);
+    if(status) qs.set("status", status);
     if(usuario_casino) qs.set("usuario_casino", usuario_casino);
     if(id_transferencia) qs.set("id_transferencia", id_transferencia);
     if(monto_min) qs.set("monto_min", monto_min);

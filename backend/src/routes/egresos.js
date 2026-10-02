@@ -1609,6 +1609,8 @@ router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res
       fecha_hasta,
       empresa_salida,
       etiqueta,
+      status,
+      moneda,
       usuario_casino,
       id_transferencia,
       monto_min,
@@ -1649,6 +1651,23 @@ router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res
       }
     }
 
+    if (status) {
+      if (String(status) === "editada") {
+        where.push(`e.edited_at IS NOT NULL AND COALESCE(e.status, 'activo') <> 'anulado'`);
+      } else if (String(status) === "activo" || String(status) === "pendiente") {
+        params.push(status);
+        where.push(`e.status = $${params.length} AND e.edited_at IS NULL`);
+      } else {
+        params.push(status);
+        where.push(`e.status = $${params.length}`);
+      }
+    }
+
+    if (moneda) {
+      params.push(String(moneda).toUpperCase());
+      where.push(`e.moneda = $${params.length}`);
+    }
+
     if (usuario_casino) {
       params.push(`%${usuario_casino}%`);
       where.push(`e.usuario_casino ILIKE $${params.length}`);
@@ -1682,11 +1701,6 @@ router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res
     if (created_by) {
       params.push(Number(created_by));
       where.push(`e.created_by = $${params.length}`);
-    }
-
-    if (req.query.moneda) {
-      params.push(req.query.moneda.toUpperCase());
-      where.push(`e.moneda = $${params.length}`);
     }
 
     if (req.query.tipo_transaccion) {
