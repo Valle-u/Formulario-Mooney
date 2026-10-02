@@ -17,7 +17,7 @@ import exportRoutes from "./routes/export.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
-import { apiLimiter, exportLimiter } from "./middleware/rateLimiter.js";
+import { apiLimiter, apiKeyExportLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
 validateRequiredEnv();
@@ -187,7 +187,7 @@ app.use("/api/logs", logsRoutes);
 app.use("/api/notifications", notificationsRoutes); // Notificaciones en tiempo real (SSE)
 app.use("/api/options", optionsRoutes); // Opciones dinámicas de selects
 app.use("/api/api-keys", apiKeysRoutes); // Gestión de API keys (admin)
-app.use("/api/export", exportLimiter, exportRoutes); // Export para apps externas via API key
+app.use("/api/export", apiKeyExportLimiter, exportRoutes); // Export para apps externas via API key
 
 // Health check endpoint mejorado
 import { query } from "./config/db.js";

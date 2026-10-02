@@ -4,7 +4,7 @@ import rateLimit from "express-rate-limit";
 // validate: false silencia ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
 // porque app.set('trust proxy', 1) ya maneja X-Forwarded-For.
 
-function makeLimiter({ windowMs, max, message }) {
+function makeLimiter({ windowMs, max, message, keyGenerator }) {
   return rateLimit({
     windowMs,
     max,
@@ -12,6 +12,7 @@ function makeLimiter({ windowMs, max, message }) {
     legacyHeaders: false,
     validate: false,
     message: { message },
+    ...(keyGenerator ? { keyGenerator } : {}),
     handler: (req, res) => {
       const retryAfter = req.rateLimit?.resetTime
         ? Math.ceil(req.rateLimit.resetTime / 1000)
@@ -52,16 +53,11 @@ export const exportLimiter = makeLimiter({
   message: "Demasiadas exportaciones. Intentá de nuevo más tarde."
 });
 
-// Rate limiter para export por API key: 120 requests por minuto
-export const exportLimiter = rateLimit({
+/** Export por API key (apps externas): cuota por clave, no solo por IP. */
+export const apiKeyExportLimiter = makeLimiter({
   windowMs: 60 * 1000,
   max: 120,
-  message: {
-    message: "Demasiadas solicitudes de export. Esperá un momento."
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: false,
+  message: "Demasiadas solicitudes de export. Esperá un momento.",
   keyGenerator: (req) => {
     const headerKey = req.headers["x-api-key"];
     if (headerKey) {
@@ -69,11 +65,5 @@ export const exportLimiter = rateLimit({
       return `apikey:${digest}`;
     }
     return req.ip;
-  },
-  handler: (req, res) => {
-    res.status(429).json({
-      message: "Demasiadas solicitudes de export. Esperá un momento.",
-      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
-    });
   }
 });
