@@ -37,3 +37,9 @@ Notas:
 - Sin volumen persistente, `/tmp` se pierde en redeploy (OK para staging).
 - ClamAV off en Seenode (no hay sidecar).
 - Con `RECEIPT_FORENSIC_REQUIRED=false` el servicio arranca sin key de IA.
+
+## Seenode + env
+
+Seenode monta env vars en el **build** y eso puede romper la imagen. Para staging usamos
+`seenode.staging.env` (cargado por `src/config/load-env.ts`) en la rama de deploy.
+No subir secretos al repo canónico; el mirror de deploy puede llevar el archivo de staging.

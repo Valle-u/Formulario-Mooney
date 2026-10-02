@@ -16,6 +16,7 @@ export function credentialEnvCandidates(): string[] {
     process.env.CREDENCIALES_FILE,
     path.join(root, "GATE", "local.env"),
     path.join(root, "receipt-gate.env"),
+    path.resolve("seenode.staging.env"),
     path.resolve(".env"),
   ].filter((p): p is string => Boolean(p));
 }
