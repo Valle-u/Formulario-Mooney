@@ -767,6 +767,13 @@ function persistNotificationsToStorage() {
   }
 }
 
+function notificationBellIconHtml() {
+  // Campana SVG inline (sin dependencia de fuentes/emojis; cumple CSP script-src self)
+  return `<svg class="notif-bell" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="currentColor" d="M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22zm7-6.2V11a7 7 0 1 0-14 0v4.8L3.4 17.4a1 1 0 0 0 .7 1.7h15.8a1 1 0 0 0 .7-1.7L19 15.8z"/>
+  </svg>`;
+}
+
 function ensureNotificationUI() {
   const topbarRight = document.querySelector(".topbar-right.nav-desktop");
   if (topbarRight && !document.getElementById("notificationBtn")) {
@@ -776,7 +783,7 @@ function ensureNotificationUI() {
     btn.className = "btn-notification";
     btn.setAttribute("aria-label", "Notificaciones");
     btn.setAttribute("title", "Historial de notificaciones");
-    btn.innerHTML = 'Notif <span id="notificationBadge" class="notification-badge" style="display:none">0</span>';
+    btn.innerHTML = `${notificationBellIconHtml()}<span class="notif-label">Avisos</span><span id="notificationBadge" class="notification-badge" style="display:none">0</span>`;
     topbarRight.insertBefore(btn, topbarRight.firstChild);
   }
 
@@ -787,7 +794,8 @@ function ensureNotificationUI() {
     btnMobile.type = "button";
     btnMobile.className = "btn-notification";
     btnMobile.setAttribute("aria-label", "Notificaciones");
-    btnMobile.textContent = "Notificaciones";
+    btnMobile.setAttribute("title", "Historial de notificaciones");
+    btnMobile.innerHTML = `${notificationBellIconHtml()}<span class="notif-label">Avisos</span>`;
     mobileActions.insertBefore(btnMobile, mobileActions.firstChild);
   }
 

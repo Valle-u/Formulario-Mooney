@@ -15,23 +15,27 @@
         <h3 class="login-title">Ingrese a su cuenta</h3>
 
         <form id="loginForm">
-          <div class="input">
-            <span>USR</span>
-            <input id="username" type="text" placeholder="usuario" autocomplete="username" required>
-            <div id="username_error" class="field-error" style="display:none;" role="alert"></div>
+          <div class="login-field">
+            <div class="input">
+              <span>USR</span>
+              <input id="username" type="text" placeholder="usuario" autocomplete="username" required>
+            </div>
+            <div id="username_error" class="field-error login-field-error" style="display:none;" role="alert"></div>
           </div>
 
-          <div class="input" style="position: relative;">
-            <span>KEY</span>
-            <input id="password" type="password" placeholder="contraseña" autocomplete="current-password" required style="padding-right: 45px;">
-            <button type="button" class="password-toggle" data-target="password" title="Mostrar/Ocultar contraseña" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 11px; padding: 4px; opacity: 0.6; transition: opacity 0.2s; font-weight: 700; letter-spacing: .3px;">
-              VER
-            </button>
-            <div id="password_error" class="field-error" style="display:none;" role="alert"></div>
+          <div class="login-field">
+            <div class="input login-input-password">
+              <span>KEY</span>
+              <input id="password" type="password" placeholder="contraseña" autocomplete="current-password" required>
+              <button type="button" class="password-toggle" data-target="password" title="Mostrar/Ocultar contraseña" aria-label="Mostrar u ocultar contraseña">
+                VER
+              </button>
+            </div>
+            <div id="password_error" class="field-error login-field-error" style="display:none;" role="alert"></div>
           </div>
 
-          <label class="remember-login" style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;cursor:pointer;font-size:13px;color:var(--muted);">
-            <input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;">
+          <label class="remember-login" for="rememberMe">
+            <input type="checkbox" id="rememberMe">
             Recordar credenciales
           </label>
 
