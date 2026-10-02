@@ -95,6 +95,7 @@ function setupUsersActions(){
       if(modal && input) {
         modal.style.display = "flex";
         input.value = "";
+        clearFieldError("reset_password");
         input.focus();
       }
     }
@@ -109,16 +110,22 @@ function setupUsersActions(){
   document.getElementById("btnCloseResetModal")?.addEventListener("click", closeResetModal);
   document.getElementById("btnCancelReset")?.addEventListener("click", closeResetModal);
 
+  document.getElementById("reset_password")?.addEventListener("input", () => clearFieldError("reset_password"));
+
   document.getElementById("btnConfirmReset")?.addEventListener("click", async ()=>{
     const pass = document.getElementById("reset_password")?.value || "";
-    if(!pass || !resetUserId) return;
+    clearFieldError("reset_password");
+    if(!pass || !resetUserId) {
+      if (!pass) setFieldError("reset_password", "Ingresá la nueva contraseña.");
+      return;
+    }
 
     try{
       await api(`/api/users/${resetUserId}/reset-password`, { method:"POST", body:{ password: pass } });
       toast("Guardado","Contrasena actualizada correctamente", "success");
       closeResetModal();
     }catch(err){
-      toast("Error", err.message, "error");
+      setFieldError("reset_password", err.message || "No se pudo actualizar la contraseña.");
     }
   });
 

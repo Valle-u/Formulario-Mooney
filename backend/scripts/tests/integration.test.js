@@ -102,13 +102,13 @@ describe("egresos", () => {
     assert.ok(r.headers.get("ratelimit-limit"));
   });
 
-  test("empleado no puede borrar", async () => {
-    if (!empToken) return;
+  test("DELETE físico deshabilitado (usar anular)", async () => {
+    assert.ok(adminToken, "falta adminToken");
     const list = await json("/api/egresos?limit=1", { token: adminToken });
     const id = list.data.egresos[0]?.id;
     if (!id) return;
-    const r = await json(`/api/egresos/${id}`, { method: "DELETE", token: empToken });
-    assert.equal(r.status, 403);
+    const r = await json(`/api/egresos/${id}`, { method: "DELETE", token: adminToken });
+    assert.equal(r.status, 405);
   });
 
   test("rechaza archivo con magic number incorrecto", async () => {

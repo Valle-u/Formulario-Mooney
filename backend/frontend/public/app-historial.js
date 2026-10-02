@@ -255,16 +255,22 @@ function mostrarDetalle(e){
     maximumFractionDigits: 2
   });
 
-  const isPdf = e.comprobante_mime === "application/pdf";
+  const hasComprobante = !!(e.comprobante_url || e.comprobante_filename);
+  const isPdf = e.comprobante_mime === "application/pdf"
+    || /\.pdf$/i.test(e.comprobante_filename || "")
+    || (e.comprobante_url && /\.pdf(\?|$)/i.test(e.comprobante_url));
 
-  // Usar directamente la URL de ImgBB si está disponible, sino usar el endpoint del backend
-  const comprobanteUrl = e.comprobante_url && e.comprobante_url.startsWith('http')
-    ? e.comprobante_url // URL directa de ImgBB o R2
-    : `${API_BASE}/api/egresos/${encodeURIComponent(e.id)}/comprobante`; // Fallback al endpoint del backend
-
-  const comprobantePreview = isPdf
-    ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Ver PDF en nueva ventana</a>`
-    : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" data-comprobante-img="1"></a>`;
+  const comprobantePreview = !hasComprobante
+    ? `<div class="note">Sin comprobante adjunto</div>`
+    : isPdf
+    ? `<div class="comprobante-inline" data-egreso-id="${escapeHtml(String(e.id))}" data-comprobante-kind="pdf">
+        <iframe class="comprobante-pdf-frame" title="Comprobante PDF" style="width:100%;min-height:420px;border:1px solid var(--border);border-radius:8px;background:#111;"></iframe>
+        <button type="button" class="btn btn-ghost btn-comprobante-tab" style="margin-top:8px;">Abrir en nueva pestaña</button>
+      </div>`
+    : `<div class="comprobante-inline" data-egreso-id="${escapeHtml(String(e.id))}" data-comprobante-kind="image">
+        <img class="comprobante-img" style="max-width:100%;max-height:400px;border-radius:8px;" alt="Comprobante">
+        <button type="button" class="btn btn-ghost btn-comprobante-tab" style="margin-top:8px;">Abrir en nueva pestaña</button>
+      </div>`;
 
   // Estado visual: la marca de edición vive en edited_at, no en status
   const status = e.status || 'activo';
@@ -282,8 +288,7 @@ function mostrarDetalle(e){
   const isAdminOrDireccion = (user.role === 'admin' || user.role === 'direccion');
   const isOwner = e.created_by === user.id;
   const canEdit = isAdminOrDireccion || isOwner;
-  // El borrado físico queda solo para admin; el resto anula
-  const canDelete = user.role === 'admin';
+  const canAnular = user.role === 'admin';
 
   body.innerHTML = `
     <div class="grid">
@@ -385,9 +390,9 @@ function mostrarDetalle(e){
             <button class="btn btn-primary btn-editar-egreso" style="flex: 1; min-width: 140px;">
               Editar
             </button>
-            ${canDelete ? `
-              <button class="btn btn-eliminar-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
-                Eliminar
+            ${canAnular ? `
+              <button type="button" class="btn btn-anular-egreso" data-egreso-id="${e.id}" style="flex: 1; min-width: 140px; background: #ef4444; color: white;">
+                Anular
               </button>
             ` : ''}
           ` : ''}
@@ -403,18 +408,16 @@ function mostrarDetalle(e){
   console.log('Estado actual del modal:', modal.style.display);
   modal.style.display = "flex";
 
-  // El fallback del comprobante se engancha por JS: el CSP bloquea onerror inline.
-  body.querySelector('[data-comprobante-img]')?.addEventListener('error', (ev) => {
-    const link = ev.target.parentElement;
-    if (link) link.textContent = 'Error cargando imagen';
-  });
+  if (hasComprobante) {
+    hydrateComprobantePreview(e);
+  }
 
   console.log('Modal mostrado con display:', modal.style.display);
 
   // Agregar event listeners a los botones de acción
   setTimeout(() => {
     const btnEditar = document.querySelector('.btn-editar-egreso');
-    const btnEliminar = document.querySelector('.btn-eliminar-egreso');
+    const btnAnular = document.querySelector('.btn-anular-egreso');
     const btnHistorial = document.querySelector('.btn-ver-historial');
 
     if (btnEditar) {
@@ -424,11 +427,10 @@ function mostrarDetalle(e){
       });
     }
 
-    if (btnEliminar) {
-      btnEliminar.addEventListener('click', () => {
-        const egresoId = btnEliminar.dataset.egresoId;
-        console.log('Boton Eliminar clickeado, ID:', egresoId);
-        mostrarModalEliminar(egresoId);
+    if (btnAnular) {
+      btnAnular.addEventListener('click', () => {
+        const egresoId = btnAnular.dataset.egresoId;
+        mostrarFormAnular(egresoId);
       });
     }
 
@@ -440,6 +442,92 @@ function mostrarDetalle(e){
       });
     }
   }, 100);
+}
+
+async function hydrateComprobantePreview(egreso) {
+  const container = document.querySelector("#detalleBody .comprobante-inline");
+  if (!container || !egreso?.id) return;
+
+  const kind = container.dataset.comprobanteKind;
+  const token = getToken();
+  const url = `${API_BASE}/api/egresos/${encodeURIComponent(egreso.id)}/comprobante`;
+
+  try {
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      throw new Error("No se pudo cargar el comprobante");
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    if (kind === "pdf") {
+      const iframe = container.querySelector("iframe");
+      if (iframe) iframe.src = objectUrl;
+    } else {
+      const img = container.querySelector(".comprobante-img");
+      if (img) img.src = objectUrl;
+    }
+
+    container.querySelector(".btn-comprobante-tab")?.addEventListener("click", () => {
+      window.open(objectUrl, "_blank", "noopener,noreferrer");
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="note" style="color:#ef4444;">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function mostrarFormAnular(egresoId) {
+  const modal = document.getElementById("detalleModal");
+  const body = document.getElementById("detalleBody");
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div style="max-width: 520px;">
+      <h3 style="margin: 0 0 8px 0;">Anular egreso #${escapeHtml(egresoId)}</h3>
+      <p class="note" style="margin: 0 0 16px 0;">El movimiento quedará marcado como anulado y se conservará en el historial para auditoría.</p>
+      <div class="field">
+        <label for="anular_motivo">Motivo de anulación *</label>
+        <textarea id="anular_motivo" rows="4" placeholder="Describí por qué se anula este egreso"></textarea>
+        <div id="anular_motivo_error" class="field-error" style="display:none;" role="alert"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost" id="btnCancelAnular">Volver</button>
+        <button type="button" class="btn" id="btnConfirmAnular" style="background:#ef4444;color:#fff;">Confirmar anulación</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+
+  document.getElementById("anular_motivo")?.addEventListener("input", () => clearFieldError("anular_motivo"));
+
+  document.getElementById("btnCancelAnular")?.addEventListener("click", () => {
+    if (currentEgreso) mostrarDetalle(currentEgreso);
+    else cerrarModal();
+  });
+
+  document.getElementById("btnConfirmAnular")?.addEventListener("click", async () => {
+    const motivo = document.getElementById("anular_motivo")?.value?.trim() || "";
+    clearFieldError("anular_motivo");
+    if (!motivo) {
+      setFieldError("anular_motivo", "El motivo de anulación es obligatorio.");
+      return;
+    }
+    await anularEgreso(egresoId, motivo);
+  });
+}
+
+async function anularEgreso(id, motivo) {
+  try {
+    await api(`/api/egresos/${id}/anular`, { method: "POST", body: { motivo } });
+    toast("Anulado", "Egreso anulado correctamente", "success", 5000);
+    cerrarModal();
+    buscarEgresos();
+  } catch (err) {
+    setFieldError("anular_motivo", err.message || "No se pudo anular el egreso.");
+  }
 }
 
 function limpiarFiltros(){
@@ -888,31 +976,12 @@ function editarEgresoModal(){
   modal.style.display = "flex";
 }
 
-function mostrarModalEliminar(id){
-  const confirmacion = confirm(`Estas seguro que queres ELIMINAR el egreso #${id}?\n\nEsta accion NO se puede deshacer.\nEl egreso sera eliminado permanentemente de la base de datos.`);
-
-  if(!confirmacion) return;
-
-  eliminarEgreso(id);
-}
-
-async function eliminarEgreso(id){
-  try{
-    await api(`/api/egresos/${id}`, { method: 'DELETE' });
-    toast("Eliminado", "Egreso eliminado correctamente", "success", 5000);
-    cerrarModal();
-    buscarEgresos(); // Recargar listado
-  }catch(err){
-    toast("Error", err.message, "error");
-  }
-}
-
 async function verHistorial(id){
   try{
     const data = await api(`/api/egresos/${id}/history`);
 
     if(!data.changes || data.changes.length === 0){
-      toast("Sin cambios", "Este egreso no tiene historial de modificaciones", "info");
+      mostrarHistorialVacio(id);
       return;
     }
 
@@ -921,6 +990,31 @@ async function verHistorial(id){
   }catch(err){
     toast("Error", err.message, "error");
   }
+}
+
+function mostrarHistorialVacio(egresoId) {
+  const modal = document.getElementById("detalleModal");
+  const body = document.getElementById("detalleBody");
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div style="text-align:center;padding:28px 12px;">
+      <h3 style="margin:0 0 12px 0;">Sin historial de cambios</h3>
+      <p class="note" style="margin:0 0 24px 0;">El egreso #${escapeHtml(egresoId)} no tiene modificaciones registradas.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" id="btnHistorialVacioVolver">Volver al detalle</button>
+        <button type="button" class="btn btn-ghost" id="btnHistorialVacioCerrar">Cerrar</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+
+  document.getElementById("btnHistorialVacioCerrar")?.addEventListener("click", cerrarModal);
+  document.getElementById("btnHistorialVacioVolver")?.addEventListener("click", () => {
+    if (currentEgreso) mostrarDetalle(currentEgreso);
+    else cerrarModal();
+  });
 }
 
 function mostrarHistorialModal(egresoId, changes){
@@ -1007,7 +1101,7 @@ function mostrarHistorialModal(egresoId, changes){
     </div>
   `;
 
-  modal.style.display = "block";
+  modal.style.display = "flex";
 
   // Agregar event listener al botón Cerrar
   setTimeout(() => {

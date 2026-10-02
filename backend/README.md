@@ -114,7 +114,7 @@ GET    /api/egresos                    # Listar con filtros + paginación
 POST   /api/egresos                    # Crear egreso (multipart, campo "comprobante")
 PUT    /api/egresos/:id                # Editar egreso
 POST   /api/egresos/:id/anular         # Anular egreso
-DELETE /api/egresos/:id                # Eliminar (propios, o cualquiera si admin/direccion)
+DELETE /api/egresos/:id                # Deshabilitado (405) — usar POST /:id/anular
 GET    /api/egresos/:id/history        # Historial de cambios
 GET    /api/egresos/:id/comprobante    # Descargar comprobante
 GET    /api/egresos/csv                # Exportar CSV (admin / direccion)
