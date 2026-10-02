@@ -671,12 +671,12 @@ function renderFilasOperaciones(egresos) {
     const tipoIcon = e.tipo_transaccion === "ENTRADA" ? "IN" : "OUT";
 
     let statusBadge = '';
-    if (e.status === 'activo') {
-      statusBadge = '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>';
-    } else if (e.status === 'anulado') {
+    if (e.status === 'anulado') {
       statusBadge = '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Anulado</span>';
-    } else {
+    } else if (e.edited_at || e.status === 'editada') {
       statusBadge = '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Editado</span>';
+    } else {
+      statusBadge = '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Activo</span>';
     }
 
     const rowStyle = e.status === 'anulado' ? 'opacity: 0.5;' : '';
@@ -730,7 +730,13 @@ function aplicarFiltrosModal(etiquetasUnicas) {
   // Filtrar egresos
   let filtrados = modalSaldosData.egresos.filter(e => {
     if (tipo && e.tipo_transaccion !== tipo) return false;
-    if (estado && e.status !== estado) return false;
+    if (estado === "editada") {
+      if (!(e.edited_at || e.status === "editada") || e.status === "anulado") return false;
+    } else if (estado === "activo") {
+      if (e.status === "anulado" || e.edited_at || e.status === "editada") return false;
+    } else if (estado && e.status !== estado) {
+      return false;
+    }
     if (etiqueta && e.etiqueta !== etiqueta) return false;
 
     const monto = Number(e.monto);

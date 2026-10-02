@@ -146,13 +146,14 @@ function renderEgresos(egresos, pagination, sumas){
       : '<span style="background: #5a5a5a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ARS</span>';
 
     const status = e.status || 'activo';
-    const statusBadge = status === 'activo'
-      ? '<span style="background: #444444; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ACTIVO</span>'
-      : status === 'anulado'
+    const wasEdited = !!e.edited_at || status === 'editada';
+    const statusBadge = status === 'anulado'
       ? '<span style="background: #2a2a2a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ANULADO</span>'
-      : status === 'editada'
+      : wasEdited
       ? '<span style="background: #666666; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">EDITADA</span>'
-      : '<span style="background: #7a7a7a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">PENDIENTE</span>';
+      : status === 'pendiente'
+      ? '<span style="background: #7a7a7a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">PENDIENTE</span>'
+      : '<span style="background: #444444; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ACTIVO</span>';
 
     return `
       <tr>
@@ -260,15 +261,16 @@ function mostrarDetalle(e){
     ? `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Ver PDF en nueva ventana</a>`
     : `<a href="${escapeHtml(comprobanteUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(comprobanteUrl)}" style="max-width: 100%; max-height: 400px; border-radius: 8px;" alt="Comprobante" data-comprobante-img="1"></a>`;
 
-  // Estado visual
+  // Estado visual: la marca de edición vive en edited_at, no en status
   const status = e.status || 'activo';
-  const statusBadge = status === 'activo'
-    ? '<span style="background: #444444; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ACTIVO</span>'
-    : status === 'anulado'
+  const wasEdited = !!e.edited_at || status === 'editada';
+  const statusBadge = status === 'anulado'
     ? '<span style="background: #2a2a2a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ANULADO</span>'
-    : status === 'editada'
+    : wasEdited
     ? '<span style="background: #666666; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">EDITADA</span>'
-    : '<span style="background: #7a7a7a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">PENDIENTE</span>';
+    : status === 'pendiente'
+    ? '<span style="background: #7a7a7a; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">PENDIENTE</span>'
+    : '<span style="background: #444444; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">ACTIVO</span>';
 
   const user = getUser();
   // Admin/Direccion pueden editar cualquier egreso, otros usuarios solo los propios
@@ -928,10 +930,24 @@ function mostrarHistorialModal(egresoId, changes){
 
     const fieldLabel = {
       'monto': 'Monto',
+      'monto_raw': 'Monto (texto)',
+      'moneda': 'Moneda',
+      'tipo_transaccion': 'Tipo de transacción',
       'status': 'Estado',
       'fecha': 'Fecha',
+      'hora': 'Hora',
+      'turno': 'Turno',
       'etiqueta': 'Etiqueta',
-      'cuenta_receptora': 'Cuenta Receptora',
+      'etiqueta_otro': 'Otro concepto',
+      'cuenta_receptora': 'Cuenta receptora',
+      'usuario_casino': 'Usuario casino',
+      'hora_solicitud_cliente': 'Hora solicitud cliente',
+      'hora_quema_fichas': 'Hora quema de fichas',
+      'cuenta_salida': 'Cuenta salida',
+      'empresa_salida': 'Empresa salida',
+      'id_transferencia': 'ID transferencia',
+      'codigo_operacion': 'Código de operación',
+      'comprobante': 'Comprobante',
       'notas': 'Notas'
     }[c.field_name] || c.field_name;
 

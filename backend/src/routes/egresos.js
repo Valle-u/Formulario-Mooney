@@ -1454,8 +1454,19 @@ router.get("/", auth, async (req, res) => {
     }
 
     if (status) {
-      params.push(status);
-      where.push(`e.status = $${params.length}`);
+      // "editada" dejó de ser un valor de status: ahora se filtra por edited_at.
+      // Se mantiene el valor del query para no romper los selects del frontend.
+      // Activo/Pendiente excluyen los editados para que las opciones del select
+      // sigan siendo mutuamente excluyentes en la UI.
+      if (String(status) === "editada") {
+        where.push(`e.edited_at IS NOT NULL AND COALESCE(e.status, 'activo') <> 'anulado'`);
+      } else if (String(status) === "activo" || String(status) === "pendiente") {
+        params.push(status);
+        where.push(`e.status = $${params.length} AND e.edited_at IS NULL`);
+      } else {
+        params.push(status);
+        where.push(`e.status = $${params.length}`);
+      }
     }
 
     if (moneda) {
@@ -1593,6 +1604,7 @@ router.get("/", auth, async (req, res) => {
       comprobante_mime: e.comprobante_mime,
       notas: e.notas,
       status: e.status || 'activo',
+      edited_at: e.edited_at || null,
       motivo_anulacion: e.motivo_anulacion || null,
       anulado_at: e.anulado_at || null,
       updated_at: e.updated_at || null,
@@ -2308,8 +2320,11 @@ router.put("/:id", auth, async (req, res) => {
     if (sendsEmpresaSalida) setField("empresa_salida", empresaSalidaNorm);
     if (sendsNotas) setField("notas", notasNorm);
 
-    // Marcar siempre como editado y registrar auditoría de quién editó
-    setClauses.push("status = 'editada'");
+    // Marcar edición sin pisar status (activo/pendiente se conservan).
+    // last_change_reason lo lee el trigger y lo copia a egresos_history.
+    params.push(changeReasonNorm);
+    setClauses.push(`last_change_reason = $${params.length}`);
+    setClauses.push("edited_at = CURRENT_TIMESTAMP");
     params.push(req.user.id);
     setClauses.push(`updated_by = $${params.length}`);
     setClauses.push("updated_at = CURRENT_TIMESTAMP");
@@ -2320,12 +2335,6 @@ router.put("/:id", auth, async (req, res) => {
       `UPDATE egresos SET ${setClauses.join(", ")} WHERE id = $${params.length}`,
       params
     );
-
-    // Si no hay campos explícitos para cambio, al menos dejar trazabilidad por estado/updated_by
-    if (setClauses.length === 3) {
-      // status + updated_by + updated_at
-      // no-op: ya quedó trazabilidad
-    }
 
     // Registrar en audit logs
     await auditLog(req, {
