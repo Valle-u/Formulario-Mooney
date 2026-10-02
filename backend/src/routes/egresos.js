@@ -12,7 +12,9 @@ import {
   isFutureDateISO,
   parseMontoARSStrict,
   montoToCommaString,
-  requireNonEmpty
+  requireNonEmpty,
+  TURNOS_CIERRE,
+  TURNOS_CIERRE_ORDER
 } from "../utils/validators.js";
 import {
   isValidEmpresa,
@@ -60,13 +62,6 @@ function setSaldosCache(cacheKey, payload) {
 function clearSaldosCache() {
   if (saldosCache.size) saldosCache.clear();
 }
-
-const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
-const TURNOS_CIERRE_ORDER = {
-  "Turno mañana": 1,
-  "Turno tarde": 2,
-  "Turno noche": 3
-};
 
 function normalizeTurnoLabel(turnoValue) {
   const raw = String(turnoValue || "").trim();

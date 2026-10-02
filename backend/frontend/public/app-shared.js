@@ -34,7 +34,11 @@ console.log('API_BASE:', API_BASE);
 /* =========================
    DATOS (selects)
    ========================= */
+// Fallbacks si /api/options no responde. Origen de verdad: tabla select_options.
 const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Lohas", "Banco Nacion", "Otra (Especificar en notas)"];
+
+/** Turnos de cierre de caja — única definición del frontend. */
+const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
 
 const ETIQUETAS = [
   // Unidad M

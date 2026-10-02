@@ -2,7 +2,6 @@
    CIERRES DE CAJA - MODULO GUIADO
    ========================= */
 
-const CIERRE_TURNOS = ["Turno mañana", "Turno tarde", "Turno noche"];
 let cierreKpiRowsCache = [];
 
 function toISODateLocal(dateObj) {
@@ -186,7 +185,7 @@ function validateCierreForm() {
   const montoRaw = document.getElementById("cierre_monto")?.value || "";
   const comprobante = document.getElementById("cierre_comprobante")?.files?.[0];
 
-  if (!turno || !CIERRE_TURNOS.includes(turno)) {
+  if (!turno || !TURNOS_CIERRE.includes(turno)) {
     throw new Error("Selecciona un turno laboral antes de guardar.");
   }
   if (!fecha) {

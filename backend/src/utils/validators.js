@@ -1,3 +1,5 @@
+// Fallbacks si la tabla select_options no responde. El origen de verdad es
+// select_options (migración 031); optionsCache.js los usa solo al fallar.
 export const EMPRESAS_SALIDA = ["Telepagos", "Copter", "Palta", "Personal Pay", "Lemoncash", "NaranjaX", "TrustWallet", "Mercado Pago", "Brubank", "Binance", "AstroPay", "DolarApp", "Uala", "Cuenta DNI", "Lohas", "Banco Nacion", "Otra (Especificar en notas)"];
 
 export const ETIQUETAS_CON_USUARIO_CASINO = new Set([
@@ -9,6 +11,14 @@ export const ETIQUETAS_PREMIO_MINIMO = new Set(["[Unidad M] Premio Pagado"]);
 export const ETIQUETAS_CIERRE_CAJA = new Set([
   "Cierre de Caja"
 ]);
+
+/** Turnos de cierre de caja. Una sola definición para rutas y validación. */
+export const TURNOS_CIERRE = ["Turno mañana", "Turno tarde", "Turno noche"];
+export const TURNOS_CIERRE_ORDER = {
+  "Turno mañana": 1,
+  "Turno tarde": 2,
+  "Turno noche": 3
+};
 
 // Mapa de equivalencias: etiquetas legacy <-> etiquetas nuevas con prefijo
 // Permite buscar por cualquiera de las dos versiones y encontrar ambas
