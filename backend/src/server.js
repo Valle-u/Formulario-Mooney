@@ -54,11 +54,12 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://i.ibb.co", "https://*.ibb.co"],
-      connectSrc: ["'self'", "https://api.imgbb.com"],
+      // i.ibb.co: fetch del comprobante puede seguir un redirect de ImgBB
+      connectSrc: ["'self'", "https://api.imgbb.com", "https://i.ibb.co", "https://*.ibb.co"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", "blob:"],
-      frameSrc: ["'self'", "blob:"]
+      frameSrc: ["'self'", "blob:", "https://i.ibb.co", "https://*.ibb.co"]
     }
   },
   // Prevent clickjacking
