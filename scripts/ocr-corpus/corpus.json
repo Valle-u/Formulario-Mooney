@@ -1,0 +1,29 @@
+{
+  "description": "Corpus de regresión OCR de codigo_operacion/coelsa_id (PTMUAT-414). Fuente: MSG-PAM-20260726-6 (75 lecturas vs 390 transferencias reales). Un cambio de prompt NO debe reintroducir ninguno de estos misreads. Ejecutar: npm run test:ocr-corpus. Las imágenes viven en scripts/ocr-corpus/images/<id>.jpg (gitignored, PII) — pedir scan_id a PAM/QA para poblar desde gate prod storage (TTL 168h) o reenvío.",
+  "expected_after_plan_a": {
+    "glyph": "d=0 (solo glifos) → tras Plan A el OCR debe leer EXACTO el ground_truth",
+    "char_lost": "d=1 (carácter perdido) → objetivo exacto; si no, no peor que baseline",
+    "transposition": "d=2 → objetivo exacto; corrobora colapso PAM",
+    "length": "d=3 (largo 21 vs 22) → objetivo exacto"
+  },
+  "cases": [
+    { "id": "439", "scan_id": "a4b55462-2068-43a2-b8c5-4ab9b96ada11", "ocr_read": "L18MKX9RPXVMQKMV20GWVV", "ground_truth": "L18MKX9RPXVMQKMV2O6WYV", "distance": 0, "category": "glyph", "full": true, "note": "0->O, G->6, V->Y. Validado LIVE." },
+    { "id": "159", "ocr_read": "XJBG7V957", "ground_truth": "XJ8G7V957", "distance": 0, "category": "glyph", "full": false, "note": "B->8 (parcial, prefijo)" },
+    { "id": "209", "ocr_read": "NQMDOG", "ground_truth": "NQMD0G", "distance": 0, "category": "glyph", "full": false, "note": "O->0 (parcial, sufijo)" },
+    { "id": "217", "ocr_read": "5QX60XP", "ground_truth": "5QX6OXP", "distance": 0, "category": "glyph", "full": false, "note": "0->O (parcial)" },
+    { "id": "234", "ocr_read": "PD XVELZK", "ground_truth": "PDXVELZK", "distance": 0, "category": "spacing", "full": false, "note": "espacio insertado" },
+    { "id": "332", "ocr_read": "GQ0033ER", "ground_truth": "GQOO33ER", "distance": 0, "category": "glyph", "full": false, "note": "00->OO (parcial)" },
+    { "id": "336", "ocr_read": "GQ0033ER", "ground_truth": "GQOO33ER", "distance": 0, "category": "glyph", "full": false, "note": "idem #332 (parcial)" },
+    { "id": "342", "scan_id": "ec2383fb-c7eb-411e-ab18-01c308ac0d4c", "ocr_read": "LOEJWV9JXZLOXPP3NQMDOG", "ground_truth": "LOEJWV9JXZLOXPP3NQMD0G", "distance": 0, "category": "glyph", "full": true, "note": "O->0 (par completo 22, imagen entregada MSG-PAM-20260727-6)" },
+    { "id": "356", "ocr_read": "206WYV", "ground_truth": "2O6WYV", "distance": 0, "category": "glyph", "full": false, "note": "0->O (parcial, sufijo)" },
+    { "id": "408", "scan_id": "1bc402e0-1b75-44da-bdc5-e685a5351ab8", "ocr_read": "0V1JXON1RL04D037NZG4EL", "ground_truth": "0V1JXON1RL04D037NZ64EL", "distance": 0, "category": "glyph", "full": true, "note": "G->6 (par completo 22, imagen entregada MSG-PAM-20260727-6)" },
+    { "id": "219", "ocr_read": "", "ground_truth": "", "distance": 1, "category": "char_lost", "full": false, "note": "cae una G" },
+    { "id": "264", "ocr_read": "I7I", "ground_truth": "4171", "distance": 1, "category": "char_lost", "full": false, "note": "I7I por 4171" },
+    { "id": "422", "scan_id": "217dd835-71ae-4d30-95b7-44a3ca086e43", "ocr_read": "Z6OLMDN37VL4KXG9E7RQ5", "ground_truth": "Z6OLMDN37VL4KXGX9E7RQ5", "distance": 1, "category": "char_lost", "full": true, "note": "cae una X (21 vs 22); imagen entregada MSG-PAM-20260727-6" },
+    { "id": "285", "ocr_read": "818RMQQ", "ground_truth": "818RQMQ", "distance": 2, "category": "transposition", "full": false, "note": "transposición MQ<->QM (parcial)" },
+    { "id": "282", "ocr_read": "", "ground_truth": "", "distance": 3, "category": "length", "full": false, "note": "largo 21 vs 22" },
+    { "id": "444", "scan_id": "81a02d02-d922-47d3-8fa5-407429c95939", "ocr_read": "D4ROT72VPZ3PLYR2KJ5QE", "ground_truth": "D4RO172VPZR3PLYR2KJ3QE", "distance": 3, "category": "char_lost", "full": true, "note": "char-loss (cae R) + glifos 1->T y 3->5; d=3 tras colapso. ADEMAS el CBU emisor tiene checksum invalido -> doble credito $1000 (#443+#444). MSG-PAM-20260728-6. Imagen del propio storage por scan_id." },
+    { "id": "451", "scan_id": "8e1576af-0f44-434b-9f4d-356f7e9f9a5c", "ocr_read": "Z0KV8794706538D9PEYDX", "ground_truth": "Z0KV879470R6538D9PEYDX", "distance": 1, "category": "char_lost", "full": true, "note": "char-loss (cae R), 21 vs 22. El peldano difuso de PAM SI la agarro (score 85, confirmar manual). Refuerza que el A/B debe atacar d grande (#444 d=3), no d=1. CBU emisor tambien misleido: 0000031000004007I5658 (una I) -> v1.2 lo marca false via looksLikeMisreadCbu. MSG-PAM-20260728-7." },
+    { "id": "459", "ocr_read": "XJ3G7V957D5LYVDNEMPYRl", "ground_truth": "XJ8G7V957D5LY1VDNEMPYR", "distance": 3, "category": "char_lost", "full": false, "note": "3 ediciones sobre 22: 8->3, se pierde un 1, una l de mas al final. Unica muestra util del minado de PAM (64 pares -> 1 tras filtrar por atribucion). Sin scan_id/imagen. MSG-PAM-20260729-5." }
+  ]
+}

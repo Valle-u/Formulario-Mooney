@@ -1,0 +1,89 @@
+# Receipt Gate + ClamAV como sidecar. El gate apunta a clamd por red (CLAMD_HOST=clamav).
+#
+# Topología TEST (gate interno en el mismo EC2 que el PAM):
+#   - El gate NO se expone a internet: publica solo en 127.0.0.1:4100 (ops/health en la box).
+#   - El contenedor del PAM lo alcanza por la red Docker `receipt-net` → http://receipt-gate:4100
+#     (conectar el contenedor del PAM: `docker network connect receipt-net casinodragon-test`).
+#   - Para Etapa 2 (CRM externo), exponer un subdominio HTTPS aparte por nginx (no acá).
+#
+# Secretos: no van en este YAML.
+#   docker compose --env-file ~/receipt-gate/.env up --build -d
+
+networks:
+  receipt-net:
+    name: receipt-net
+
+services:
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    networks: [receipt-net]
+    # Sin esto el log de Docker crece sin tope: este sidecar lleva 5 semanas arriba.
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+    # ClamAV carga ~3.6M firmas; limitar RAM evita que un reload colgado tire el host.
+    mem_limit: 1536m
+    mem_reservation: 512m
+    # clamd escucha en 3310; la primera vez freshclam baja la base de firmas (~tarda).
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  gate:
+    build: .
+    container_name: receipt-gate
+    restart: unless-stopped
+    networks: [receipt-net]
+    depends_on:
+      clamav:
+        condition: service_healthy
+    # Solo loopback de la box (no internet). El PAM entra por la red `receipt-net`.
+    ports:
+      - "127.0.0.1:4100:4100"
+    # Acota el log de Docker; la traza que hay que poder auditar va a /data/logs (GATE_LOG_DIR).
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+    environment:
+      NODE_ENV: production
+      PORT: "4100"
+      DB_PATH: /data/receipt-gate.db
+      RECEIPT_STORAGE_PATH: /data/receipts
+      # Almacén RETENIDO de la base que aprende (PTMUAT-414 c) — en el volumen /data, fuera del TTL.
+      RECEIPT_EVAL_STORAGE_PATH: /data/ocr-eval
+      # Traza en el volumen: el log de Docker se borra al reemplazar el contenedor, y un rechazo no
+      # deja fila en la base. Retención 7 días = el TTL de los scans que describe.
+      GATE_LOG_DIR: /data/logs
+      GATE_LOG_RETENTION_DAYS: "7"
+      # Auth y vista (obligatorios en prod). Vienen del --env-file.
+      RECEIPT_GATE_TOKENS: ${RECEIPT_GATE_TOKENS}
+      RECEIPT_VIEW_SECRET: ${RECEIPT_VIEW_SECRET}
+      RECEIPT_PUBLIC_URL: ${RECEIPT_PUBLIC_URL}
+      # ClamAV sidecar
+      RECEIPT_CLAMAV_ENABLED: "true"
+      RECEIPT_CLAMAV_FAIL_CLOSED: "true"
+      CLAMD_HOST: clamav
+      CLAMD_PORT: "3310"
+      # Flags sensibles al dinero. Viven en el `.env` de cada host y NO en este archivo: cuando el
+      # valor sólo existía en el compose del host, un deploy que sincronizaba el compose desde el repo
+      # los apagaba en silencio — pasó en gate-test el 13/08 04:18, y `RECEIPT_SANITIZE_INVALID_CBU`
+      # emite campos del contrato v1.2, así que apagarlo es una regresión de contrato sin aviso.
+      # El default de acá replica el de env.ts: si el host no lo declara, queda OFF y se nota.
+      RECEIPT_DEDUP_CONTENT_STRONG: ${RECEIPT_DEDUP_CONTENT_STRONG:-false}
+      RECEIPT_SANITIZE_INVALID_CBU: ${RECEIPT_SANITIZE_INVALID_CBU:-false}
+      # Capa 2 — IA forense (Claude primario → OpenAI → Gemini)
+      RECEIPT_FORENSIC_ENABLED: ${RECEIPT_FORENSIC_ENABLED:-true}
+      RECEIPT_FORENSIC_REQUIRED: ${RECEIPT_FORENSIC_REQUIRED:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-4-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - gate-data:/data
+
+volumes:
+  gate-data:

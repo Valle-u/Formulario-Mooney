@@ -1,0 +1,29 @@
+---
+description: GATE — servicio aislado de comprobantes (Capa 1+2)
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# GATE
+
+## Qué es
+Servicio Node/TS **aislado** que sanea comprobantes (E0–E4) antes del PAM.
+**No** decide dinero. **No** corre en el servidor del PAM.
+
+Nombre del producto: **GATE**. Identificadores técnicos (`RECEIPT_GATE_*`, `receipt-gate`)
+se mantienen por compatibilidad CRM/PAM.
+
+## Docs
+Empezar por `docs/ESTADO.md` (punto actual, pendientes, outbox de mensajes, qué está live). El
+índice general está en `docs/README.md`; la historia en `docs/historial/`.
+
+## Reglas
+- Al cliente solo JPEG re-generado + pHash (nunca el original)
+- ClamAV fail-closed en prod
+- Tokens Bearer obligatorios en production
+- Parsers (poppler/sharp) = riesgo RCE → sandbox efímero (G5, pendiente infra)
+
+## Repos hermanos
+- CRM: `C:\Users\lauta\Desktop\CRM` — transporte HTTP al GATE (integrado)
+- PAM: `Black Dragon V1.0.1` — consume GATE, decide dinero (integrado en test)

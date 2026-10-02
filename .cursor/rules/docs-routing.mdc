@@ -1,0 +1,47 @@
+---
+description: Dónde se escribe cada cosa en la documentación de GATE — estado, historia, referencia, cross-repo
+alwaysApply: true
+---
+
+# Dónde escribir: un hecho, un dueño, un lugar
+
+**El dueño de un dato lo define quién lo cambia.** Si el mismo hecho vive en dos archivos, tarde o
+temprano dicen cosas distintas y ninguno manda. Mismo criterio que PAM.
+
+## Tabla de ruteo
+
+| Si lo que anotás… | Va a | Se edita |
+|-------------------|------|----------|
+| Cambia ahora y va a seguir cambiando (punto actual, pendientes, mensajes, qué está live) | `docs/ESTADO.md` | **Se sobrescribe libre** |
+| Ya pasó y no cambia más (narrativa, mediciones, evidencia) | `docs/historial/<AAAA-MM>.md` | **Append-only**, nunca se edita |
+| Decisiones de fondo y gate de calidad | `docs/06_PENDIENTES.md` | Cuando cambia una decisión |
+| Contrato con CRM y PAM | `docs/05_INTEGRACION_CRM_PAM.md` (canon de los 3 repos) | Con aviso R1 a los consumidores |
+| **Cruza** a otra instancia (infra, secretos, Qase, dependencia) | `E:\credenciales\docs\PLAN_ACCION.md` | Un puntero, **no** una copia |
+| Cómo funciona el pipeline | `docs/01_ARQUITECTURA.md` · `02_CAPA_1.md` · `03_CAPA_2.md` | Cuando cambia el comportamiento |
+
+## Reglas duras
+
+1. **El outbox de `docs/ESTADO.md` es la ÚNICA fuente de verdad sobre si un mensaje salió.** Estados:
+   `BORRADOR` · `ENVIADO` · `RESPONDIDO` · `DESCARTADO`.
+2. **El outbox se audita contra el destinatario, no contra sí mismo.** Un commit del otro repo citando
+   el `REF-MENSAJE` vale más que nuestra propia tabla. El 28/07/2026 PAM estuvo un día esperando una
+   respuesta nuestra a un mensaje que su registro daba por no enviado, mientras nosotros ya habíamos
+   actuado sobre él y los esperábamos.
+3. **Nada de "PUNTO ACTUAL" fuera de `ESTADO.md`.** `06_PENDIENTES.md` tuvo uno congelado once días,
+   con todos sus ítems ya resueltos, y seguía diciendo "punto actual".
+4. **No poner estado en un archivo de referencia** (skills, README, reglas): queda viejo en un día.
+
+## Topes de tamaño
+
+| Archivo | Tope | Si se pasa |
+|---------|------|------------|
+| `docs/ESTADO.md` | **150 líneas** | Archivar lo cerrado en `docs/historial/` |
+| `docs/06_PENDIENTES.md` | ~80 líneas | Es referencia; si crece, se le metió estado o historia |
+
+`ptm-audit.ps1` avisa cuando `ESTADO.md` pasa el tope.
+
+## Al escribir estos archivos
+
+**UTF-8 explícito, siempre.** Nunca `Set-Content` ni redirección de PowerShell: en el vault,
+`PLAN_ACCION.md` perdió **857 caracteres acentuados** de forma irrecuperable por eso. Con PowerShell,
+`[System.IO.File]::WriteAllText($p, $t, (New-Object System.Text.UTF8Encoding($false)))`.
