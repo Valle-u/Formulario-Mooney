@@ -211,7 +211,7 @@ Jerarquía: `admin` > `direccion` > `encargado` > `empleado`.
 
 **Dirección** (`direccion`):
 - Crear, editar y resetear contraseñas de usuarios
-- Ver, editar y eliminar cualquier egreso
+- Ver y editar cualquier egreso
 - Exportar el CSV de egresos
 - Ver logs de auditoría
 
@@ -221,8 +221,11 @@ Jerarquía: `admin` > `direccion` > `encargado` > `empleado`.
 
 **Empleado** (`empleado`):
 - Crear egresos
-- Ver, editar y eliminar sus propios egresos
+- Ver y editar sus propios egresos
 - Descargar comprobantes propios
+
+El borrado físico de un egreso es exclusivo de `admin`. El resto de roles
+usa la anulación, que conserva la fila y el historial.
 
 ### Flujo de trabajo
 

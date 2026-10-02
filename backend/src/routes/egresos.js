@@ -2476,10 +2476,10 @@ router.get("/:id/history", auth, async (req, res) => {
   }
 });
 
-// DELETE /api/egresos/:id - Eliminar egreso completamente
-// Admin/Direccion: puede eliminar cualquier egreso
-// Empleado/Encargado: solo puede eliminar sus propios egresos
-router.delete("/:id", auth, async (req, res) => {
+// DELETE /api/egresos/:id - Eliminar egreso completamente (solo admin)
+// Para el resto de roles la figura correcta es anular (POST /:id/anular),
+// que preserva la fila y el historial.
+router.delete("/:id", auth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -2494,14 +2494,6 @@ router.delete("/:id", auth, async (req, res) => {
     }
 
     const egreso = checkEgreso.rows[0];
-
-    // Verificar permisos: admin/direccion pueden eliminar cualquiera, otros solo los propios
-    const isAdminOrDireccion = req.user.role === 'admin' || req.user.role === 'direccion';
-    const isOwner = egreso.created_by === req.user.id;
-
-    if (!isAdminOrDireccion && !isOwner) {
-      return res.status(403).json({ message: "Solo podés eliminar tus propios egresos" });
-    }
 
     // Eliminar el egreso de la base de datos
     await query(

@@ -277,7 +277,8 @@ function mostrarDetalle(e){
   const isAdminOrDireccion = (user.role === 'admin' || user.role === 'direccion');
   const isOwner = e.created_by === user.id;
   const canEdit = isAdminOrDireccion || isOwner;
-  const canDelete = isAdminOrDireccion || isOwner;
+  // El borrado físico queda solo para admin; el resto anula
+  const canDelete = user.role === 'admin';
 
   body.innerHTML = `
     <div class="grid">
