@@ -7,6 +7,7 @@ import https from "https";
 import { query } from "../config/db.js";
 import { auth, requireAdminOrDireccion, requireAdmin } from "../middleware/auth.js";
 import { validateUploadedFile } from "../middleware/fileValidator.js";
+import { writeLimiter, exportLimiter } from "../middleware/rateLimiter.js";
 import {
   isFutureDateISO,
   parseMontoARSStrict,
@@ -408,7 +409,7 @@ router.get("/check-id-transferencia", auth, async (req, res) => {
   }
 });
 
-router.post("/", auth, upload.single("comprobante"), validateUploadedFile, async (req, res) => {
+router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploadedFile, async (req, res) => {
   try {
     const dataStr = req.body?.data;
     if (!dataStr) return res.status(400).json({ message: "Falta campo data" });
@@ -756,34 +757,21 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
 
   const nextIdx = baseParams.length + 1;
 
-  // Función SQL reutilizable para parsear fecha de forma segura
-  // Filtra filas con fechas inválidas (NULL, vacías, formato desconocido)
-  const FECHA_VALIDA = `(fecha IS NOT NULL AND fecha::text <> '' AND (fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' OR fecha::text ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'))`;
-  const PARSE_FECHA = `(CASE WHEN fecha::text ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TO_DATE(fecha::text, 'YYYY-MM-DD') ELSE TO_DATE(fecha::text, 'DD/MM/YYYY') END)`;
-
-  // 1) Cierre de Caja anterior al mes seleccionado
+  // egresos.fecha es DATE desde la migración 001: comparar directo para que
+  // idx_egresos_fecha sea usable. El CAST a text + TO_DATE anterior hacía un
+  // scan completo en cada cálculo de saldos.
   const cierreSql = `
-    WITH base AS (
-      SELECT
-        empresa_salida,
-        cuenta_salida,
-        moneda,
-        monto,
-        ${PARSE_FECHA} AS fecha_parsed
-      FROM egresos
-      WHERE status <> 'anulado'
-        AND etiqueta = 'Cierre de Caja'
-        AND ${FECHA_VALIDA}
-        ${commonFilter}
-    )
     SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
       empresa_salida,
       cuenta_salida,
       moneda,
       monto
-    FROM base
-    WHERE fecha_parsed < $${nextIdx}::date
-    ORDER BY empresa_salida, cuenta_salida, moneda, fecha_parsed DESC
+    FROM egresos
+    WHERE status <> 'anulado'
+      AND etiqueta = 'Cierre de Caja'
+      AND fecha < $${nextIdx}::date
+      ${commonFilter}
+    ORDER BY empresa_salida, cuenta_salida, moneda, fecha DESC
   `;
   const cierreResult = await query(cierreSql, [...baseParams, primerDiaMesISO]);
 
@@ -795,22 +783,6 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
   // 2) Movimientos del mes (con o sin desglose por etiqueta)
   const movSql = includeBreakdown
     ? `
-      WITH base AS (
-        SELECT
-          empresa_salida,
-          cuenta_salida,
-          moneda,
-          etiqueta,
-          tipo_transaccion,
-          monto,
-          created_at,
-          ${PARSE_FECHA} AS fecha_parsed
-        FROM egresos
-        WHERE status <> 'anulado'
-          AND etiqueta != 'Cierre de Caja'
-          AND ${FECHA_VALIDA}
-          ${commonFilter}
-      )
       SELECT
         empresa_salida,
         cuenta_salida,
@@ -820,28 +792,16 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
         COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
         MAX(created_at) AS ultima_transaccion,
         COUNT(*) AS cnt
-      FROM base
-      WHERE fecha_parsed >= $${nextIdx}::date
-        AND fecha_parsed < $${nextIdx + 1}::date
+      FROM egresos
+      WHERE status <> 'anulado'
+        AND etiqueta != 'Cierre de Caja'
+        AND fecha >= $${nextIdx}::date
+        AND fecha < $${nextIdx + 1}::date
+        ${commonFilter}
       GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
       ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
     `
     : `
-      WITH base AS (
-        SELECT
-          empresa_salida,
-          cuenta_salida,
-          moneda,
-          tipo_transaccion,
-          monto,
-          created_at,
-          ${PARSE_FECHA} AS fecha_parsed
-        FROM egresos
-        WHERE status <> 'anulado'
-          AND etiqueta != 'Cierre de Caja'
-          AND ${FECHA_VALIDA}
-          ${commonFilter}
-      )
       SELECT
         empresa_salida,
         cuenta_salida,
@@ -850,9 +810,12 @@ async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakd
         COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
         MAX(created_at) AS ultima_transaccion,
         COUNT(*) AS cnt
-      FROM base
-      WHERE fecha_parsed >= $${nextIdx}::date
-        AND fecha_parsed < $${nextIdx + 1}::date
+      FROM egresos
+      WHERE status <> 'anulado'
+        AND etiqueta != 'Cierre de Caja'
+        AND fecha >= $${nextIdx}::date
+        AND fecha < $${nextIdx + 1}::date
+        ${commonFilter}
       GROUP BY empresa_salida, cuenta_salida, moneda
       ORDER BY empresa_salida, cuenta_salida, moneda
     `;
@@ -1079,7 +1042,7 @@ router.get("/saldos", auth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/egresos/saldos/csv - Exportar saldos a CSV
-router.get("/saldos/csv", auth, requireAdmin, async (req, res) => {
+router.get("/saldos/csv", auth, requireAdmin, exportLimiter, async (req, res) => {
   try {
     const { empresa, moneda, cuenta } = req.query;
     const { mes, anio } = parsePeriodoQuery(req);
@@ -1256,7 +1219,7 @@ router.get("/cierres/kpi", auth, async (req, res) => {
 });
 
 // GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados (incluye legacy)
-router.get("/cierres/csv", auth, async (req, res) => {
+router.get("/cierres/csv", auth, exportLimiter, async (req, res) => {
   try {
     const todayISO = localDateToISO(new Date());
     const defaultDesde = shiftISODate(todayISO, -2);
@@ -1613,14 +1576,9 @@ router.get("/", auth, async (req, res) => {
       created_at: e.created_at
     }));
 
-    await auditLog(req, {
-      action: "EGRESO_LIST",
-      entity: "egresos",
-      entity_id: null,
-      success: true,
-      status_code: 200,
-      details: { rows: r.rowCount, filters: req.query }
-    });
+    // No se audita el listado: con filtros y paginación genera ruido que tapa
+    // los eventos que importan (CREATE/UPDATE/ANULAR). Sí se auditan CSV y
+    // descarga de comprobantes, que son extracción de datos.
 
     return res.json({
       egresos,
@@ -1643,7 +1601,7 @@ router.get("/", auth, async (req, res) => {
 });
 
 // CSV con filtros (solo admin y direccion)
-router.get("/csv", auth, requireAdminOrDireccion, async (req, res) => {
+router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res) => {
   try {
 
     const {
@@ -2000,7 +1958,7 @@ router.get("/debug/uploads", auth, requireAdmin, async (req, res) => {
 // PUT /api/egresos/:id - Editar egreso
 // Admin/Direccion: puede editar cualquier egreso
 // Empleado/Encargado: solo puede editar sus propios egresos
-router.put("/:id", auth, async (req, res) => {
+router.put("/:id", auth, writeLimiter, async (req, res) => {
   try {
     // Cargar egreso existente para validaciones previas
     const { id } = req.params;
@@ -2371,7 +2329,7 @@ router.put("/:id", auth, async (req, res) => {
 });
 
 // POST /api/egresos/:id/anular - Anular egreso (solo admin)
-router.post("/:id/anular", auth, async (req, res) => {
+router.post("/:id/anular", auth, writeLimiter, async (req, res) => {
   try {
     // Solo admin puede anular
     if (req.user.role !== "admin") {
@@ -2479,7 +2437,7 @@ router.get("/:id/history", auth, async (req, res) => {
 // DELETE /api/egresos/:id - Eliminar egreso completamente (solo admin)
 // Para el resto de roles la figura correcta es anular (POST /:id/anular),
 // que preserva la fila y el historial.
-router.delete("/:id", auth, requireAdmin, async (req, res) => {
+router.delete("/:id", auth, requireAdmin, writeLimiter, async (req, res) => {
   try {
     const { id } = req.params;
 

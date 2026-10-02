@@ -15,6 +15,7 @@ import optionsRoutes from "./routes/options.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
+import { apiLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
 validateRequiredEnv();
@@ -100,6 +101,9 @@ const corsOptions =
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
+
+// Rate limiting de lectura general; login/escritura/CSV tienen límites propios
+app.use("/api", apiLimiter);
 
 // Servir archivos estáticos del frontend
 const __filename = fileURLToPath(import.meta.url);

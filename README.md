@@ -126,7 +126,7 @@ servidor reescribe para evitar caché vieja).
 El sistema implementa:
 
 - ✅ **JWT con expiración**: Tokens de 12 horas (HS256)
-- ✅ **Rate Limiting**: 100 intentos de login por minuto y por IP
+- ✅ **Rate Limiting**: 10 login/min, 300 lecturas/min, 60 escrituras/min, 30 CSV/15 min (por IP)
 - ✅ **Contraseñas fuertes**: Mínimo 8 caracteres, mayúsculas, números, especiales
 - ✅ **Bcrypt**: Hash de contraseñas con salt rounds 12
 - ✅ **XSS Protection**: Escapado de todo dato del servidor antes de inyectarlo en el DOM, más CSP sin `unsafe-inline` en `script-src`

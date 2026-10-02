@@ -169,13 +169,11 @@ Response: { ok: true }
 
 ### Rate Limiting
 
-- **Login**: 100 intentos por minuto y por IP (`loginLimiter`)
-- **Resto de la API**: sin límite — `apiLimiter` está definido en
-  `middleware/rateLimiter.js` pero no está montado en ninguna ruta
+- **Login**: 10 intentos por minuto y por IP (`loginLimiter`)
+- **Lectura de la API**: 300 requests por minuto y por IP (`apiLimiter`)
+- **Escrituras** (alta/edición/anulación/borrado): 60 por minuto (`writeLimiter`)
+- **Exportaciones CSV**: 30 por 15 minutos (`exportLimiter`)
 - Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`
-
-El límite de login es deliberadamente permisivo y hoy no frena un ataque de
-fuerza bruta. Ver `docs/AUDITORIA_2026-10.md` (hallazgo M-1).
 
 ### Validación de Contraseñas
 
