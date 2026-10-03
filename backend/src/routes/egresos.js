@@ -24,6 +24,12 @@ import {
 } from "../utils/optionsCache.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { auditLog } from "../utils/audit.js";
+import {
+  sha256Hex,
+  findEgresoByTransferIds,
+  findEgresoByComprobanteSha256,
+  formatDuplicateMessage,
+} from "../utils/egresoDuplicates.js";
 
 // Almacenamiento de comprobantes
 import { uploadToImgBB, isImgBBConfigured } from "../config/imgbb.js";
@@ -416,6 +422,18 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
     const file = req.file;
     if (!file) return res.status(400).json({ message: "Comprobante obligatorio" });
 
+    // Bloquear mismo archivo ya registrado (aunque cambien ID/empresa)
+    const comprobanteSha256 = sha256Hex(file.buffer);
+    const dupFile = await findEgresoByComprobanteSha256(comprobanteSha256);
+    if (dupFile) {
+      return res.status(409).json({
+        message: formatDuplicateMessage(dupFile, "comprobante"),
+        code: "already_in_mooney",
+        egreso_id: dupFile.id,
+        codigo_operacion: dupFile.codigo_operacion,
+      });
+    }
+
     const {
       fecha, hora, turno,
       etiqueta, otro_concepto,
@@ -479,6 +497,19 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
       // id_transferencia puede ser null (checkbox "Sin ID") o un valor alfanumérico válido
       if (idTrim !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo letras, números, guiones y guiones bajos" });
+      }
+
+      // Bloquear ID ya usado en cualquier empresa (no solo la misma)
+      if (idTrim) {
+        const dupId = await findEgresoByTransferIds([idTrim]);
+        if (dupId) {
+          return res.status(409).json({
+            message: formatDuplicateMessage(dupId, "id"),
+            code: "already_in_mooney",
+            egreso_id: dupId.id,
+            codigo_operacion: dupId.codigo_operacion,
+          });
+        }
       }
     }
 
@@ -599,14 +630,16 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
         (fecha,hora,turno,etiqueta,etiqueta_otro,monto_raw,monto,
          cuenta_receptora,usuario_casino,cuenta_salida,empresa_salida,id_transferencia,
          comprobante_url,comprobante_filename,comprobante_mime,comprobante_size,
+         comprobante_sha256,
          notas,created_by,
          hora_solicitud_cliente,hora_quema_fichas,moneda,tipo_transaccion)
        VALUES
         ($1,$2,$3,$4,$5,$6,$7,
          $8,$9,$10,$11,$12,
          $13,$14,$15,$16,
-         $17,$18,
-         $19,$20,$21,$22)
+         $17,
+         $18,$19,
+         $20,$21,$22,$23)
        RETURNING id`,
       [
         fechaNorm, // Fecha normalizada en formato ISO
@@ -625,6 +658,7 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
         file.originalname,
         file.mimetype,
         file.size,
+        comprobanteSha256,
         String(notas || "").trim() || null,
         req.user.id,
         hsNorm,
@@ -707,7 +741,19 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
       });
     }catch{}
 
-    if (e?.code === "23505") return res.status(409).json({ message: "Duplicado: ya existe un egreso con ese ID para esa empresa" });
+    if (e?.code === "23505") {
+      const detail = String(e?.detail || e?.constraint || "");
+      if (detail.includes("comprobante_sha256") || detail.includes("egresos_unique_comprobante_sha256")) {
+        return res.status(409).json({
+          message: "Duplicado: este archivo de comprobante ya está cargado en el sistema",
+          code: "already_in_mooney",
+        });
+      }
+      return res.status(409).json({
+        message: "Duplicado: ya existe un egreso con ese ID de transferencia",
+        code: "already_in_mooney",
+      });
+    }
     if (e?.code === "23514") return res.status(400).json({ message: "Datos inválidos: revisá TURNO/ID/MONTO" });
 
     if (String(e?.message || "").includes("File too large")) return res.status(400).json({ message: `Archivo muy grande. Máx ${MAX_UPLOAD_MB}MB` });

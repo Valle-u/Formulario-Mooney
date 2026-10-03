@@ -138,6 +138,16 @@ function fileLabel(){
    ========================= */
 let gateScanInFlight = false;
 let gateScanSeq = 0;
+/** Si el scan/archivo ya está en Mooney, bloquear el guardado. */
+let comprobanteDuplicadoBloqueo = null;
+
+function clearComprobanteDuplicadoBloqueo() {
+  comprobanteDuplicadoBloqueo = null;
+}
+
+function setComprobanteDuplicadoBloqueo(message, egreso = null) {
+  comprobanteDuplicadoBloqueo = { message: message || "Este comprobante ya está cargado en el sistema.", egreso };
+}
 
 function setInputValue(id, value) {
   const el = document.getElementById(id);
@@ -197,6 +207,7 @@ async function autocompletarDesdeComprobante(file) {
 
   const mySeq = ++gateScanSeq;
   gateScanInFlight = true;
+  clearComprobanteDuplicadoBloqueo();
 
   const nombreNote = document.getElementById("comprobante_nombre");
   const prevNote = nombreNote?.textContent || "";
@@ -244,13 +255,14 @@ async function autocompletarDesdeComprobante(file) {
       );
     }
 
-    // Solo alertar duplicado si YA está guardado en Mooney (no el dedup de GATE).
-    if (data?.warning?.code === "already_in_mooney") {
+    // Duplicado ya guardado en Mooney → bloquear alta
+    if (data?.warning?.code === "already_in_mooney" || data?.block) {
+      setComprobanteDuplicadoBloqueo(data.warning?.message || data.message, data.warning?.egreso || data.egreso);
       toast(
-        "Ya está en el sistema",
-        data.warning.message || "Este comprobante ya fue registrado como egreso.",
-        "warning",
-        9000
+        "Comprobante duplicado",
+        comprobanteDuplicadoBloqueo.message + " No se puede guardar.",
+        "error",
+        10000
       );
     }
 
@@ -264,7 +276,13 @@ async function autocompletarDesdeComprobante(file) {
       if (nombreNote) nombreNote.textContent = prevNote;
       return;
     }
-    toast("Sin autocompletado", msg, "warning", 7000);
+    // 409 already_in_mooney viene como Error con message
+    if (/ya está cargado|already_in_mooney|duplicad/i.test(msg)) {
+      setComprobanteDuplicadoBloqueo(msg);
+      toast("Comprobante duplicado", msg + " No se puede guardar.", "error", 10000);
+    } else {
+      toast("Sin autocompletado", msg, "warning", 7000);
+    }
     if (nombreNote) nombreNote.textContent = file.name || prevNote || "Ningún archivo seleccionado";
   } finally {
     if (mySeq === gateScanSeq) gateScanInFlight = false;
@@ -660,6 +678,7 @@ function conectarRecordarValores() {
 function limpiarFormularioConRecordar() {
   const form = document.getElementById('egresoForm');
   if (!form) return;
+  clearComprobanteDuplicadoBloqueo();
 
   // Guardar valores que deben recordarse ANTES de limpiar
   const valoresRecordados = [];
@@ -1134,6 +1153,10 @@ async function handleEgresoSubmit(e){
   const turnoDisabled = turnoSelect?.disabled;
 
   try{
+    if (comprobanteDuplicadoBloqueo) {
+      throw new Error(comprobanteDuplicadoBloqueo.message + " No se puede guardar.");
+    }
+
     const montoRaw = document.getElementById("monto").value;
     const montoNum = parseMontoARSStrict(montoRaw);
 
