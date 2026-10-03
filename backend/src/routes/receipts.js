@@ -2,7 +2,6 @@ import express from "express";
 import multer from "multer";
 import { auth } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rateLimiter.js";
-import { query } from "../config/db.js";
 import { getActiveEmpresas } from "../utils/optionsCache.js";
 import {
   isReceiptGateConfigured,
@@ -10,6 +9,12 @@ import {
   scanReceiptWithGate,
   buildAutofillSubjectId,
 } from "../services/receiptGate.js";
+import {
+  sha256Hex,
+  findEgresoByTransferIds,
+  findEgresoByComprobanteSha256,
+  formatDuplicateMessage,
+} from "../utils/egresoDuplicates.js";
 
 const router = express.Router();
 
@@ -27,33 +32,10 @@ const upload = multer({
   },
 });
 
-/** Duplicado real en Mooney (egreso ya guardado), no el dedup de chat de GATE. */
-async function findEgresoDuplicado(idTransferencia, empresaSalida) {
-  if (!idTransferencia) return null;
-
-  const params = [idTransferencia];
-  let sql = `
-    SELECT id, empresa_salida, id_transferencia, monto, moneda, etiqueta, status
-    FROM egresos
-    WHERE id_transferencia = $1
-      AND status IS DISTINCT FROM 'anulado'
-  `;
-
-  if (empresaSalida) {
-    params.push(empresaSalida);
-    sql += ` AND empresa_salida = $2`;
-  }
-
-  sql += ` ORDER BY id DESC LIMIT 1`;
-
-  const result = await query(sql, params);
-  return result.rows[0] || null;
-}
-
 /**
  * POST /api/receipts/scan
  * Proxy autenticado → GATE POST /scan. Devuelve fields listos para el form de egreso.
- * Multipart field: comprobante
+ * Si el comprobante o el ID ya existen en Mooney, marca block=true.
  */
 router.post("/scan", auth, writeLimiter, (req, res) => {
   upload.single("comprobante")(req, res, async (multerErr) => {
@@ -77,16 +59,29 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
         return res.status(400).json({ message: "Subí el comprobante" });
       }
 
-      const userId = req.user?.id ?? req.user?.userId ?? "anon";
-      // Subject único por intento: evitar que el dedup de GATE (pensado para chat)
-      // bloquee re-lecturas del mismo archivo antes de guardar el egreso.
-      const subjectId = buildAutofillSubjectId(userId);
+      const fileSha = sha256Hex(req.file.buffer);
+      const existingByFile = await findEgresoByComprobanteSha256(fileSha);
+      if (existingByFile) {
+        return res.status(409).json({
+          ok: false,
+          code: "already_in_mooney",
+          block: true,
+          message: formatDuplicateMessage(existingByFile, "comprobante"),
+          egreso: {
+            id: existingByFile.id,
+            codigo_operacion: existingByFile.codigo_operacion,
+            empresa_salida: existingByFile.empresa_salida,
+            id_transferencia: existingByFile.id_transferencia,
+          },
+          comprobante_sha256: fileSha,
+        });
+      }
 
+      const userId = req.user?.id ?? req.user?.userId ?? "anon";
+      const subjectId = buildAutofillSubjectId(userId);
       const gate = await scanReceiptWithGate(req.file, { subjectId });
 
       if (gate?.status === "rejected") {
-        // duplicate de GATE no debería llegar con subject único; si llega, no lo tratamos
-        // como error de negocio de Mooney.
         if (gate.reason === "duplicate") {
           return res.status(422).json({
             message:
@@ -112,23 +107,29 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
 
       const empresas = await getActiveEmpresas();
       const { fields, filled } = mapExtractionToEgresoFields(gate?.extraction, empresas);
+      const candidateIds = [
+        ...(fields._ids_candidato || []),
+        fields.id_transferencia,
+        gate?.extraction?.codigo_operacion,
+        gate?.extraction?.coelsa_id,
+      ].filter(Boolean);
+      delete fields._ids_candidato;
 
       let warning = null;
       try {
-        const existing = await findEgresoDuplicado(
-          fields.id_transferencia,
-          fields.empresa_salida || null
-        );
-        if (existing) {
+        const existingById = await findEgresoByTransferIds(candidateIds);
+        if (existingById) {
           warning = {
             code: "already_in_mooney",
-            message: `Este ID ya está cargado en el sistema (Egreso #${existing.id}${existing.empresa_salida ? ` · ${existing.empresa_salida}` : ""}).`,
+            block: true,
+            message: formatDuplicateMessage(existingById, "id"),
             egreso: {
-              id: existing.id,
-              empresa_salida: existing.empresa_salida,
-              id_transferencia: existing.id_transferencia,
-              monto: existing.monto,
-              etiqueta: existing.etiqueta,
+              id: existingById.id,
+              codigo_operacion: existingById.codigo_operacion,
+              empresa_salida: existingById.empresa_salida,
+              id_transferencia: existingById.id_transferencia,
+              monto: existingById.monto,
+              etiqueta: existingById.etiqueta,
             },
           };
         }
@@ -143,6 +144,8 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
         fields,
         filled,
         warning,
+        block: Boolean(warning?.block),
+        comprobante_sha256: fileSha,
         alerts: gate?.validation?.alerts || [],
         bank: gate?.bank || null,
       });

@@ -6,6 +6,7 @@
 
 import crypto from "crypto";
 import { EMPRESAS_SALIDA } from "../utils/validators.js";
+import { looksLikeUuid } from "../utils/egresoDuplicates.js";
 
 const DEFAULT_TIMEOUT_MS = 90_000;
 
@@ -180,10 +181,14 @@ export function mapExtractionToEgresoFields(extraction, empresasActivas = EMPRES
   if (fh?.fecha) fields.fecha = fh.fecha;
   if (fh?.hora) fields.hora = fh.hora;
 
-  const id =
-    sanitizeIdTransferencia(extraction.codigo_operacion) ||
-    sanitizeIdTransferencia(extraction.coelsa_id);
+  // Preferir COELSA cuando codigo_operacion es UUID interno (GATE): en Mooney
+  // suele guardarse el código bancario y si no matchean el dedup por ID falla.
+  const codigo = sanitizeIdTransferencia(extraction.codigo_operacion);
+  const coelsa = sanitizeIdTransferencia(extraction.coelsa_id);
+  const id = (codigo && looksLikeUuid(codigo) && coelsa) ? coelsa : (codigo || coelsa);
   if (id) fields.id_transferencia = id;
+  // Exponer ambos para chequeo de duplicados en la ruta
+  fields._ids_candidato = [codigo, coelsa].filter(Boolean);
 
   const cuentaSalida = cleanPersonName(extraction.nombre_emisor);
   if (cuentaSalida) fields.cuenta_salida = cuentaSalida;
@@ -194,7 +199,7 @@ export function mapExtractionToEgresoFields(extraction, empresasActivas = EMPRES
   const empresa = matchEmpresaSalida(extraction.entidad_emisora, empresasActivas);
   if (empresa) fields.empresa_salida = empresa;
 
-  const filled = Object.keys(fields);
+  const filled = Object.keys(fields).filter((k) => !k.startsWith("_"));
   return { fields, filled };
 }
 
