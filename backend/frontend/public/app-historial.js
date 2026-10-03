@@ -76,6 +76,7 @@ async function buscarEgresos(){
   const moneda = document.getElementById("moneda")?.value || "";
   const usuario_casino = document.getElementById("usuario_casino")?.value?.trim() || "";
   const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
+  const codigo_operacion = document.getElementById("codigo_operacion")?.value?.trim() || "";
   const monto_min = document.getElementById("monto_min")?.value || "";
   const monto_max = document.getElementById("monto_max")?.value || "";
   const turno = document.getElementById("turno")?.value || "";
@@ -84,7 +85,7 @@ async function buscarEgresos(){
 
   currentFilters = {
     fecha_desde, fecha_hasta, empresa_salida, etiqueta, status, moneda,
-    usuario_casino, id_transferencia, monto_min, monto_max,
+    usuario_casino, id_transferencia, codigo_operacion, monto_min, monto_max,
     turno, cuenta_receptora, created_by
   };
 
@@ -101,6 +102,7 @@ async function buscarEgresos(){
   if(currentFilters.moneda) qs.set("moneda", currentFilters.moneda);
   if(usuario_casino) qs.set("usuario_casino", usuario_casino);
   if(id_transferencia) qs.set("id_transferencia", id_transferencia);
+  if(codigo_operacion) qs.set("codigo_operacion", codigo_operacion);
   if(monto_min) qs.set("monto_min", monto_min);
   if(monto_max) qs.set("monto_max", monto_max);
   if(turno) qs.set("turno", turno);
@@ -551,8 +553,8 @@ async function anularEgreso(id, motivo) {
 function limpiarFiltros(){
   const clearIds = [
     "fecha_desde", "fecha_hasta", "empresa_salida", "etiqueta", "status",
-    "moneda", "usuario_casino", "id_transferencia", "monto_min", "monto_max",
-    "turno", "cuenta_receptora", "created_by"
+    "moneda", "usuario_casino", "id_transferencia", "codigo_operacion",
+    "monto_min", "monto_max", "turno", "cuenta_receptora", "created_by"
   ];
   for (const id of clearIds) {
     const el = document.getElementById(id);
@@ -604,6 +606,7 @@ async function downloadCSVFiltrado(){
     const status = document.getElementById("status")?.value || "";
     const usuario_casino = document.getElementById("usuario_casino")?.value?.trim() || "";
     const id_transferencia = document.getElementById("id_transferencia")?.value?.trim() || "";
+    const codigo_operacion = document.getElementById("codigo_operacion")?.value?.trim() || "";
     const monto_min = document.getElementById("monto_min")?.value || "";
     const monto_max = document.getElementById("monto_max")?.value || "";
     const turno = document.getElementById("turno")?.value || "";
@@ -620,6 +623,7 @@ async function downloadCSVFiltrado(){
     if(status) qs.set("status", status);
     if(usuario_casino) qs.set("usuario_casino", usuario_casino);
     if(id_transferencia) qs.set("id_transferencia", id_transferencia);
+    if(codigo_operacion) qs.set("codigo_operacion", codigo_operacion);
     if(monto_min) qs.set("monto_min", monto_min);
     if(monto_max) qs.set("monto_max", monto_max);
     if(turno) qs.set("turno", turno);
@@ -633,7 +637,7 @@ async function downloadCSVFiltrado(){
       : `${API_BASE}/api/egresos/csv`;
 
     console.log("URL CSV:", url);
-    console.log("Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, moneda, usuario_casino, id_transferencia, monto_min, monto_max, turno, cuenta_receptora, created_by });
+    console.log("Filtros aplicados:", { fecha_desde, fecha_hasta, empresa_salida, etiqueta, moneda, usuario_casino, id_transferencia, codigo_operacion, monto_min, monto_max, turno, cuenta_receptora, created_by });
 
     const res = await fetch(url,{
       method:"GET",
