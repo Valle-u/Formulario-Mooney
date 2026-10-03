@@ -9,14 +9,14 @@ function populateEtiquetas(){
   const etiquetasFormulario = getEtiquetas_dynamic().filter(e => !getEtiquetaFlags(e).cierre_caja);
 
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    etiquetasFormulario.map(e => `<option value="${e}">${e}</option>`).join("");
+    etiquetasFormulario.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
 }
 
 function populateEmpresasSalida(){
   const sel = document.getElementById("empresa_salida");
   if(!sel) return;
   sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    getEmpresas().map(x => `<option value="${x}">${x}</option>`).join("");
+    getEmpresas().map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
 }
 
 function toggleCasinoUserField(){
@@ -133,6 +133,144 @@ function fileLabel(){
   if(dz) dz.classList.toggle("has-file", !!fileName);
 }
 
+/* =========================
+   AUTOCOMPLETADO VIA GATE
+   ========================= */
+let gateScanInFlight = false;
+let gateScanSeq = 0;
+
+function setInputValue(id, value) {
+  const el = document.getElementById(id);
+  if (!el || value == null || value === "") return false;
+  el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function applyGateFields(fields) {
+  if (!fields || typeof fields !== "object") return [];
+  const applied = [];
+
+  if (fields.monto && setInputValue("monto", fields.monto)) applied.push("monto");
+  if (fields.fecha && setInputValue("fecha", fields.fecha)) applied.push("fecha");
+  if (fields.hora && setInputValue("hora", fields.hora)) {
+    applied.push("hora");
+    autoCalcularTurno();
+  }
+
+  if (fields.id_transferencia) {
+    const sinId = document.getElementById("sin_id_transferencia");
+    if (sinId?.checked) {
+      sinId.checked = false;
+      sinId.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (setInputValue("id_transferencia", fields.id_transferencia)) {
+      applied.push("id_transferencia");
+    }
+  }
+
+  if (fields.cuenta_salida && setInputValue("cuenta_salida", fields.cuenta_salida)) {
+    applied.push("cuenta_salida");
+  }
+
+  if (fields.empresa_salida) {
+    const sel = document.getElementById("empresa_salida");
+    if (sel) {
+      const exists = Array.from(sel.options).some((o) => o.value === fields.empresa_salida);
+      if (exists && setInputValue("empresa_salida", fields.empresa_salida)) {
+        applied.push("empresa_salida");
+      }
+    }
+  }
+
+  if (fields.cuenta_receptora && setInputValue("cuenta_receptora", fields.cuenta_receptora)) {
+    applied.push("cuenta_receptora");
+  }
+
+  return applied;
+}
+
+async function autocompletarDesdeComprobante(file) {
+  if (!file || !getToken()) return;
+  if (gateScanInFlight) return;
+
+  const mySeq = ++gateScanSeq;
+  gateScanInFlight = true;
+
+  const nombreNote = document.getElementById("comprobante_nombre");
+  const prevNote = nombreNote?.textContent || "";
+  if (nombreNote) {
+    nombreNote.textContent = `${file.name || "comprobante"} · leyendo…`;
+  }
+
+  toast("Leyendo comprobante", "Extrayendo datos del archivo…", "info", 5000);
+
+  try {
+    const fd = new FormData();
+    // Asegurar nombre con extensión (paste a veces manda blob sin extensión útil)
+    let uploadFile = file;
+    if (!file.name || !/\.(jpe?g|png|pdf)$/i.test(file.name)) {
+      const ext =
+        file.type === "application/pdf" ? "pdf" :
+        file.type === "image/png" ? "png" : "jpg";
+      uploadFile = new File([file], `comprobante.${ext}`, { type: file.type || "image/jpeg" });
+    }
+    fd.append("comprobante", uploadFile);
+
+    const data = await api("/api/receipts/scan", {
+      method: "POST",
+      body: fd,
+      auth: true,
+      timeout: 90000,
+    });
+
+    if (mySeq !== gateScanSeq) return;
+
+    const applied = applyGateFields(data?.fields || {});
+    if (applied.length) {
+      toast(
+        "Autocompletado",
+        `Se rellenaron: ${applied.join(", ")}. Revisá antes de guardar.`,
+        "success",
+        7000
+      );
+    } else {
+      toast(
+        "Sin datos claros",
+        "El comprobante se leyó pero no se pudieron mapear campos. Completá a mano.",
+        "warning",
+        7000
+      );
+    }
+
+    // Solo alertar duplicado si YA está guardado en Mooney (no el dedup de GATE).
+    if (data?.warning?.code === "already_in_mooney") {
+      toast(
+        "Ya está en el sistema",
+        data.warning.message || "Este comprobante ya fue registrado como egreso.",
+        "warning",
+        9000
+      );
+    }
+
+    if (nombreNote) {
+      nombreNote.textContent = file.name || "comprobante";
+    }
+  } catch (err) {
+    if (mySeq !== gateScanSeq) return;
+    const msg = err?.message || "No se pudo leer el comprobante";
+    if (/no configurado/i.test(msg) || /gate_not_configured/i.test(msg)) {
+      if (nombreNote) nombreNote.textContent = prevNote;
+      return;
+    }
+    toast("Sin autocompletado", msg, "warning", 7000);
+    if (nombreNote) nombreNote.textContent = file.name || prevNote || "Ningún archivo seleccionado";
+  } finally {
+    if (mySeq === gateScanSeq) gateScanInFlight = false;
+  }
+}
+
 function wireDropZone(){
   const dz = document.getElementById("dropzone_comprobante");
   const input = document.getElementById("comprobante");
@@ -175,6 +313,7 @@ function wireDropZone(){
     dt.items.add(file);
     input.files = dt.files;
     fileLabel();
+    autocompletarDesdeComprobante(file);
   });
 
   // Paste handler: pegar imagen del portapapeles como comprobante (Ctrl+V)
@@ -197,11 +336,14 @@ function wireDropZone(){
           return;
         }
 
+        const ext = file.type === "image/png" ? "png" : "jpg";
+        const named = new File([file], `comprobante-paste.${ext}`, { type: file.type });
         const dt = new DataTransfer();
-        dt.items.add(file);
+        dt.items.add(named);
         input.files = dt.files;
         fileLabel();
         toast("Comprobante pegado", "Imagen del portapapeles cargada.", "success", 3000);
+        autocompletarDesdeComprobante(named);
         break;
       }
     }
@@ -412,7 +554,7 @@ function actualizarDatalist(datalistId, historyKey) {
   if (!dl) return;
   try {
     const arr = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    dl.innerHTML = arr.map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
+    dl.innerHTML = arr.map(v => `<option value="${escapeHtml(v)}">`).join('');
   } catch { dl.innerHTML = ''; }
 }
 
@@ -1452,7 +1594,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const inputComprobante = document.getElementById("comprobante");
   if (inputComprobante) {
-    inputComprobante.addEventListener("change", fileLabel);
+    inputComprobante.addEventListener("change", () => {
+      fileLabel();
+      const file = inputComprobante.files?.[0];
+      if (file) autocompletarDesdeComprobante(file);
+    });
   }
   wireDropZone();
 

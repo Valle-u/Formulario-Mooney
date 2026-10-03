@@ -7,9 +7,11 @@ import { query } from "../config/db.js";
  * - Verifica firma y expiración
  * - Valida que el usuario siga activo en la BD
  * - Protege contra tokens robados de usuarios desactivados
- * - Acepta token desde header Authorization o query param ?token=
+ * - Solo acepta el token por header Authorization. La única excepción es el
+ *   stream SSE, que usa authAllowQueryToken porque EventSource no permite
+ *   enviar headers.
  */
-export async function auth(req, res, next) {
+async function authenticate(req, res, next, { allowQueryToken = false } = {}) {
   let token = null;
 
   // Intentar obtener token desde header Authorization
@@ -19,8 +21,9 @@ export async function auth(req, res, next) {
   if (parts.length === 2 && parts[0] === "Bearer") {
     token = parts[1];
   }
-  // Si no hay token en header, intentar desde query params
-  else if (req.query.token) {
+  // Solo las rutas que lo habilitan explícitamente leen el token de la URL:
+  // las query strings quedan en logs de proxies y en el historial del navegador.
+  else if (allowQueryToken && req.query.token) {
     token = req.query.token;
   }
 
@@ -101,6 +104,19 @@ export async function auth(req, res, next) {
     console.error("❌ Error en auth middleware:", error);
     return res.status(500).json({ message: "Error de autenticación" });
   }
+}
+
+/** Autenticación estándar: token solo por header Authorization. */
+export function auth(req, res, next) {
+  return authenticate(req, res, next);
+}
+
+/**
+ * Autenticación que además acepta ?token=. Reservada para el stream SSE:
+ * EventSource no permite enviar headers.
+ */
+export function authAllowQueryToken(req, res, next) {
+  return authenticate(req, res, next, { allowQueryToken: true });
 }
 
 /**

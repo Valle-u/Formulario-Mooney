@@ -1,6 +1,7 @@
 import fs from "fs";
 import fileTypePkg from "file-type";
-const { fileTypeFromFile } = fileTypePkg;
+// file-type v16 exporta fromFile/fromBuffer (no fileTypeFromFile/fileTypeFromBuffer).
+const { fromFile: fileTypeFromFile, fromBuffer: fileTypeFromBuffer } = fileTypePkg;
 
 /**
  * Middleware para validar archivos subidos
@@ -123,10 +124,26 @@ export async function validateUploadedFile(req, res, next) {
     // Guardar el tipo detectado en req.file para uso posterior
     req.file.detectedMimeType = validation.detectedType;
   } else if (req.file.buffer) {
-    // Si el archivo está en memoria (memoryStorage), solo validar extensión y MIME declarado
-    // La validación profunda con magic numbers requeriría escribir el buffer a un archivo temporal
-    console.log(`✓ Archivo en memoria validado: ${filename} (${req.file.mimetype})`);
-    req.file.detectedMimeType = `buffer-based/${ext}`;
+    // Si el archivo está en memoria (memoryStorage), validar los magic numbers
+    // directamente sobre el buffer.
+    let detected = null;
+    try {
+      detected = await fileTypeFromBuffer(req.file.buffer);
+    } catch (err) {
+      console.warn("⚠️ file-type no pudo analizar el buffer:", err.message);
+    }
+
+    // Solo se rechaza cuando se detecta un tipo concreto que no está permitido.
+    // Si no se detecta nada se mantiene el comportamiento previo (fail-open por
+    // extensión + MIME declarado) para no rechazar archivos válidos.
+    if (detected && !ALLOWED_MIMES.has(detected.mime)) {
+      return res.status(400).json({
+        message: `El contenido del archivo no coincide con un JPG, PNG o PDF (detectado: ${detected.mime})`
+      });
+    }
+
+    req.file.detectedMimeType = detected ? detected.mime : `buffer-based/${ext}`;
+    console.log(`✓ Archivo en memoria validado: ${filename} (${req.file.detectedMimeType})`);
   }
 
   next();

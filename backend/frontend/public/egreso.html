@@ -4,15 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Retiros</title>
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
-          document.documentElement.classList.add('sidebar-collapsed');
-        }
-      } catch (_) {}
-    })();
-  </script>
+  <script src="boot-sidebar.js?v=AUTO"></script>
   <!-- Build: 2026-01-02-23-03-19 -->
   <link rel="stylesheet" href="styles.css?v=AUTO"/>
 </head>
@@ -351,7 +343,7 @@
                       </div>
                     </div>
                     <div class="note" id="comprobante_nombre">Ningún archivo seleccionado</div>
-                    <div class="note">JPG / PNG / PDF • Máx 10MB</div>
+                    <div class="note">JPG / PNG / PDF • Máx 10MB · Al subir se intentan autocompletar monto, ID, fecha y cuentas</div>
                   </div>
 
                   <div class="field span12" id="wrap_notas">

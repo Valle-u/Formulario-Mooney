@@ -4,15 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>MooneyMaker • Consulta de Retiros</title>
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem('mm_sidebar_collapsed') === '1') {
-          document.documentElement.classList.add('sidebar-collapsed');
-        }
-      } catch (_) {}
-    })();
-  </script>
+  <script src="boot-sidebar.js?v=AUTO"></script>
   <!-- Build: 2026-01-02-23-03-19 -->
   <link rel="stylesheet" href="styles.css?v=AUTO"/>
 </head>
@@ -250,11 +242,11 @@
 
     <!-- MODAL DETALLE -->
     <div id="detalleModal" class="modal" style="display: none;">
-      <div class="modal-backdrop" onclick="cerrarModal()"></div>
+      <div class="modal-backdrop" id="detalleModalBackdrop"></div>
       <div class="modal-content">
         <div class="modal-header">
           <h3>Detalle de transferencia</h3>
-          <button id="btnCerrarModal" class="btn-close" onclick="cerrarModal()">X</button>
+          <button id="btnCerrarModal" class="btn-close" type="button">X</button>
         </div>
         <div id="detalleBody" style="padding: 20px 24px;">
           <!-- Contenido dinámico -->

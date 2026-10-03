@@ -2,7 +2,6 @@
    CIERRES DE CAJA - MODULO GUIADO
    ========================= */
 
-const CIERRE_TURNOS = ["Turno mañana", "Turno tarde", "Turno noche"];
 let cierreKpiRowsCache = [];
 
 function toISODateLocal(dateObj) {
@@ -186,7 +185,7 @@ function validateCierreForm() {
   const montoRaw = document.getElementById("cierre_monto")?.value || "";
   const comprobante = document.getElementById("cierre_comprobante")?.files?.[0];
 
-  if (!turno || !CIERRE_TURNOS.includes(turno)) {
+  if (!turno || !TURNOS_CIERRE.includes(turno)) {
     throw new Error("Selecciona un turno laboral antes de guardar.");
   }
   if (!fecha) {
@@ -310,7 +309,7 @@ function renderKPIRows(rows) {
 
     const cierre = row.cierre;
     const detail = cierre
-      ? `${formatMoney(cierre.monto, cierre.moneda || "ARS")} | ${escapeHtml(cierre.empresa_salida || "-")} | ${escapeHtml(cierre.cuenta_salida || "-")} | cargado: ${formatCreatedAt(cierre.created_at)}${cierre.created_by_username ? ` | usuario: ${escapeHtml(cierre.created_by_username)}` : ""}`
+      ? `${formatMoney(cierre.monto, cierre.moneda || "ARS")} | ${escapeHtml(cierre.empresa_salida || "-")} | ${escapeHtml(cierre.cuenta_salida || "-")} | cargado: ${escapeHtml(formatCreatedAt(cierre.created_at))}${cierre.created_by_username ? ` | usuario: ${escapeHtml(cierre.created_by_username)}` : ""}`
       : "Sin cierre cargado para este turno.";
 
     const action = row.status === "PENDIENTE"

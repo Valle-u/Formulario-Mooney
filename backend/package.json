@@ -9,10 +9,11 @@
     "dev": "node src/server.js",
     "seed:admin": "node scripts/seed_admin.js",
     "backup": "node scripts/backup-database.js",
-    "backup:now": "node scripts/backup-database.js"
+    "backup:now": "node scripts/backup-database.js",
+    "test": "node --test scripts/tests/integration.test.js"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -20,7 +21,7 @@
     "file-type": "^16.5.4",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.4.0",
     "pg": "^8.12.0"
   }
 }
