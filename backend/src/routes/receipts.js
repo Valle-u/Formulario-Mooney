@@ -2,11 +2,13 @@ import express from "express";
 import multer from "multer";
 import { auth } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rateLimiter.js";
+import { query } from "../config/db.js";
 import { getActiveEmpresas } from "../utils/optionsCache.js";
 import {
   isReceiptGateConfigured,
   mapExtractionToEgresoFields,
   scanReceiptWithGate,
+  buildAutofillSubjectId,
 } from "../services/receiptGate.js";
 
 const router = express.Router();
@@ -24,6 +26,29 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+/** Duplicado real en Mooney (egreso ya guardado), no el dedup de chat de GATE. */
+async function findEgresoDuplicado(idTransferencia, empresaSalida) {
+  if (!idTransferencia) return null;
+
+  const params = [idTransferencia];
+  let sql = `
+    SELECT id, empresa_salida, id_transferencia, monto, moneda, etiqueta, status
+    FROM egresos
+    WHERE id_transferencia = $1
+      AND status IS DISTINCT FROM 'anulado'
+  `;
+
+  if (empresaSalida) {
+    params.push(empresaSalida);
+    sql += ` AND empresa_salida = $2`;
+  }
+
+  sql += ` ORDER BY id DESC LIMIT 1`;
+
+  const result = await query(sql, params);
+  return result.rows[0] || null;
+}
 
 /**
  * POST /api/receipts/scan
@@ -53,11 +78,23 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
       }
 
       const userId = req.user?.id ?? req.user?.userId ?? "anon";
-      const subjectId = `mooney:${userId}`;
+      // Subject único por intento: evitar que el dedup de GATE (pensado para chat)
+      // bloquee re-lecturas del mismo archivo antes de guardar el egreso.
+      const subjectId = buildAutofillSubjectId(userId);
 
       const gate = await scanReceiptWithGate(req.file, { subjectId });
 
       if (gate?.status === "rejected") {
+        // duplicate de GATE no debería llegar con subject único; si llega, no lo tratamos
+        // como error de negocio de Mooney.
+        if (gate.reason === "duplicate") {
+          return res.status(422).json({
+            message:
+              "GATE marcó el archivo como reenvío. Probá de nuevo; si persiste, recargá la página.",
+            code: "gate_duplicate_retry",
+            gate_status: gate.status,
+          });
+        }
         return res.status(422).json({
           message: gate.user_message || "El comprobante fue rechazado",
           code: gate.reason || "rejected",
@@ -76,12 +113,36 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
       const empresas = await getActiveEmpresas();
       const { fields, filled } = mapExtractionToEgresoFields(gate?.extraction, empresas);
 
+      let warning = null;
+      try {
+        const existing = await findEgresoDuplicado(
+          fields.id_transferencia,
+          fields.empresa_salida || null
+        );
+        if (existing) {
+          warning = {
+            code: "already_in_mooney",
+            message: `Este ID ya está cargado en el sistema (Egreso #${existing.id}${existing.empresa_salida ? ` · ${existing.empresa_salida}` : ""}).`,
+            egreso: {
+              id: existing.id,
+              empresa_salida: existing.empresa_salida,
+              id_transferencia: existing.id_transferencia,
+              monto: existing.monto,
+              etiqueta: existing.etiqueta,
+            },
+          };
+        }
+      } catch (dupErr) {
+        console.warn("⚠️ No se pudo chequear duplicado Mooney:", dupErr?.message);
+      }
+
       return res.json({
         ok: true,
         scan_id: gate?.scan_id || null,
         forensic_status: gate?.forensic_status || null,
         fields,
         filled,
+        warning,
         alerts: gate?.validation?.alerts || [],
         bank: gate?.bank || null,
       });

@@ -244,6 +244,16 @@ async function autocompletarDesdeComprobante(file) {
       );
     }
 
+    // Solo alertar duplicado si YA está guardado en Mooney (no el dedup de GATE).
+    if (data?.warning?.code === "already_in_mooney") {
+      toast(
+        "Ya está en el sistema",
+        data.warning.message || "Este comprobante ya fue registrado como egreso.",
+        "warning",
+        9000
+      );
+    }
+
     if (nombreNote) {
       nombreNote.textContent = file.name || "comprobante";
     }

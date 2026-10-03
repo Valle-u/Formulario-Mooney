@@ -134,10 +134,17 @@ async function loadSelectOptions() {
     _etiquetasCache = etqRes.options.map(o => o.value);
     _etiquetaFlagsCache = {};
     etqRes.options.forEach(o => {
+      // Piso con flags hardcodeados: si la DB quedó desfasada (ej. staging sin
+      // flag_usuario_casino en Premio Pagado), el form no pierde campos de main.
+      const hardcoded = {
+        usuario_casino: ETIQUETAS_CON_USUARIO_CASINO.has(o.value),
+        premio_minimo: ETIQUETAS_PREMIO_MINIMO.has(o.value),
+        cierre_caja: ETIQUETAS_CIERRE_CAJA.has(o.value)
+      };
       _etiquetaFlagsCache[o.value] = {
-        usuario_casino: o.flag_usuario_casino,
-        premio_minimo: o.flag_premio_minimo,
-        cierre_caja: o.flag_cierre_caja
+        usuario_casino: !!(o.flag_usuario_casino || hardcoded.usuario_casino),
+        premio_minimo: !!(o.flag_premio_minimo || hardcoded.premio_minimo),
+        cierre_caja: !!(o.flag_cierre_caja || hardcoded.cierre_caja)
       };
     });
     _optionsLoaded = true;

@@ -4,6 +4,7 @@
  * Si faltan, el autocompletado queda deshabilitado (503 desde la ruta).
  */
 
+import crypto from "crypto";
 import { EMPRESAS_SALIDA } from "../utils/validators.js";
 
 const DEFAULT_TIMEOUT_MS = 90_000;
@@ -117,6 +118,43 @@ function cleanPersonName(raw) {
 }
 
 /**
+ * GATE v1.1 no tiene `nombre_receptor`; a veces viene en observaciones
+ * ("Transferencia de X a Y.") o en campos aditivos futuros.
+ */
+export function parseNombreReceptor(extraction) {
+  if (!extraction || typeof extraction !== "object") return null;
+
+  const direct =
+    cleanPersonName(extraction.nombre_receptor) ||
+    cleanPersonName(extraction.nombre_beneficiario) ||
+    cleanPersonName(extraction.titular_receptor);
+  if (direct) return direct;
+
+  const obs = String(extraction.observaciones || "").trim();
+  if (!obs) return null;
+
+  const emisorFold = fold(extraction.nombre_emisor);
+
+  const patterns = [
+    /transferencia\s+de\s+.+?\s+a\s+([A-ZÁÉÍÓÚÑ][^.]+?)(?:\.|$)/i,
+    /\bpara\s*:\s*([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñüÁÉÍÓÚÑÜ\s'-]{1,80})/i,
+    /\ba\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñü]+){0,4})\b/,
+  ];
+
+  for (const re of patterns) {
+    const m = obs.match(re);
+    if (!m?.[1]) continue;
+    const name = cleanPersonName(m[1]);
+    if (!name) continue;
+    if (emisorFold && fold(name) === emisorFold) continue;
+    if (name.length < 3) continue;
+    return name;
+  }
+
+  return null;
+}
+
+/**
  * @param {object|null} extraction
  * @param {string[]} empresasActivas
  */
@@ -141,27 +179,35 @@ export function mapExtractionToEgresoFields(extraction, empresasActivas = EMPRES
   const cuentaSalida = cleanPersonName(extraction.nombre_emisor);
   if (cuentaSalida) fields.cuenta_salida = cuentaSalida;
 
+  const cuentaReceptora = parseNombreReceptor(extraction);
+  if (cuentaReceptora) fields.cuenta_receptora = cuentaReceptora;
+
   const empresa = matchEmpresaSalida(extraction.entidad_emisora, empresasActivas);
   if (empresa) fields.empresa_salida = empresa;
-
-  // GATE no trae nombre del receptor (solo CBU/CVU). No rellenar cuenta_receptora con dígitos.
 
   const filled = Object.keys(fields);
   return { fields, filled };
 }
 
+/** subject_id único por intento: el dedup de GATE es por subject+sha256 (chat). */
+export function buildAutofillSubjectId(userId) {
+  const uid = userId ?? "anon";
+  return `mooney:autofill:${uid}:${crypto.randomUUID()}`;
+}
+
 /**
  * @param {{ buffer: Buffer, mimetype: string, originalname?: string }} file
- * @param {{ subjectId: string, timeoutMs?: number }} opts
+ * @param {{ subjectId?: string, userId?: string|number, timeoutMs?: number }} opts
  */
-export async function scanReceiptWithGate(file, opts) {
+export async function scanReceiptWithGate(file, opts = {}) {
   const baseUrl = process.env.RECEIPT_GATE_URL.replace(/\/+$/, "");
   const token = process.env.RECEIPT_GATE_TOKEN.trim();
   const timeoutMs = opts.timeoutMs ?? Number(process.env.RECEIPT_GATE_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  const subjectId = opts.subjectId || buildAutofillSubjectId(opts.userId);
 
   const data_base64 = file.buffer.toString("base64");
   const body = {
-    subject_id: opts.subjectId,
+    subject_id: subjectId,
     channel: "other",
     declared_mime: file.mimetype || "application/octet-stream",
     filename: file.originalname || "comprobante",
