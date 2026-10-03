@@ -1416,6 +1416,7 @@ router.get("/", auth, async (req, res) => {
       moneda,
       usuario_casino,
       id_transferencia,
+      codigo_operacion,
       monto_min,
       monto_max,
       turno,
@@ -1494,6 +1495,11 @@ router.get("/", auth, async (req, res) => {
     if (id_transferencia) {
       params.push(`%${id_transferencia}%`);
       where.push(`e.id_transferencia ILIKE $${params.length}`);
+    }
+
+    if (codigo_operacion) {
+      params.push(`%${String(codigo_operacion).trim()}%`);
+      where.push(`e.codigo_operacion ILIKE $${params.length}`);
     }
 
     if (monto_min) {
@@ -1603,6 +1609,7 @@ router.get("/", auth, async (req, res) => {
       cuenta_salida: e.cuenta_salida,
       empresa_salida: e.empresa_salida,
       id_transferencia: e.id_transferencia,
+      codigo_operacion: e.codigo_operacion || null,
       comprobante_url: e.comprobante_url,
       comprobante_filename: e.comprobante_filename,
       comprobante_mime: e.comprobante_mime,
@@ -1654,6 +1661,7 @@ router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res
       moneda,
       usuario_casino,
       id_transferencia,
+      codigo_operacion,
       monto_min,
       monto_max,
       turno,
@@ -1717,6 +1725,11 @@ router.get("/csv", auth, requireAdminOrDireccion, exportLimiter, async (req, res
     if (id_transferencia) {
       params.push(`%${id_transferencia}%`);
       where.push(`e.id_transferencia ILIKE $${params.length}`);
+    }
+
+    if (codigo_operacion) {
+      params.push(`%${String(codigo_operacion).trim()}%`);
+      where.push(`e.codigo_operacion ILIKE $${params.length}`);
     }
 
     if (monto_min) {
