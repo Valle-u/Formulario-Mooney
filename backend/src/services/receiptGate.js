@@ -136,15 +136,24 @@ export function parseNombreReceptor(extraction) {
   const emisorFold = fold(extraction.nombre_emisor);
 
   const patterns = [
+    // Formatos típicos del OCR de GATE (varían entre corridas):
+    // "Receptor: Nahuel Esquivel (CUIT: …)"
+    // "Para: Nahuel Esquivel"
+    // "Transferencia de X a Nahuel Esquivel."
+    /\breceptor\s*:\s*([A-ZÁÉÍÓÚÑ][^.(,\n]{1,80})/i,
+    /\bpara\s*:\s*([A-ZÁÉÍÓÚÑ][^.(,\n]{1,80})/i,
+    /\bbeneficiario\s*:\s*([A-ZÁÉÍÓÚÑ][^.(,\n]{1,80})/i,
     /transferencia\s+de\s+.+?\s+a\s+([A-ZÁÉÍÓÚÑ][^.]+?)(?:\.|$)/i,
-    /\bpara\s*:\s*([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñüÁÉÍÓÚÑÜ\s'-]{1,80})/i,
     /\ba\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñü]+){0,4})\b/,
   ];
 
   for (const re of patterns) {
     const m = obs.match(re);
     if (!m?.[1]) continue;
-    const name = cleanPersonName(m[1]);
+    let name = cleanPersonName(m[1]);
+    if (!name) continue;
+    // Cortar restos tipo "CUIT …" / "CBU …" si el clean dejó basura pegada
+    name = name.replace(/\b(CUIT|CBU|CVU|Alias)\b.*$/i, "").trim();
     if (!name) continue;
     if (emisorFold && fold(name) === emisorFold) continue;
     if (name.length < 3) continue;
