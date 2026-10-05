@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Balance diario</title>
+  <script src="boot-sidebar.js?v=AUTO"></script>
+  <link rel="stylesheet" href="styles.css?v=AUTO"/>
+</head>
+<body>
+  <div class="app-nosidebar">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="nav-item active" data-requires-encargado="1">Balance</a>
+          <a href="cierres-caja.html" class="nav-item">Cierres</a>
+          <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="nav-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+          <span id="whoami" class="user-badge">—</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <span class="brand">MooneyMaker</span>
+          <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
+        </div>
+        <nav class="mobile-nav">
+          <a href="egreso.html" class="mobile-item">Retiros</a>
+          <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+          <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="mobile-item active" data-requires-encargado="1">Balance</a>
+          <a href="cierres-caja.html" class="mobile-item">Cierres</a>
+          <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="mobile-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="mobile-actions">
+          <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema">TEMA</button>
+          <div id="whoamiMobile" class="user-badge">—</div>
+          <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+    </header>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <main class="content-wrap">
+      <div class="page">
+        <section class="card">
+          <div class="card-header">Balance diario desde CSV de banco</div>
+          <div class="card-body">
+            <p class="note">
+              Subí el extracto del día (Lohas, HG.Cash y/o Riven Flow). Los egresos salen de este formulario
+              y la planilla de cargas se lee sola de Google Sheets. El resultado se puede descargar o cargar
+              en el balance mensual.
+            </p>
+            <form id="balanceForm" class="grid">
+              <div class="field span3">
+                <label for="fecha">DÍA</label>
+                <input id="fecha" type="date" required>
+              </div>
+              <div class="field span6">
+                <label for="bancos">CSV DEL BANCO (uno o varios)</label>
+                <input id="bancos" type="file" accept=".csv,text/csv" multiple required>
+              </div>
+              <div class="field span3" style="align-self:end">
+                <button class="btn btn-primary" id="btnGenerar" type="submit">Generar balance</button>
+              </div>
+            </form>
+            <div id="balanceEstado" class="note" style="margin-top:12px"></div>
+          </div>
+        </section>
+
+        <section class="card" id="resultadoCard" style="display:none">
+          <div class="card-header">Resultado</div>
+          <div class="card-body">
+            <div id="avisos"></div>
+            <div id="cuadre" class="note" style="margin:12px 0"></div>
+            <div id="resumen" class="note" style="margin-bottom:12px"></div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px">
+              <button type="button" class="btn" id="btnDescBalance">Descargar balance</button>
+              <button type="button" class="btn" id="btnDescRevisar">Descargar a revisar</button>
+              <button type="button" class="btn" id="btnDescUsdt">Descargar USDT</button>
+              <button type="button" class="btn btn-primary" id="btnCargar">Cargar en balance mensual</button>
+            </div>
+            <h3 style="margin:16px 0 8px">A revisar</h3>
+            <div class="table-wrap">
+              <table class="table" id="tablaRevisar"></table>
+            </div>
+            <h3 style="margin:16px 0 8px">Balance</h3>
+            <div class="table-wrap" style="max-height:480px; overflow:auto">
+              <table class="table" id="tablaBalance"></table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="app-shared.js?v=AUTO"></script>
+  <script src="app-balance.js?v=AUTO"></script>
+</body>
+</html>
