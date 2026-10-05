@@ -124,6 +124,7 @@ GET    /api/egresos/check-id-transferencia # Validar duplicado antes de guardar
 GET    /api/egresos/saldos             # Saldos por cuenta (admin only)
 GET    /api/egresos/saldos/csv         # Exportar saldos (admin only)
 GET    /api/egresos/cierres/kpi        # KPIs de cierre de caja
+GET    /api/egresos/cierres/resumen-dia # Totales ARS/USDT de cierres por usuario/fecha
 GET    /api/egresos/cierres/csv        # Exportar cierres de caja
 ```
 

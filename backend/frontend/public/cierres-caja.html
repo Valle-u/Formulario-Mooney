@@ -194,6 +194,39 @@
                   <p>Lista clara por dia y turno. Siempre son 3 cierres por dia: manana, tarde y noche.</p>
                 </div>
 
+                <div class="cierre-resumen-dia" id="cierreResumenDiaPanel">
+                  <div class="cierre-resumen-dia-head">
+                    <div>
+                      <h3>Resumen cierre dia anterior</h3>
+                      <p>Totales ARS y USDT cargados por el usuario de cierre de fin de dia.</p>
+                    </div>
+                  </div>
+
+                  <div class="grid cierre-resumen-dia-filters">
+                    <div class="field span6">
+                      <label for="resumen_fecha">FECHA</label>
+                      <input id="resumen_fecha" type="date">
+                    </div>
+                    <div class="field span6">
+                      <label for="resumen_usuario">USUARIO</label>
+                      <select id="resumen_usuario"></select>
+                    </div>
+                  </div>
+
+                  <div class="cierre-resumen-dia-totals" aria-live="polite">
+                    <div class="resumen-total-chip ars">
+                      <span>Total ARS</span>
+                      <strong id="resumenTotalArs">$ 0,00</strong>
+                    </div>
+                    <div class="resumen-total-chip usdt">
+                      <span>Total USDT</span>
+                      <strong id="resumenTotalUsdt">USDT 0,00</strong>
+                    </div>
+                  </div>
+
+                  <div id="cierreResumenDiaDetail" class="cierre-resumen-dia-detail" aria-live="polite"></div>
+                </div>
+
                 <div class="cierre-kpi-summary">
                   <div class="kpi-chip pendiente">
                     <span>Pendientes</span>
