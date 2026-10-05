@@ -774,6 +774,17 @@ export function isoAFecha(iso) {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+/** Primera fila de Sheets (1-based) libre para cargar, sin pisar el encabezado ni filas con movimiento. */
+export function filaInicioCarga(existing) {
+  if (!existing?.length) return 1;
+  for (let i = 1; i < existing.length; i += 1) {
+    const fh = String(existing[i]?.[0] ?? "").trim();
+    const id = String(existing[i]?.[1] ?? "").trim();
+    if (!fh && !id) return i + 1;
+  }
+  return existing.length + 1;
+}
+
 export function tabDeFecha(fechaDDMMAAAA) {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(fechaDDMMAAAA || "").trim());
   if (!m) return null;

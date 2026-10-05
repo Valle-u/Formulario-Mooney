@@ -13,12 +13,11 @@ import {
   contarFechasFuera,
   contarDirecciones,
   isoAFecha,
-  tabDeFecha,
   leerBancoTexto,
   planillaPareceValida,
   normText,
 } from "../services/balanceDiario.js";
-import { leerPlanillaDia, escribirBalanceMensual } from "../services/sheetsBalance.js";
+import { leerPlanillaDia, escribirBalanceMensual, tabDestinoBalance } from "../services/sheetsBalance.js";
 
 const router = express.Router();
 
@@ -210,7 +209,7 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
       return res.json({
         fecha,
         fechaDD,
-        tab: tabDeFecha(fechaDD),
+        tab: tabDestinoBalance(),
         planilla: { tab: planilla.tab, filas: resto.cuadre.planilla_filas },
         bancos: resto.resumenFormatos,
         avisos,
