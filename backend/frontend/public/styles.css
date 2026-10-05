@@ -1897,6 +1897,10 @@ label{
   background: #f3f4f6;
 }
 
+tr.egreso-foco td {
+  background: rgba(16, 185, 129, 0.16);
+}
+
 .notification-item.unread {
   background: #eff6ff;
   border-left-color: #2563eb;

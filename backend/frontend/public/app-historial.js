@@ -163,7 +163,7 @@ function renderEgresos(egresos, pagination, sumas){
       : '<span style="background: #444444; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">ACTIVO</span>';
 
     return `
-      <tr>
+      <tr data-egreso-row="${escapeHtml(String(e.id))}">
         <td>${escapeHtml(e.fecha)}</td>
         <td>${escapeHtml(e.hora || "-")}</td>
         <td>${escapeHtml(e.empresa_salida)}</td>
@@ -182,6 +182,7 @@ function renderEgresos(egresos, pagination, sumas){
   }).join("");
 
   bindVerDetalleButtons(egresos);
+  resaltarEgresoEnLista();
 
   const info = document.getElementById("resultadosInfo");
   if(info) info.textContent = `Total: ${pagination.total} transferencias`;
@@ -1170,4 +1171,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // IMPORTANTE: Cargar egresos al iniciar la página
   buscarEgresos();
+  abrirEgresoDesdeQuery();
 });
+
+function egresoIdDesdeQuery() {
+  const raw = new URLSearchParams(location.search).get("egreso");
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  return Number(raw);
+}
+
+function resaltarEgresoEnLista() {
+  const id = egresoIdDesdeQuery();
+  if (!id) return;
+  const row = document.querySelector(`[data-egreso-row="${id}"]`);
+  if (!row) return;
+  row.classList.add("egreso-foco");
+  row.scrollIntoView({ block: "center" });
+}
+
+async function abrirEgresoDesdeQuery() {
+  const id = egresoIdDesdeQuery();
+  if (!id) return;
+  try {
+    const { egresos } = await api(`/api/egresos?id=${id}&limit=1`);
+    const egreso = (egresos || []).find((e) => Number(e.id) === id);
+    if (!egreso) {
+      toast("Movimiento", "No encontré ese egreso", "warning");
+      return;
+    }
+    mostrarDetalle(egreso);
+    resaltarEgresoEnLista();
+  } catch (err) {
+    toast("Movimiento", err.message || "No pude abrir el egreso", "error");
+  }
+}
