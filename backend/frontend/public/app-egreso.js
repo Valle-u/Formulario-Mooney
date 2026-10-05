@@ -806,19 +806,20 @@ function wireNombresValidation() {
   const cuentaSalidaInput = document.getElementById("cuenta_salida");
   const cuentaReceptoraInput = document.getElementById("cuenta_receptora");
 
-  // Regex: solo letras (incluyendo á, é, í, ó, ú, ñ), espacios y algunos caracteres comunes en nombres
+  // La salida es un nombre. La receptora también puede ser CBU, CVU o alias.
   const regexNombres = /^[a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]*$/;
+  const regexCuentaReceptora = /^[a-záéíóúñüA-ZÁÉÍÓÚÑÜ0-9\s'.@_-]*$/;
 
-  function validarNombre(input) {
+  function validarNombre(input, regex, strip) {
     if (!input) return;
 
     input.addEventListener("input", (e) => {
       const valor = e.target.value;
 
       // Verificar si contiene caracteres no permitidos
-      if (!regexNombres.test(valor)) {
+      if (!regex.test(valor)) {
         // Remover caracteres no permitidos
-        e.target.value = valor.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]/g, "");
+        e.target.value = valor.replace(strip, "");
 
         // Mostrar feedback temporal
         e.target.style.borderColor = "#dc3545";
@@ -833,14 +834,14 @@ function wireNombresValidation() {
     // Validar al perder foco
     input.addEventListener("blur", (e) => {
       const valor = e.target.value.trim();
-      if (valor && !regexNombres.test(valor)) {
-        e.target.value = valor.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]/g, "");
+      if (valor && !regex.test(valor)) {
+        e.target.value = valor.replace(strip, "");
       }
     });
   }
 
-  validarNombre(cuentaSalidaInput);
-  validarNombre(cuentaReceptoraInput);
+  validarNombre(cuentaSalidaInput, regexNombres, /[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s'-]/g);
+  validarNombre(cuentaReceptoraInput, regexCuentaReceptora, /[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ0-9\s'.@_-]/g);
 }
 
 /* =========================
