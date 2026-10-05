@@ -970,6 +970,15 @@ function showToast(notification) {
   toastEl.appendChild(content);
   toastEl.appendChild(closeBtn);
 
+  const egresoId = notification.data?.egreso_id;
+  if (egresoId) {
+    toastEl.style.cursor = "pointer";
+    toastEl.addEventListener("click", (e) => {
+      if (e.target.closest(".toast-close")) return;
+      window.location.href = `consulta-egresos.html?egreso=${encodeURIComponent(egresoId)}`;
+    });
+  }
+
   container.appendChild(toastEl);
 
   // Auto-remover después de 5 segundos
@@ -1016,8 +1025,13 @@ function updateNotificationPanel() {
   // Agregar event listeners
   list.querySelectorAll(".notification-item").forEach(item => {
     item.addEventListener("click", () => {
-      const id = parseInt(item.dataset.id);
+      const id = parseInt(item.dataset.id, 10);
+      const notification = notifications.find(n => n.id === id);
       markNotificationAsRead(id);
+      const egresoId = notification?.data?.egreso_id;
+      if (egresoId) {
+        window.location.href = `consulta-egresos.html?egreso=${encodeURIComponent(egresoId)}`;
+      }
     });
   });
 }

@@ -70,6 +70,11 @@ export function normName(s) {
   return normText(s).replace(/[^a-z0-9]/g, "");
 }
 
+/** Mismas palabras, cualquier orden: "JURI DANIEL GUSTAVO" y "Daniel Gustavo Juri". */
+export function claveNombre(s) {
+  return normText(s).split(/[^a-z0-9]+/).filter(Boolean).sort().join("");
+}
+
 function distanciaEdicion(a, b) {
   if (a === b) return 0;
   if (a.length < b.length) [a, b] = [b, a];
@@ -386,7 +391,7 @@ export function cargarPlanillaFilas(rows, fechaISO) {
     if (!nombre.trim() || !monto.trim()) continue;
     const m = parseMonto(monto);
     if (m == null) continue;
-    const key = normName(nombre);
+    const key = claveNombre(nombre);
     if (!cargas.has(key)) cargas.set(key, []);
     cargas.get(key).push({
       monto: m,
@@ -405,7 +410,7 @@ export function planillaPareceValida(rows) {
 }
 
 function matchDeposito(cargas, nombre, monto, fechaHoraBanco) {
-  const nombreNorm = normName(nombre);
+  const nombreNorm = claveNombre(nombre);
   const lst = cargas.get(nombreNorm) || [];
   const [bkFecha, bkMin] = fechaMinutosBanco(fechaHoraBanco);
 
@@ -500,7 +505,7 @@ export function indexarEgresos(filas) {
     const moneda = monedaDeEgreso(r);
     const fila = { raw: r, etiqueta, banco, monto, nombre, moneda, consumida: false };
     if (moneda === "ARS") {
-      push(salidas, [banco, normName(nombre), monto], fila);
+      push(salidas, [banco, claveNombre(nombre), monto], fila);
       push(porBancoMonto, [banco, monto], fila);
       const idv = String(r.id_transferencia || "").trim();
       if (idv && !porId.has(idv)) porId.set(idv, fila);
@@ -535,7 +540,7 @@ function matchSalidaPorId(porId, ids) {
 }
 
 function matchSalida(salidas, porBancoMonto, banco, nombre, monto) {
-  const porNombre = tomar(salidas.get(JSON.stringify([normText(banco), normName(nombre), monto])));
+  const porNombre = tomar(salidas.get(JSON.stringify([normText(banco), claveNombre(nombre), monto])));
   if (porNombre != null) return porNombre;
   return tomar(porBancoMonto.get(JSON.stringify([normText(banco), monto])));
 }

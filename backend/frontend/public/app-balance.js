@@ -128,6 +128,23 @@ function abrirFiltro(btn, tablaId, col, filasBase) {
   pintarLista();
 }
 
+function opcionesEtiqueta() {
+  const set = new Set(typeof getEtiquetas_dynamic === "function" ? getEtiquetas_dynamic() : []);
+  for (const f of balanceActual?.filas || []) {
+    const e = String(f.Etiqueta || "").trim();
+    if (e) set.add(e);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, "es"));
+}
+
+function htmlSelectEtiqueta(fila) {
+  const actual = String(fila.Etiqueta || "").trim();
+  const opts = opcionesEtiqueta().map((e) =>
+    `<option value="${escapeHtml(e)}"${e === actual ? " selected" : ""}>${escapeHtml(e)}</option>`
+  ).join("");
+  return `<select class="sel-etiqueta" data-etiqueta-fila="1"><option value="">Elegir etiqueta</option>${opts}</select>`;
+}
+
 function renderTabla(el, filas, columnas, tablaId, filasBase) {
   if (!filasBase.length) {
     el.innerHTML = "<tbody><tr><td class='muted'>Sin filas</td></tr></tbody>";
@@ -138,7 +155,10 @@ function renderTabla(el, filas, columnas, tablaId, filasBase) {
     const activo = filtrosTabla[tablaId] && filtrosTabla[tablaId][c] instanceof Set;
     return `<th>${escapeHtml(c.trim())}<button type="button" class="th-filtro${activo ? " activo" : ""}" data-tabla="${tablaId}" data-col="${escapeHtml(c)}">▾</button></th>`;
   }).join("")}</tr></thead>`;
-  const body = tope.map((f) => `<tr>${columnas.map((c) => `<td>${escapeHtml(f[c] ?? "")}</td>`).join("")}</tr>`).join("");
+  const body = tope.map((f, i) => `<tr data-fila-idx="${i}">${columnas.map((c) => {
+    if (tablaId === "revisar" && c === "Etiqueta") return `<td>${htmlSelectEtiqueta(f)}</td>`;
+    return `<td>${escapeHtml(f[c] ?? "")}</td>`;
+  }).join("")}</tr>`).join("");
   const extra = filas.length > tope.length
     ? `<tr><td colspan="${columnas.length}" class="muted">Mostrando ${tope.length} de ${filas.length}. El CSV descargado trae todas.</td></tr>`
     : (filas.length !== filasBase.length
@@ -151,6 +171,78 @@ function renderTabla(el, filas, columnas, tablaId, filasBase) {
       abrirFiltro(btn, tablaId, btn.getAttribute("data-col"), filasBase);
     });
   });
+  if (tablaId === "revisar") {
+    el.querySelectorAll("select.sel-etiqueta").forEach((sel) => {
+      sel.addEventListener("click", (ev) => ev.stopPropagation());
+      sel.addEventListener("change", () => {
+        const idx = Number(sel.closest("tr")?.dataset.filaIdx);
+        const fila = tope[idx];
+        if (fila && sel.value) aplicarEtiquetaManual(fila, sel.value);
+      });
+    });
+  }
+}
+
+function mismaOperacion(a, b) {
+  return ["FechaHora", "ID", "Empresa", "Tipo de transferencia", "Titular", "Importe"].every(
+    (k) => String(a[k] ?? "") === String(b[k] ?? "")
+  );
+}
+
+function etiquetaRedireccion(etiqueta) {
+  return String(etiqueta || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("redireccion de capital");
+}
+
+function resumenDesdeFilas(filas) {
+  const map = new Map();
+  for (const f of filas) {
+    const et = String(f.Etiqueta || "").trim() || "(sin etiqueta)";
+    if (!map.has(et)) map.set(et, { etiqueta: et, cantidad: 0 });
+    map.get(et).cantidad += 1;
+  }
+  return [...map.values()].sort((a, b) => b.cantidad - a.cantidad);
+}
+
+function pintarChips() {
+  const resumen = document.getElementById("resumen");
+  if (!resumen || !balanceActual) return;
+  const chips = balanceActual.resumen || [];
+  resumen.innerHTML = chips.map((r) =>
+    `<button type="button" class="btn chip${r.etiqueta === etiquetaActiva ? " activo" : ""}" data-etiqueta="${escapeHtml(r.etiqueta)}">${escapeHtml(r.etiqueta)}: ${r.cantidad}</button>`
+  ).join("") + `<span class="note" style="align-self:center">Pestaña destino: ${escapeHtml(balanceActual.tab || "—")}. Tocá una etiqueta para filtrar el balance.</span>`;
+  resumen.querySelectorAll(".chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const et = btn.getAttribute("data-etiqueta");
+      etiquetaActiva = etiquetaActiva === et ? "" : et;
+      resumen.querySelectorAll(".chip").forEach((b) => b.classList.toggle("activo", b.getAttribute("data-etiqueta") === etiquetaActiva));
+      pintarTablas();
+    });
+  });
+}
+
+function aplicarEtiquetaManual(filaRevisar, etiqueta) {
+  const origen = (balanceActual.filas || []).find((f) => !String(f.Etiqueta || "").trim() && mismaOperacion(f, filaRevisar));
+  if (origen) {
+    origen.Etiqueta = etiqueta;
+    if (etiquetaRedireccion(etiqueta)) {
+      const invertido = origen["Tipo de transferencia"] === "Transferencia Saliente"
+        ? "Transferencia Entrante"
+        : "Transferencia Saliente";
+      const ya = balanceActual.filas.some((f) => f !== origen && mismaOperacion(
+        { ...origen, "Tipo de transferencia": invertido },
+        f
+      ) && f.Etiqueta === etiqueta);
+      if (!ya) balanceActual.filas.push({ ...origen, "Tipo de transferencia": invertido });
+    }
+  }
+  balanceActual.revisar = (balanceActual.revisar || []).filter((r) => r !== filaRevisar);
+  balanceActual.resumen = resumenDesdeFilas(balanceActual.filas || []);
+  const cuadre = document.getElementById("cuadre");
+  if (cuadre) {
+    cuadre.textContent = cuadre.textContent.replace(/A revisar: \d+/, `A revisar: ${balanceActual.revisar.length}`);
+  }
+  pintarChips();
+  pintarTablas();
 }
 
 function pintarUsdt(data) {
@@ -234,19 +326,7 @@ function pintarResultado(data) {
     `A revisar: ${(data.revisar || []).length}. ` +
     `Egresos del formulario ese día (sin cierre de caja): ${eg.total}. HG.Cash: ${eg.hg}. ${empresas}.`;
 
-  const resumen = document.getElementById("resumen");
-  const chips = data.resumen || [];
-  resumen.innerHTML = chips.map((r) =>
-    `<button type="button" class="btn chip" data-etiqueta="${escapeHtml(r.etiqueta)}">${escapeHtml(r.etiqueta)}: ${r.cantidad}</button>`
-  ).join("") + `<span class="note" style="align-self:center">Pestaña destino: ${escapeHtml(data.tab || "—")}. Tocá una etiqueta para filtrar el balance.</span>`;
-  resumen.querySelectorAll(".chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const et = btn.getAttribute("data-etiqueta");
-      etiquetaActiva = etiquetaActiva === et ? "" : et;
-      resumen.querySelectorAll(".chip").forEach((b) => b.classList.toggle("activo", b.getAttribute("data-etiqueta") === etiquetaActiva));
-      pintarTablas();
-    });
-  });
+  pintarChips();
 
   pintarUsdt(data);
   pintarTablas();

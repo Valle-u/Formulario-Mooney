@@ -1656,6 +1656,15 @@ router.get("/", auth, async (req, res) => {
       where.push(`e.created_by = $${params.length}`);
     }
 
+    if (req.query.id != null && String(req.query.id).trim() !== "") {
+      const idNum = Number(req.query.id);
+      if (!Number.isInteger(idNum) || idNum <= 0) {
+        return res.status(400).json({ message: "ID inválido" });
+      }
+      params.push(idNum);
+      where.push(`e.id = $${params.length}`);
+    }
+
     // Filtrar por rol del usuario:
     // - Admin/Dirección: ven todos los egresos
     // - Encargado: ve egresos de empleados y encargados
