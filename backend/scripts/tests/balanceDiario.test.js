@@ -123,8 +123,8 @@ test("USDT cuadra cierre anterior más entradas menos salidas contra el cierre d
   const r = armarCuadreUsdt({
     cierresAyer: [{ empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "1000", hora: "22:00" }],
     movimientos: [
-      { empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "[Otra] Recepcion de USDT", tipo_transaccion: "ENTRADA", monto: "200", hora: "10:00", cuenta_receptora: "A", id_transferencia: "1" },
-      { empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "[Otra] Cambio a USDT", tipo_transaccion: "SALIDA", monto: "50", hora: "11:00", cuenta_receptora: "B", id_transferencia: "2" },
+      { empresa_salida: "TrustWallet", cuenta_salida: "externo", cuenta_receptora: "main", moneda: "USDT", etiqueta: "[Otra] Recepcion de USDT", tipo_transaccion: "ENTRADA", monto: "200", hora: "10:00", id_transferencia: "1" },
+      { empresa_salida: "TrustWallet", cuenta_salida: "main", cuenta_receptora: "B", moneda: "USDT", etiqueta: "[Otra] Cambio a USDT", tipo_transaccion: "SALIDA", monto: "50", hora: "11:00", id_transferencia: "2" },
     ],
     cierresHoy: [{ empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "1150", hora: "23:00" }],
   });
@@ -189,6 +189,24 @@ test("la carga entra debajo del encabezado aunque haya celdas sueltas más abajo
     ["FechaHora", "ID"],
     ["04/10/2026 01:40:14", "ABC"],
   ]), 3);
+});
+
+test("USDT suma la entrada en la cuenta receptora y la salida en la cuenta de salida", () => {
+  const r = armarCuadreUsdt({
+    cierresAyer: [{ empresa_salida: "TrustWallet", cuenta_salida: "Exodus", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "2622.19", hora: "23:00" }],
+    movimientos: [
+      { empresa_salida: "TrustWallet", cuenta_salida: "Enoc", cuenta_receptora: "Exodus", moneda: "USDT", etiqueta: "[Otra] Recepcion de USDT", tipo_transaccion: "ENTRADA", monto: "1833.34", hora: "00:23" },
+      { empresa_salida: "TrustWallet", cuenta_salida: "Exodus", cuenta_receptora: "Williams", moneda: "USDT", etiqueta: "[Otra] Gasto Personal William", tipo_transaccion: "SALIDA", monto: "100", hora: "21:45" },
+    ],
+    cierresHoy: [{ empresa_salida: "TrustWallet", cuenta_salida: "Exodus", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "4354.46", hora: "23:30" }],
+  });
+  assert.equal(r.cuentas.length, 1);
+  assert.equal(r.cuentas[0].cuenta, "Exodus");
+  assert.equal(r.cuentas[0].entradas, 1833.34);
+  assert.equal(r.cuentas[0].salidas, 100);
+  assert.equal(r.cuentas[0].saldo_calculado, 4355.53);
+  assert.equal(r.cuentas[0].movimientos[0].contraparte, "Enoc");
+  assert.equal(r.cuentas[0].movimientos[1].contraparte, "Williams");
 });
 
 test("USDT marca discrepancia si el cierre de hoy no coincide", () => {

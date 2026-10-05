@@ -806,8 +806,18 @@ export function filasACsv(filas, columns = OUTPUT_COLUMNS) {
   return lineas.join("\n");
 }
 
+function esEntrada(r) {
+  return String(r.tipo_transaccion || "").toUpperCase() === "ENTRADA";
+}
+
+/** Billetera propia del movimiento. La entrada entra en la cuenta receptora; la salida sale de la cuenta de salida. El cierre se guarda en cuenta de salida. */
+function billeteraDe(r) {
+  if (esEntrada(r)) return r.cuenta_receptora || "";
+  return r.cuenta_salida || "";
+}
+
 function claveCuenta(r) {
-  return [r.empresa_salida || "", r.cuenta_salida || "", monedaDeEgreso(r)].join("|");
+  return [r.empresa_salida || "", billeteraDe(r), monedaDeEgreso(r)].join("|");
 }
 
 function ultimoPorCuenta(rows) {
@@ -848,7 +858,7 @@ export function armarCuadreUsdt({ cierresAyer = [], movimientos = [], cierresHoy
     const diferencia = saldo == null || cierreHoy == null ? null : Math.round((cierreHoy - saldo) * 100) / 100;
     cuentas.push({
       empresa: sample.empresa_salida,
-      cuenta: sample.cuenta_salida,
+      cuenta: billeteraDe(sample),
       moneda: "USDT",
       cierre_anterior: cierreAnt,
       entradas,
@@ -857,14 +867,17 @@ export function armarCuadreUsdt({ cierresAyer = [], movimientos = [], cierresHoy
       cierre_dia: cierreHoy,
       diferencia,
       cuadra: diferencia === 0,
-      movimientos: delDia.map((r) => ({
-        hora: r.hora || "",
-        tipo: String(r.tipo_transaccion || "SALIDA").toUpperCase(),
-        etiqueta: r.etiqueta || "",
-        monto: Number(r.monto) || 0,
-        cuenta_receptora: r.cuenta_receptora || "",
-        id_transferencia: r.id_transferencia || "",
-      })),
+      movimientos: delDia.map((r) => {
+        const tipo = String(r.tipo_transaccion || "SALIDA").toUpperCase();
+        return {
+          hora: r.hora || "",
+          tipo,
+          etiqueta: r.etiqueta || "",
+          monto: Number(r.monto) || 0,
+          contraparte: tipo === "ENTRADA" ? (r.cuenta_salida || "") : (r.cuenta_receptora || ""),
+          id_transferencia: r.id_transferencia || "",
+        };
+      }),
     });
   }
   cuentas.sort((a, b) => String(a.empresa).localeCompare(String(b.empresa)) || String(a.cuenta).localeCompare(String(b.cuenta)));

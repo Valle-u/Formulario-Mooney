@@ -307,7 +307,7 @@ function pintarUsdt(data) {
     Tipo: m.tipo,
     Etiqueta: m.etiqueta,
     Monto: peso(m.monto),
-    Contraparte: m.cuenta_receptora,
+    Contraparte: m.contraparte,
     ID: m.id_transferencia,
   })));
   const cols = ["Empresa", "Cuenta", "Hora", "Tipo", "Etiqueta", "Monto", "Contraparte", "ID"];
