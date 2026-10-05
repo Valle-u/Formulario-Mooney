@@ -1,7 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { google } from "googleapis";
-import { OUTPUT_COLUMNS, filasAMatriz, claveMovimiento, tabDeFecha } from "./balanceDiario.js";
+import { OUTPUT_COLUMNS, filasAMatriz, claveMovimiento, filaInicioCarga } from "./balanceDiario.js";
+
+export const TAB_BALANCE_MENSUAL = "Balance Mensual Bancario";
+
+export function tabDestinoBalance() {
+  return String(process.env.BALANCE_DEF_TAB || "").trim() || TAB_BALANCE_MENSUAL;
+}
 
 let sheetsClient = null;
 
@@ -89,22 +95,29 @@ function celdaSegura(v) {
 }
 
 /**
- * Append incremental a la pestaña del mes (Septiembre, Octubre, …).
- * Dedup contra lo ya cargado: ID|Tipo|Importe|Titular|FechaHora.
+ * Escribe en la hoja "Balance Mensual Bancario" del spreadsheet del mes.
+ * No pisa el encabezado. Dedup: ID|Tipo|Importe|Titular|FechaHora.
  */
-export async function escribirBalanceMensual(filas, fechaDDMMAAAA) {
+export async function escribirBalanceMensual(filas) {
   const spreadsheetId = process.env.BALANCE_DEF_SHEET_ID;
   if (!spreadsheetId) throw new Error("Falta BALANCE_DEF_SHEET_ID");
-  const tab = tabDeFecha(fechaDDMMAAAA) || process.env.BALANCE_DEF_TAB;
-  if (!tab) throw new Error("No pude resolver la pestaña del mes");
+  const tab = tabDestinoBalance();
 
   const dataRows = filasAMatriz(filas).map((r) => r.map(celdaSegura));
   const sheets = await getSheets();
   await asegurarTab(sheets, spreadsheetId, tab);
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'` });
   const existing = res.data.values || [];
-  const yaCargadas = new Set(existing.slice(1).map((r) => claveMovimiento(r)));
+  const yaCargadas = new Set(
+    existing.slice(1)
+      .filter((r) => String(r?.[1] ?? "").trim())
+      .map((r) => claveMovimiento(r)),
+  );
   const nuevas = dataRows.filter((r) => !yaCargadas.has(claveMovimiento(r)));
+
+  if (!nuevas.length) {
+    return { tab, nuevas: 0, repetidas: dataRows.length };
+  }
 
   if (existing.length === 0) {
     await sheets.spreadsheets.values.update({
@@ -113,12 +126,20 @@ export async function escribirBalanceMensual(filas, fechaDDMMAAAA) {
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [OUTPUT_COLUMNS, ...nuevas] },
     });
-  } else if (nuevas.length) {
-    await sheets.spreadsheets.values.append({
+  } else {
+    const inicio = filaInicioCarga(existing);
+    if (!String(existing[0]?.[12] ?? "").trim()) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${tab}'!M1`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [["Etiqueta"]] },
+      });
+    }
+    await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `'${tab}'!A1`,
+      range: `'${tab}'!A${inicio}`,
       valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
       requestBody: { values: nuevas },
     });
   }

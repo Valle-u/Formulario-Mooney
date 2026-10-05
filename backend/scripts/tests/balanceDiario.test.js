@@ -8,6 +8,7 @@ import {
   transformar,
   egresosDesdeCsv,
   armarCuadreUsdt,
+  filaInicioCarga,
   OUTPUT_COLUMNS,
 } from "../../src/services/balanceDiario.js";
 
@@ -173,6 +174,21 @@ test("una salida con el nombre reordenado toma la etiqueta del formulario", () =
   });
   assert.equal(r.salida[0].Etiqueta, "[Unidad M] Premio Pagado");
   assert.equal(r.revisar.length, 0);
+});
+
+test("la carga entra debajo del encabezado aunque haya celdas sueltas más abajo", () => {
+  const existing = [
+    ["FechaHora", "ID", "Empresa"],
+    [],
+    [],
+    ["", "", "", "", "", "", "", "", "", "", "30/12/1986", "Turno noche"],
+  ];
+  assert.equal(filaInicioCarga(existing), 2);
+  assert.equal(filaInicioCarga([]), 1);
+  assert.equal(filaInicioCarga([
+    ["FechaHora", "ID"],
+    ["04/10/2026 01:40:14", "ABC"],
+  ]), 3);
 });
 
 test("USDT marca discrepancia si el cierre de hoy no coincide", () => {
