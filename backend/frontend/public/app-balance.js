@@ -1,4 +1,5 @@
 let balanceActual = null;
+let usdtActual = null;
 
 function hoyISO() {
   const d = new Date();
@@ -245,23 +246,60 @@ function aplicarEtiquetaManual(filaRevisar, etiqueta) {
   pintarTablas();
 }
 
+const COLUMNAS_USDT = [
+  "Empresa", "Cuenta", "Cierre anterior", "Entradas", "Salidas",
+  "Saldo calculado", "Cierre de hoy", "Diferencia", "Estado",
+];
+
+function estadoUsdt(c) {
+  if (c.diferencia == null) return "incompleto";
+  return c.cuadra ? "cuadra" : "discrepancia";
+}
+
+function filasResumenUsdt(usdt) {
+  return (usdt?.cuentas || []).map((c) => ({
+    Empresa: c.empresa || "",
+    Cuenta: c.cuenta || "",
+    "Cierre anterior": c.cierre_anterior == null ? "" : peso(c.cierre_anterior),
+    Entradas: peso(c.entradas),
+    Salidas: peso(c.salidas),
+    "Saldo calculado": c.saldo_calculado == null ? "" : peso(c.saldo_calculado),
+    "Cierre de hoy": c.cierre_dia == null ? "" : peso(c.cierre_dia),
+    Diferencia: c.diferencia == null ? "" : peso(c.diferencia),
+    Estado: estadoUsdt(c),
+    _dif: c.diferencia != null && !c.cuadra,
+  }));
+}
+
 function pintarUsdt(data) {
+  const card = document.getElementById("resultadoUsdtCard");
   const box = document.getElementById("usdtCuadre");
   const tabla = document.getElementById("tablaUsdt");
+  const resumen = document.getElementById("tablaUsdtResumen");
+  card.style.display = "";
   const usdt = data.usdt || { cuentas: [] };
+  usdtActual = {
+    fecha: data.fecha,
+    fechaDD: data.fechaDD || data.fecha,
+    filas: filasResumenUsdt(usdt),
+  };
   if (!usdt.cuentas.length) {
     box.textContent = "No hay movimientos ni cierres USDT en el formulario para este día ni para el día anterior.";
+    resumen.innerHTML = "";
     tabla.innerHTML = "";
     return;
   }
-  const lineas = usdt.cuentas.map((c) => {
-    const ant = c.cierre_anterior == null ? "sin cierre del día anterior" : peso(c.cierre_anterior);
-    const hoy = c.cierre_dia == null ? "sin cierre de hoy" : peso(c.cierre_dia);
-    const dif = c.diferencia == null ? "no se puede cerrar" : peso(c.diferencia);
-    const estado = c.cuadra ? "cuadra" : "discrepancia";
-    return `${c.empresa} / ${c.cuenta}: cierre anterior ${ant}, entradas ${peso(c.entradas)}, salidas ${peso(c.salidas)}, saldo ${c.saldo_calculado == null ? "—" : peso(c.saldo_calculado)}, cierre de hoy ${hoy}, diferencia ${dif} (${estado}).`;
-  });
-  box.textContent = lineas.join(" ");
+  const mal = usdt.cuentas.filter((c) => c.diferencia != null && !c.cuadra).length;
+  const incompletas = usdt.cuentas.filter((c) => c.diferencia == null).length;
+  const partes = [`${usdt.cuentas.length} cuenta(s) USDT.`];
+  if (mal) partes.push(`${mal} con diferencia entre el saldo calculado y el cierre de hoy.`);
+  if (incompletas) partes.push(`${incompletas} sin cierre del día anterior o de hoy, así que no se puede cerrar.`);
+  if (!mal && !incompletas) partes.push("Todas cuadran con el cierre de hoy.");
+  box.textContent = partes.join(" ");
+  const filas = usdtActual.filas;
+  resumen.innerHTML = `<thead><tr>${COLUMNAS_USDT.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>` +
+    filas.map((f) => `<tr class="${f._dif ? "usdt-dif" : ""}">${COLUMNAS_USDT.map((c) => `<td>${escapeHtml(f[c] ?? "")}</td>`).join("")}</tr>`).join("") +
+    "</tbody>";
   const movs = usdt.cuentas.flatMap((c) => c.movimientos.map((m) => ({
     Empresa: c.empresa,
     Cuenta: c.cuenta,
@@ -327,8 +365,6 @@ function pintarResultado(data) {
     `Egresos del formulario ese día (sin cierre de caja): ${eg.total}. HG.Cash: ${eg.hg}. ${empresas}.`;
 
   pintarChips();
-
-  pintarUsdt(data);
   pintarTablas();
 
   const fecha = data.fechaDD || data.fecha;
@@ -337,8 +373,6 @@ function pintarResultado(data) {
     descargarCsv(`balance_${fecha}.csv`, cols, data.filas || []);
   document.getElementById("btnDescRevisar").onclick = () =>
     descargarCsv(`revisar_${fecha}.csv`, cols.concat(["Motivo"]), data.revisar || []);
-  document.getElementById("btnDescUsdt").onclick = () =>
-    descargarCsv(`balance_usdt_${fecha}.csv`, cols, data.filasUsdt || []);
 }
 
 async function generar(e) {
@@ -368,6 +402,43 @@ async function generar(e) {
   } finally {
     btn.disabled = false;
   }
+}
+
+async function generarUsdt() {
+  const fecha = document.getElementById("fecha").value;
+  const estado = document.getElementById("balanceEstado");
+  if (!fecha) {
+    toast("Falta el día", "Elegí la fecha del balance.", "error");
+    return;
+  }
+  const btn = document.getElementById("btnGenerarUsdt");
+  btn.disabled = true;
+  estado.textContent = "Cruzando movimientos USDT con el cierre del día anterior…";
+  try {
+    const data = await api("/api/balance/generar-usdt", {
+      method: "POST",
+      body: { fecha },
+      timeout: 60000,
+    });
+    pintarUsdt(data);
+    const n = data.usdt?.cuentas?.length || 0;
+    estado.textContent = n ? `${n} cuenta(s) USDT.` : "Sin datos USDT para ese día.";
+    toast("Balance USDT", n ? `${n} cuenta(s).` : "No hay movimientos ni cierres USDT.", n ? "success" : "error");
+  } catch (err) {
+    estado.textContent = "";
+    toast("No se pudo generar el USDT", err.message || "Error", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function descargarUsdt() {
+  if (!usdtActual?.filas?.length) {
+    toast("Nada para descargar", "Generá el balance USDT primero.", "error");
+    return;
+  }
+  const fecha = usdtActual.fechaDD || usdtActual.fecha || "usdt";
+  descargarCsv(`balance_usdt_${fecha}.csv`, COLUMNAS_USDT, usdtActual.filas);
 }
 
 async function cargar() {
@@ -410,6 +481,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   document.getElementById("fecha").value = hoyISO();
   document.getElementById("balanceForm").addEventListener("submit", generar);
+  document.getElementById("btnGenerarUsdt").addEventListener("click", generarUsdt);
+  document.getElementById("btnDescUsdt").addEventListener("click", descargarUsdt);
   document.getElementById("btnCargar").addEventListener("click", cargar);
   document.addEventListener("click", (ev) => {
     const pop = document.getElementById("filtroPopover");
