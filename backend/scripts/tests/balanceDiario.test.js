@@ -133,6 +133,48 @@ test("USDT cuadra cierre anterior más entradas menos salidas contra el cierre d
   assert.equal(r.hay_discrepancia, false);
 });
 
+test("el mismo nombre en otro orden matchea el depósito de la planilla", () => {
+  const csv = [
+    "Fecha,Dirección,Nombre Remitente,Monto,Código COELSA,ID Externo,Cuenta,Estado,Concepto,Tipo",
+    "04/10/2026 01:40:14,Entrante,JURI DANIEL GUSTAVO,200000,ABC123,ABC123,HORIZONTE,Aprobada,,Transferencia",
+  ].join("\n");
+  const r = transformar({
+    bancos: [{ nombre: "hg.csv", texto: csv }],
+    egresos: [],
+    planillaFilas: [
+      ["", ""],
+      ["", "Nombre de cliente", "Monto", "Hora"],
+      ["", "Daniel Gustavo Juri", "200000", "1:40"],
+    ],
+    planillaFecha: "2026-10-04",
+  });
+  assert.equal(r.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(r.revisar.length, 0);
+});
+
+test("una salida con el nombre reordenado toma la etiqueta del formulario", () => {
+  const csv = [
+    "Fecha,Dirección,Nombre Destinatario,Monto,Código COELSA,ID Externo,Cuenta,Estado,Concepto,Tipo",
+    "04/10/2026 15:00:00,Saliente,JURI DANIEL GUSTAVO,50000,XYZ,XYZ,HORIZONTE,Aprobada,,Transferencia",
+  ].join("\n");
+  const r = transformar({
+    bancos: [{ nombre: "hg.csv", texto: csv }],
+    egresos: [{
+      empresa_salida: "HG.Cash",
+      cuenta_receptora: "Daniel Gustavo Juri",
+      monto: "50000",
+      etiqueta: "[Unidad M] Premio Pagado",
+      moneda: "ARS",
+      id_transferencia: "otro",
+      fecha: "04/10/2026",
+    }],
+    planillaFilas: [["", ""], ["", "Nombre de cliente"]],
+    planillaFecha: "2026-10-04",
+  });
+  assert.equal(r.salida[0].Etiqueta, "[Unidad M] Premio Pagado");
+  assert.equal(r.revisar.length, 0);
+});
+
 test("USDT marca discrepancia si el cierre de hoy no coincide", () => {
   const r = armarCuadreUsdt({
     cierresAyer: [{ empresa_salida: "Binance", cuenta_salida: "spot", moneda: "ARS", etiqueta: "Cierre de Caja", monto: "10", hora: "21:00" }],
