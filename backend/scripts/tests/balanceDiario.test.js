@@ -7,6 +7,7 @@ import {
   detectarDelim,
   transformar,
   egresosDesdeCsv,
+  armarCuadreUsdt,
   OUTPUT_COLUMNS,
 } from "../../src/services/balanceDiario.js";
 
@@ -115,4 +116,33 @@ test("Riven sintético coincide con el golden", { skip: !fs.existsSync(ROOT) }, 
     matrizEsperada(path.join(base, "salida_solo_adaptador", "balance_esperado.csv")),
     "riven",
   );
+});
+
+test("USDT cuadra cierre anterior más entradas menos salidas contra el cierre del día", () => {
+  const r = armarCuadreUsdt({
+    cierresAyer: [{ empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "1000", hora: "22:00" }],
+    movimientos: [
+      { empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "[Otra] Recepcion de USDT", tipo_transaccion: "ENTRADA", monto: "200", hora: "10:00", cuenta_receptora: "A", id_transferencia: "1" },
+      { empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "[Otra] Cambio a USDT", tipo_transaccion: "SALIDA", monto: "50", hora: "11:00", cuenta_receptora: "B", id_transferencia: "2" },
+    ],
+    cierresHoy: [{ empresa_salida: "TrustWallet", cuenta_salida: "main", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "1150", hora: "23:00" }],
+  });
+  assert.equal(r.cuentas.length, 1);
+  assert.equal(r.cuentas[0].saldo_calculado, 1150);
+  assert.equal(r.cuentas[0].diferencia, 0);
+  assert.equal(r.hay_discrepancia, false);
+});
+
+test("USDT marca discrepancia si el cierre de hoy no coincide", () => {
+  const r = armarCuadreUsdt({
+    cierresAyer: [{ empresa_salida: "Binance", cuenta_salida: "spot", moneda: "ARS", etiqueta: "Cierre de Caja", monto: "10", hora: "21:00" }],
+    movimientos: [
+      { empresa_salida: "Binance", cuenta_salida: "spot", moneda: "USDT", etiqueta: "Gasto", tipo_transaccion: "SALIDA", monto: "4", hora: "12:00" },
+    ],
+    cierresHoy: [{ empresa_salida: "Binance", cuenta_salida: "spot", moneda: "USDT", etiqueta: "Cierre de Caja", monto: "10", hora: "22:00" }],
+  });
+  assert.equal(r.cuentas[0].cierre_anterior, 10);
+  assert.equal(r.cuentas[0].saldo_calculado, 6);
+  assert.equal(r.cuentas[0].diferencia, 4);
+  assert.equal(r.hay_discrepancia, true);
 });
