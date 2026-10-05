@@ -790,6 +790,74 @@ export function filasACsv(filas, columns = OUTPUT_COLUMNS) {
   return lineas.join("\n");
 }
 
+function claveCuenta(r) {
+  return [r.empresa_salida || "", r.cuenta_salida || "", monedaDeEgreso(r)].join("|");
+}
+
+function ultimoPorCuenta(rows) {
+  const map = new Map();
+  const ordered = [...rows].sort((a, b) => String(b.hora || "").localeCompare(String(a.hora || "")));
+  for (const r of ordered) {
+    const k = claveCuenta(r);
+    if (!map.has(k)) map.set(k, r);
+  }
+  return map;
+}
+
+function sumaMonto(rows) {
+  return rows.reduce((s, r) => s + (Number(r.monto) || 0), 0);
+}
+
+/**
+ * USDT del formulario: cierre del día anterior + entradas/salidas del día.
+ * diferencia = cierre de hoy − (cierre de ayer + entradas − salidas).
+ */
+export function armarCuadreUsdt({ cierresAyer = [], movimientos = [], cierresHoy = [] } = {}) {
+  const esUsdt = (r) => monedaDeEgreso(r) === "USDT";
+  const ayer = ultimoPorCuenta(cierresAyer.filter(esUsdt));
+  const hoy = ultimoPorCuenta(cierresHoy.filter(esUsdt));
+  const movs = movimientos.filter((r) => esUsdt(r) && normText(r.etiqueta) !== ETIQUETA_EXCLUIR);
+  const keys = new Set([...ayer.keys(), ...hoy.keys(), ...movs.map(claveCuenta)]);
+  const cuentas = [];
+  for (const k of keys) {
+    const sample = ayer.get(k) || hoy.get(k) || movs.find((r) => claveCuenta(r) === k);
+    const delDia = movs.filter((r) => claveCuenta(r) === k);
+    const entradasRows = delDia.filter((r) => String(r.tipo_transaccion || "").toUpperCase() === "ENTRADA");
+    const salidasRows = delDia.filter((r) => String(r.tipo_transaccion || "").toUpperCase() !== "ENTRADA");
+    const entradas = Math.round(sumaMonto(entradasRows) * 100) / 100;
+    const salidas = Math.round(sumaMonto(salidasRows) * 100) / 100;
+    const cierreAnt = ayer.has(k) ? Number(ayer.get(k).monto) : null;
+    const cierreHoy = hoy.has(k) ? Number(hoy.get(k).monto) : null;
+    const saldo = cierreAnt == null ? null : Math.round((cierreAnt + entradas - salidas) * 100) / 100;
+    const diferencia = saldo == null || cierreHoy == null ? null : Math.round((cierreHoy - saldo) * 100) / 100;
+    cuentas.push({
+      empresa: sample.empresa_salida,
+      cuenta: sample.cuenta_salida,
+      moneda: "USDT",
+      cierre_anterior: cierreAnt,
+      entradas,
+      salidas,
+      saldo_calculado: saldo,
+      cierre_dia: cierreHoy,
+      diferencia,
+      cuadra: diferencia === 0,
+      movimientos: delDia.map((r) => ({
+        hora: r.hora || "",
+        tipo: String(r.tipo_transaccion || "SALIDA").toUpperCase(),
+        etiqueta: r.etiqueta || "",
+        monto: Number(r.monto) || 0,
+        cuenta_receptora: r.cuenta_receptora || "",
+        id_transferencia: r.id_transferencia || "",
+      })),
+    });
+  }
+  cuentas.sort((a, b) => String(a.empresa).localeCompare(String(b.empresa)) || String(a.cuenta).localeCompare(String(b.cuenta)));
+  return {
+    cuentas,
+    hay_discrepancia: cuentas.some((c) => c.diferencia !== 0),
+  };
+}
+
 export function egresosDesdeCsv(text) {
   const delim = detectarDelim(text);
   const { headers, filas } = matrixAObjetos(parseCsv(text, delim));

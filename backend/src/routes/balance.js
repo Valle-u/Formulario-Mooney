@@ -9,6 +9,7 @@ import {
   OUTPUT_COLUMNS,
   transformar,
   resumenEtiquetas,
+  armarCuadreUsdt,
   contarFechasFuera,
   contarDirecciones,
   isoAFecha,
@@ -39,6 +40,26 @@ function fechaValida(iso) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(iso || ""));
 }
 
+async function cierresEnFecha(fechaSQL, params) {
+  const result = await query(
+    `SELECT
+        empresa_salida,
+        cuenta_salida,
+        COALESCE(moneda, 'ARS') AS moneda,
+        etiqueta,
+        COALESCE(tipo_transaccion, 'SALIDA') AS tipo_transaccion,
+        monto::text AS monto,
+        to_char(hora, 'HH24:MI') AS hora
+     FROM egresos
+     WHERE status IS DISTINCT FROM 'anulado'
+       AND etiqueta = 'Cierre de Caja'
+       AND ${fechaSQL}
+     ORDER BY hora DESC`,
+    params
+  );
+  return result.rows;
+}
+
 async function egresosDelDia(fechaISO) {
   const result = await query(
     `SELECT
@@ -49,6 +70,7 @@ async function egresosDelDia(fechaISO) {
         COALESCE(id_transferencia, '') AS id_transferencia,
         COALESCE(cuenta_receptora, '') AS cuenta_receptora,
         etiqueta,
+        COALESCE(tipo_transaccion, 'SALIDA') AS tipo_transaccion,
         monto_raw,
         monto::text AS monto,
         COALESCE(moneda, 'ARS') AS moneda
@@ -159,6 +181,15 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
       }
 
       const egresos = await egresosDelDia(fecha);
+      const cierresAyer = await cierresEnFecha("fecha = $1::date - 1", [fecha]);
+      const cierresHoy = egresos.filter((e) => normText(e.etiqueta) === "cierre de caja");
+      const usdt = armarCuadreUsdt({ cierresAyer, movimientos: egresos, cierresHoy });
+      const porEmpresa = new Map();
+      for (const e of egresos) {
+        if (normText(e.etiqueta) === "cierre de caja") continue;
+        const nombre = e.empresa_salida || "(sin empresa)";
+        porEmpresa.set(nombre, (porEmpresa.get(nombre) || 0) + 1);
+      }
       const resultado = transformar({
         bancos: leidos.map((l) => ({ nombre: l.nombre, texto: l.texto })),
         egresos,
@@ -185,6 +216,12 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
         avisos,
         cuadre: resto.cuadre,
         resumen: resumenEtiquetas(resto.salida),
+        egresosFormulario: {
+          total: [...porEmpresa.values()].reduce((s, n) => s + n, 0),
+          hg: [...porEmpresa.entries()].filter(([empresa]) => normText(empresa) === "hg.cash").reduce((s, [, n]) => s + n, 0),
+          porEmpresa: [...porEmpresa.entries()].map(([empresa, cantidad]) => ({ empresa, cantidad })),
+        },
+        usdt,
         filas: resto.salida,
         revisar: resto.revisar,
         filasUsdt: resto.salidaUsdt,
