@@ -180,6 +180,101 @@
   font-size: 15px;
 }
 
+.cierre-resumen-dia {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,.03);
+}
+
+.cierre-resumen-dia-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cierre-resumen-dia-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cierre-resumen-dia-filters {
+  margin-top: 10px;
+}
+
+.cierre-resumen-dia-filters .field input,
+.cierre-resumen-dia-filters .field select {
+  min-height: 44px;
+}
+
+.cierre-resumen-dia-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.resumen-total-chip {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255,255,255,.02);
+}
+
+.resumen-total-chip span {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .25px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.resumen-total-chip strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+  color: #f8f8f8;
+}
+
+.resumen-total-chip.ars strong { color: #7dd3fc; }
+.resumen-total-chip.usdt strong { color: #86efac; }
+
+.cierre-resumen-dia-detail {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cierre-resumen-dia-empty,
+.cierre-resumen-dia-loading {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px 2px;
+}
+
+.resumen-dia-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--card2);
+  font-size: 12px;
+}
+
+.resumen-dia-item .line-main {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.resumen-dia-item .line-meta {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+[data-theme="light"] .resumen-total-chip.ars strong { color: #0369a1; }
+[data-theme="light"] .resumen-total-chip.usdt strong { color: #166534; }
+
 .cierre-kpi-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -359,6 +454,14 @@ html[data-theme="light"] .cierre-resumen-live {
 
   .cierre-kpi-summary {
     grid-template-columns: 1fr;
+  }
+
+  .cierre-resumen-dia-totals {
+    grid-template-columns: 1fr;
+  }
+
+  .cierre-resumen-dia-filters .field {
+    grid-column: span 12;
   }
 
   .kpi-row {

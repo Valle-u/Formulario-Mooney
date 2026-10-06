@@ -46,7 +46,7 @@ function formatCreatedAt(ts) {
 
 function formatMoney(n, moneda) {
   const value = Number(n || 0);
-  const symbol = moneda === "USD" ? "US$" : (moneda === "USDT" ? "USDT" : "$ ");
+  const symbol = moneda === "USD" ? "US$ " : (moneda === "USDT" ? "USDT " : "$ ");
   return `${symbol}${value.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -282,7 +282,7 @@ async function handleSubmitCierre(e) {
 
     setHoraSistemaPreview();
     updateLiveResumen();
-    await refreshKPI();
+    await Promise.all([refreshKPI(), refreshResumenDia()]);
   } catch (err) {
     toast("Error", err.message, "error", 9000);
   } finally {
@@ -478,6 +478,96 @@ async function refreshKPI() {
   }
 }
 
+function getYesterdayISO() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return toISODateLocal(d);
+}
+
+async function populateResumenUsuarios() {
+  const sel = document.getElementById("resumen_usuario");
+  if (!sel) return;
+
+  try {
+    const response = await api("/api/users/for-filter");
+    const users = Array.isArray(response?.users) ? response.users : [];
+
+    sel.innerHTML = `<option value="">Seleccionar...</option>` +
+      users.map((u) => {
+        const label = u.full_name || u.username || u.id;
+        const role = u.role ? ` (${u.role})` : "";
+        return `<option value="${escapeHtml(String(u.id))}" data-username="${escapeHtml(u.username || "")}">${escapeHtml(label)}${escapeHtml(role)}</option>`;
+      }).join("");
+
+    const dona = users.find((u) => String(u.username || "").toLowerCase() === "dona");
+    if (dona) sel.value = String(dona.id);
+  } catch (err) {
+    console.error("Error cargando usuarios para resumen:", err);
+    sel.innerHTML = `<option value="">Seleccionar...</option>`;
+  }
+}
+
+function renderResumenDiaDetail(data) {
+  const detail = document.getElementById("cierreResumenDiaDetail");
+  if (!detail) return;
+
+  const cierres = Array.isArray(data?.cierres) ? data.cierres : [];
+  if (cierres.length === 0) {
+    const userLabel = data?.usuario?.username || data?.usuario?.full_name || "el usuario seleccionado";
+    const fechaLabel = formatISODate(data?.fecha);
+    const msg = data?.message || `Sin cierres de ${userLabel} para ${fechaLabel}.`;
+    detail.innerHTML = `<div class="cierre-resumen-dia-empty">${escapeHtml(msg)}</div>`;
+    return;
+  }
+
+  detail.innerHTML = cierres.map((c) => `
+    <div class="resumen-dia-item">
+      <div class="line-main">${escapeHtml(formatMoney(c.monto, c.moneda || "ARS"))} · ${escapeHtml(c.empresa_salida || "-")} · ${escapeHtml(c.cuenta_salida || "-")}</div>
+      <div class="line-meta">${escapeHtml(c.turno || "-")} · ${escapeHtml(c.moneda || "-")}${c.hora ? ` · hora ${escapeHtml(c.hora)}` : ""} · cargado: ${escapeHtml(formatCreatedAt(c.created_at))}</div>
+    </div>
+  `).join("");
+}
+
+async function refreshResumenDia() {
+  const arsEl = document.getElementById("resumenTotalArs");
+  const usdtEl = document.getElementById("resumenTotalUsdt");
+  const detail = document.getElementById("cierreResumenDiaDetail");
+  const fechaInput = document.getElementById("resumen_fecha");
+  const userSel = document.getElementById("resumen_usuario");
+
+  if (!fechaInput || !userSel) return;
+
+  if (!fechaInput.value) fechaInput.value = getYesterdayISO();
+
+  if (detail) {
+    detail.innerHTML = '<div class="cierre-resumen-dia-loading">Cargando resumen...</div>';
+  }
+
+  try {
+    const qs = new URLSearchParams();
+    qs.set("fecha", fechaInput.value);
+    if (userSel.value) qs.set("created_by", userSel.value);
+
+    const data = await api(`/api/egresos/cierres/resumen-dia?${qs.toString()}`);
+
+    if (arsEl) arsEl.textContent = formatMoney(data?.totales?.ARS || 0, "ARS");
+    if (usdtEl) usdtEl.textContent = formatMoney(data?.totales?.USDT || 0, "USDT");
+
+    if (!userSel.value && data?.usuario?.id) {
+      const opt = Array.from(userSel.options).find((o) => o.value === String(data.usuario.id));
+      if (opt) userSel.value = String(data.usuario.id);
+    }
+
+    renderResumenDiaDetail(data);
+  } catch (err) {
+    if (arsEl) arsEl.textContent = formatMoney(0, "ARS");
+    if (usdtEl) usdtEl.textContent = formatMoney(0, "USDT");
+    if (detail) {
+      detail.innerHTML = `<div class="cierre-resumen-dia-empty">Error: ${escapeHtml(err.message || "No se pudo cargar el resumen")}</div>`;
+    }
+  }
+}
+
 function setDefaultRange() {
   const now = new Date();
   const hoy = toISODateLocal(now);
@@ -494,6 +584,11 @@ function setDefaultRange() {
   if (fechaOperativa && !fechaOperativa.value) {
     fechaOperativa.value = hoy;
     fechaOperativa.dataset.autoSuggested = "1";
+  }
+
+  const resumenFecha = document.getElementById("resumen_fecha");
+  if (resumenFecha && !resumenFecha.value) {
+    resumenFecha.value = getYesterdayISO();
   }
 }
 
@@ -560,11 +655,18 @@ function wireEvents() {
 
   document.getElementById("cierreForm")?.addEventListener("submit", handleSubmitCierre);
 
-  document.getElementById("btnRefreshCierresKPI")?.addEventListener("click", refreshKPI);
+  document.getElementById("btnRefreshCierresKPI")?.addEventListener("click", () => {
+    refreshKPI();
+    refreshResumenDia();
+  });
   document.getElementById("btnDownloadCierresCSV")?.addEventListener("click", downloadCierresCSV);
 
   ["kpi_fecha_desde", "kpi_fecha_hasta", "kpi_empresa_salida", "kpi_moneda"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", refreshKPI);
+  });
+
+  ["resumen_fecha", "resumen_usuario"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", refreshResumenDia);
   });
 }
 
@@ -580,9 +682,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   setInterval(setHoraSistemaPreview, 30000);
 
   wireEvents();
-  await cargarCuentasSugeridas();
+  await Promise.all([cargarCuentasSugeridas(), populateResumenUsuarios()]);
 
   markTurnoSelected("");
   updateLiveResumen();
-  await refreshKPI();
+  await Promise.all([refreshKPI(), refreshResumenDia()]);
 });

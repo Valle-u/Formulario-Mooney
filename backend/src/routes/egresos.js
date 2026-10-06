@@ -1259,6 +1259,129 @@ router.get("/cierres/kpi", auth, async (req, res) => {
   }
 });
 
+// GET /api/egresos/cierres/resumen-dia - Totales ARS/USDT de cierres de un usuario en una fecha
+router.get("/cierres/resumen-dia", auth, async (req, res) => {
+  try {
+    const todayISO = localDateToISO(new Date());
+    const defaultFecha = shiftISODate(todayISO, -1);
+    const fecha = parseFechaQueryFlexible(req.query.fecha, defaultFecha, "fecha");
+
+    const createdByRaw = String(req.query.created_by || req.query.usuario || "").trim();
+    const usernameRaw = String(req.query.username || "").trim();
+
+    let userRow = null;
+
+    if (createdByRaw) {
+      const userId = Number(createdByRaw);
+      if (!Number.isFinite(userId) || userId <= 0) {
+        return res.status(400).json({ message: "created_by inválido" });
+      }
+      const userResult = await query(
+        "SELECT id, username, full_name, role FROM users WHERE id = $1 LIMIT 1",
+        [userId]
+      );
+      userRow = userResult.rows[0] || null;
+      if (!userRow) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+    } else if (usernameRaw) {
+      const userResult = await query(
+        "SELECT id, username, full_name, role FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1",
+        [usernameRaw]
+      );
+      userRow = userResult.rows[0] || null;
+      if (!userRow) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+    } else {
+      const donaResult = await query(
+        "SELECT id, username, full_name, role FROM users WHERE LOWER(username) = 'dona' LIMIT 1"
+      );
+      userRow = donaResult.rows[0] || null;
+      if (!userRow) {
+        return res.json({
+          fecha,
+          usuario: null,
+          totales: { ARS: 0, USDT: 0, USD: 0 },
+          count: 0,
+          cierres: [],
+          message: "No hay usuario Dona configurado. Seleccioná un usuario."
+        });
+      }
+    }
+
+    const cierresResult = await query(
+      `SELECT
+          e.id,
+          e.fecha,
+          e.turno,
+          e.empresa_salida,
+          e.cuenta_salida,
+          e.moneda,
+          e.monto,
+          e.monto_raw,
+          e.hora,
+          e.created_at,
+          e.created_by,
+          u.username AS created_by_username
+       FROM egresos e
+       LEFT JOIN users u ON u.id = e.created_by
+       WHERE e.etiqueta = 'Cierre de Caja'
+         AND e.status IS DISTINCT FROM 'anulado'
+         AND e.fecha = $1::date
+         AND e.created_by = $2
+       ORDER BY e.created_at ASC, e.id ASC`,
+      [fecha, userRow.id]
+    );
+
+    const totales = { ARS: 0, USDT: 0, USD: 0 };
+    const cierres = cierresResult.rows.map((c) => {
+      const moneda = String(c.moneda || "").toUpperCase() || null;
+      const monto = Number(c.monto || 0);
+      if (moneda && Object.prototype.hasOwnProperty.call(totales, moneda)) {
+        totales[moneda] += monto;
+      }
+      return {
+        id: c.id,
+        fecha: toISODateOnly(c.fecha),
+        turno: normalizeTurnoLabel(c.turno),
+        empresa_salida: c.empresa_salida || null,
+        cuenta_salida: c.cuenta_salida || null,
+        moneda,
+        monto,
+        monto_raw: c.monto_raw,
+        hora: c.hora,
+        created_at: c.created_at,
+        created_by: c.created_by,
+        created_by_username: c.created_by_username || null
+      };
+    });
+
+    return res.json({
+      fecha,
+      usuario: {
+        id: userRow.id,
+        username: userRow.username,
+        full_name: userRow.full_name || null,
+        role: userRow.role || null
+      },
+      totales: {
+        ARS: Number(totales.ARS.toFixed(2)),
+        USDT: Number(totales.USDT.toFixed(2)),
+        USD: Number(totales.USD.toFixed(2))
+      },
+      count: cierres.length,
+      cierres
+    });
+  } catch (error) {
+    console.error("Error obteniendo resumen de cierres del dia:", error);
+    if (error?.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Error obteniendo resumen de cierres del dia" });
+  }
+});
+
 // GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados (incluye legacy)
 router.get("/cierres/csv", auth, exportLimiter, async (req, res) => {
   try {
