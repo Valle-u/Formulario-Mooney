@@ -69,7 +69,8 @@
             <p class="note">
               Subí el extracto del día (Lohas, HG.Cash y/o Riven Flow). Los egresos salen de este formulario
               y la planilla de cargas se lee sola de Google Sheets. El resultado se puede descargar o cargar
-              en el balance mensual.
+              en el balance mensual. El balance USDT no usa el extracto: sale de los movimientos y los cierres
+              cargados en el formulario.
             </p>
             <form id="balanceForm" class="grid">
               <div class="field span3">
@@ -80,11 +81,29 @@
                 <label for="bancos">CSV DEL BANCO (uno o varios)</label>
                 <input id="bancos" type="file" accept=".csv,text/csv" multiple required>
               </div>
-              <div class="field span3" style="align-self:end">
+              <div class="field span3" style="align-self:end; display:flex; flex-direction:column; gap:8px">
                 <button class="btn btn-primary" id="btnGenerar" type="submit">Generar balance</button>
+                <button class="btn" id="btnGenerarUsdt" type="button">Generar balance USDT</button>
               </div>
             </form>
             <div id="balanceEstado" class="note" style="margin-top:12px"></div>
+          </div>
+        </section>
+
+        <section class="card" id="resultadoUsdtCard" style="display:none">
+          <div class="card-header">Balance USDT</div>
+          <div class="card-body">
+            <div id="usdtCuadre" class="note" style="margin-bottom:8px"></div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px">
+              <button type="button" class="btn" id="btnDescUsdt">Descargar USDT</button>
+            </div>
+            <div class="table-wrap" style="max-height:280px; overflow:auto; margin-bottom:16px">
+              <table class="table" id="tablaUsdtResumen"></table>
+            </div>
+            <h3 style="margin:0 0 8px">Movimientos del día</h3>
+            <div class="table-wrap" style="max-height:280px; overflow:auto">
+              <table class="table" id="tablaUsdt"></table>
+            </div>
           </div>
         </section>
 
@@ -97,13 +116,7 @@
             <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px">
               <button type="button" class="btn" id="btnDescBalance">Descargar balance</button>
               <button type="button" class="btn" id="btnDescRevisar">Descargar a revisar</button>
-              <button type="button" class="btn" id="btnDescUsdt">Descargar USDT</button>
               <button type="button" class="btn btn-primary" id="btnCargar">Cargar en balance mensual</button>
-            </div>
-            <h3 style="margin:16px 0 8px">USDT</h3>
-            <div id="usdtCuadre" class="note" style="margin-bottom:8px"></div>
-            <div class="table-wrap" style="max-height:280px; overflow:auto; margin-bottom:16px">
-              <table class="table" id="tablaUsdt"></table>
             </div>
             <h3 style="margin:16px 0 8px">A revisar</h3>
             <p class="note" style="margin:0 0 8px">Elegí una etiqueta en la fila para corregirla. Sale de esta lista y queda en el balance que se descarga o se carga.</p>
@@ -131,6 +144,7 @@
       }
       #filtroPopover label { display: flex; gap: 6px; align-items: flex-start; margin: 4px 0; font-size: 13px; }
       .sel-etiqueta { max-width: 280px; width: 100%; background: inherit; color: inherit; border: 1px solid currentColor; border-radius: 4px; padding: 2px 4px; }
+      tr.usdt-dif td { background: rgba(239, 68, 68, 0.16); }
     </style>
   <div id="filtroPopover" style="display:none"></div>
   <script src="app-shared.js?v=AUTO"></script>

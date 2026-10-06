@@ -235,6 +235,27 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
   });
 });
 
+router.post("/generar-usdt", auth, requireConciliador, async (req, res) => {
+  try {
+    const fecha = String(req.body?.fecha || "").trim();
+    if (!fechaValida(fecha)) {
+      return res.status(400).json({ message: "Elegí el día del balance (YYYY-MM-DD)" });
+    }
+    const egresos = await egresosDelDia(fecha);
+    const cierresAyer = await cierresEnFecha("fecha = $1::date - 1", [fecha]);
+    const cierresHoy = egresos.filter((e) => normText(e.etiqueta) === "cierre de caja");
+    const usdt = armarCuadreUsdt({ cierresAyer, movimientos: egresos, cierresHoy });
+    return res.json({
+      fecha,
+      fechaDD: isoAFecha(fecha),
+      usdt,
+    });
+  } catch (e) {
+    console.error("balance/generar-usdt:", e.message);
+    return res.status(500).json({ message: e.message || "No pude armar el balance USDT" });
+  }
+});
+
 router.post("/cargar", auth, requireConciliador, writeLimiter, async (req, res) => {
   try {
     const fecha = String(req.body?.fecha || "").trim();

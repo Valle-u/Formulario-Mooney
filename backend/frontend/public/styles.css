@@ -234,6 +234,7 @@
   display: block;
   margin-top: 6px;
   font-size: 18px;
+  color: #f8f8f8;
 }
 
 .resumen-total-chip.ars strong { color: #7dd3fc; }
@@ -263,12 +264,16 @@
 
 .resumen-dia-item .line-main {
   font-weight: 700;
+  color: var(--text);
 }
 
 .resumen-dia-item .line-meta {
   margin-top: 3px;
   color: var(--muted);
 }
+
+[data-theme="light"] .resumen-total-chip.ars strong { color: #0369a1; }
+[data-theme="light"] .resumen-total-chip.usdt strong { color: #166534; }
 
 .cierre-kpi-summary {
   display: grid;
@@ -929,6 +934,39 @@ label{
 .field input::placeholder,
 .field textarea::placeholder {
   color: #a8a8ac;
+}
+
+/* Motivo del cambio: el recuadro es claro, el texto no puede heredar el blanco del tema oscuro. */
+.edit-motivo {
+  background: #fef3c7;
+  border: 1px solid #b45309;
+  border-left: 4px solid #b45309;
+  padding: 12px;
+  border-radius: 4px;
+}
+.edit-motivo > label {
+  color: #78350f;
+  font-weight: 600;
+}
+.edit-motivo .note {
+  color: #78350f;
+  margin-top: 4px;
+}
+.edit-motivo input,
+.edit-motivo input:hover,
+.edit-motivo input:focus,
+[data-theme="light"] .edit-motivo input,
+[data-theme="light"] .edit-motivo input:hover,
+[data-theme="light"] .edit-motivo input:focus {
+  margin-top: 8px;
+  background: #fffef8;
+  color: #1c1917;
+  border: 1px solid #92400e;
+  box-shadow: none;
+}
+.edit-motivo input::placeholder,
+[data-theme="light"] .edit-motivo input::placeholder {
+  color: #57534e;
 }
 .field select option {
   background-color: var(--card);

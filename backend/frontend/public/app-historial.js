@@ -175,13 +175,17 @@ function renderEgresos(egresos, pagination, sumas){
         <td>${statusBadge}</td>
         <td>${escapeHtml(e.created_by_username)}</td>
         <td>
-          <button class="btn btn-small btn-primary" data-ver-detalle="${escapeHtml(e.id)}">Ver</button>
+          <div class="row-actions" style="flex-wrap:nowrap;">
+            <button class="btn btn-small btn-primary" data-ver-detalle="${escapeHtml(e.id)}">Ver</button>
+            ${puedeEditarEgreso(e) ? `<button type="button" class="btn btn-small btn-ghost" data-editar-egreso="${escapeHtml(e.id)}">Editar</button>` : ""}
+          </div>
         </td>
       </tr>
     `;
   }).join("");
 
   bindVerDetalleButtons(egresos);
+  bindEditarButtons(egresos);
   resaltarEgresoEnLista();
 
   const info = document.getElementById("resultadosInfo");
@@ -210,6 +214,25 @@ function renderEgresos(egresos, pagination, sumas){
     const hasta = Math.min(pagination.offset + pagination.limit, pagination.total);
     paginacionInfo.textContent = `Mostrando ${desde}-${hasta} de ${pagination.total}`;
   }
+}
+
+function puedeEditarEgreso(e) {
+  const user = typeof getUser === "function" ? (getUser() || {}) : {};
+  const isAdminOrDireccion = user.role === "admin" || user.role === "direccion";
+  const isOwner = e.created_by === user.id;
+  return (isAdminOrDireccion || isOwner) && (e.status || "activo") !== "anulado";
+}
+
+function bindEditarButtons(egresos) {
+  document.querySelectorAll("[data-editar-egreso]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.editarEgreso);
+      const egreso = egresos.find((item) => Number(item.id) === id);
+      if (!egreso) return;
+      currentEgreso = egreso;
+      editarEgresoModal();
+    });
+  });
 }
 
 function bindVerDetalleButtons(egresos){
@@ -796,10 +819,10 @@ function editarEgresoModal(){
       </div>
 
       <!-- MOTIVO DEL CAMBIO -->
-      <div class="field span12" style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
-        <label style="color: #92400e; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
-        <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required style="margin-top: 8px;">
-        <div class="note" style="color: #78350f; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
+      <div class="field span12 edit-motivo">
+        <label>MOTIVO DEL CAMBIO *</label>
+        <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required>
+        <div class="note">Obligatorio: Explicá por qué estás modificando este egreso</div>
       </div>
 
       <!-- BOTONES -->

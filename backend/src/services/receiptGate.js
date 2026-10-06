@@ -118,50 +118,64 @@ function cleanPersonName(raw) {
   return cleaned || null;
 }
 
+function nombreDesdeTexto(raw, emisorFold) {
+  let name = cleanPersonName(raw);
+  if (!name) return null;
+  name = name.replace(/\b(CUIT|CBU|CVU|Alias|por)\b.*$/i, "").trim();
+  name = name.replace(/\d[\d.\s]*$/, "").trim();
+  if (!name || name.length < 3) return null;
+  if (emisorFold && fold(name) === emisorFold) return null;
+  return name;
+}
+
 /**
- * GATE v1.1 no tiene `nombre_receptor`; a veces viene en observaciones
- * ("Transferencia de X a Y.") o en campos aditivos futuros.
+ * Nombre del destinatario. GATE no tiene un campo fijo: a veces viene en
+ * observaciones ("Le transferiste a Y", "Receptor: Y") o en campos aditivos.
  */
 export function parseNombreReceptor(extraction) {
   if (!extraction || typeof extraction !== "object") return null;
 
+  const emisorFold = fold(extraction.nombre_emisor);
   const direct =
-    cleanPersonName(extraction.nombre_receptor) ||
-    cleanPersonName(extraction.nombre_beneficiario) ||
-    cleanPersonName(extraction.titular_receptor);
+    nombreDesdeTexto(extraction.nombre_receptor, emisorFold) ||
+    nombreDesdeTexto(extraction.nombre_beneficiario, emisorFold) ||
+    nombreDesdeTexto(extraction.titular_receptor, emisorFold);
   if (direct) return direct;
 
   const obs = String(extraction.observaciones || "").trim();
   if (!obs) return null;
 
-  const emisorFold = fold(extraction.nombre_emisor);
-
   const patterns = [
-    // Formatos típicos del OCR de GATE (varían entre corridas):
-    // "Receptor: Nahuel Esquivel (CUIT: …)"
-    // "Para: Nahuel Esquivel"
-    // "Transferencia de X a Nahuel Esquivel."
-    /\breceptor\s*:\s*([A-ZÁÉÍÓÚÑ][^.(,\n]{1,80})/i,
-    /\bpara\s*:\s*([A-ZÁÉÍÓÚÑ][^.(,\n]{1,80})/i,
-    /\bbeneficiario\s*:\s*([A-ZÁÉÍÓÚÑ][^.(,\n]{1,80})/i,
-    /transferencia\s+de\s+.+?\s+a\s+([A-ZÁÉÍÓÚÑ][^.]+?)(?:\.|$)/i,
-    /\ba\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñü]+){0,4})\b/,
+    /\breceptor\s*:\s*([^.(,\n]{2,80})/i,
+    /\bpara\s*:\s*([^.(,\n]{2,80})/i,
+    /\bbeneficiario\s*:\s*([^.(,\n]{2,80})/i,
+    /\bdestinatario\s*:\s*([^.(,\n]{2,80})/i,
+    /\bdestino\s*:\s*([^.(,\n]{2,80})/i,
+    /le\s+transferiste\s+a\s+([^.(,\n]{2,80})/i,
+    /transferiste\s+a\s+([^.(,\n]{2,80})/i,
+    /transferencia\s+de\s+.+?\s+a\s+([^.]+?)(?:\.|$)/i,
   ];
 
   for (const re of patterns) {
     const m = obs.match(re);
     if (!m?.[1]) continue;
-    let name = cleanPersonName(m[1]);
-    if (!name) continue;
-    // Cortar restos tipo "CUIT …" / "CBU …" si el clean dejó basura pegada
-    name = name.replace(/\b(CUIT|CBU|CVU|Alias)\b.*$/i, "").trim();
-    if (!name) continue;
-    if (emisorFold && fold(name) === emisorFold) continue;
-    if (name.length < 3) continue;
-    return name;
+    const name = nombreDesdeTexto(m[1], emisorFold);
+    if (name) return name;
   }
 
   return null;
+}
+
+/** CBU/CVU o alias que GATE ya extrajo como cuenta de destino. */
+export function parseCuentaDestino(raw) {
+  if (!raw) return null;
+  const collapsed = String(raw).replace(/\s+/g, " ").trim();
+  if (!collapsed || collapsed.length < 3) return null;
+  if (/^[\d\s.]{6,}$/.test(collapsed)) {
+    const digits = collapsed.replace(/\D/g, "");
+    return digits.length >= 6 ? digits : null;
+  }
+  return collapsed;
 }
 
 /**
@@ -193,7 +207,11 @@ export function mapExtractionToEgresoFields(extraction, empresasActivas = EMPRES
   const cuentaSalida = cleanPersonName(extraction.nombre_emisor);
   if (cuentaSalida) fields.cuenta_salida = cuentaSalida;
 
-  const cuentaReceptora = parseNombreReceptor(extraction);
+  const nombreReceptor = parseNombreReceptor(extraction);
+  const cuentaDestino = parseCuentaDestino(extraction.cuenta_receptora);
+  const cuentaReceptora = nombreReceptor || (
+    cuentaDestino && fold(cuentaDestino) !== fold(cuentaSalida) ? cuentaDestino : null
+  );
   if (cuentaReceptora) fields.cuenta_receptora = cuentaReceptora;
 
   const empresa = matchEmpresaSalida(extraction.entidad_emisora, empresasActivas);

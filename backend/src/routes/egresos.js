@@ -1294,7 +1294,6 @@ router.get("/cierres/resumen-dia", auth, async (req, res) => {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
     } else {
-      // Default operativo: Dona (cierre de fin de dia). Fallback al primer usuario activo.
       const donaResult = await query(
         "SELECT id, username, full_name, role FROM users WHERE LOWER(username) = 'dona' LIMIT 1"
       );
@@ -1328,7 +1327,7 @@ router.get("/cierres/resumen-dia", auth, async (req, res) => {
        FROM egresos e
        LEFT JOIN users u ON u.id = e.created_by
        WHERE e.etiqueta = 'Cierre de Caja'
-         AND e.status <> 'anulado'
+         AND e.status IS DISTINCT FROM 'anulado'
          AND e.fecha = $1::date
          AND e.created_by = $2
        ORDER BY e.created_at ASC, e.id ASC`,
