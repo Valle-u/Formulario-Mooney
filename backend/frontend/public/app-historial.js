@@ -175,13 +175,17 @@ function renderEgresos(egresos, pagination, sumas){
         <td>${statusBadge}</td>
         <td>${escapeHtml(e.created_by_username)}</td>
         <td>
-          <button class="btn btn-small btn-primary" data-ver-detalle="${escapeHtml(e.id)}">Ver</button>
+          <div class="row-actions" style="flex-wrap:nowrap;">
+            <button class="btn btn-small btn-primary" data-ver-detalle="${escapeHtml(e.id)}">Ver</button>
+            ${puedeEditarEgreso(e) ? `<button type="button" class="btn btn-small btn-ghost" data-editar-egreso="${escapeHtml(e.id)}">Editar</button>` : ""}
+          </div>
         </td>
       </tr>
     `;
   }).join("");
 
   bindVerDetalleButtons(egresos);
+  bindEditarButtons(egresos);
   resaltarEgresoEnLista();
 
   const info = document.getElementById("resultadosInfo");
@@ -210,6 +214,25 @@ function renderEgresos(egresos, pagination, sumas){
     const hasta = Math.min(pagination.offset + pagination.limit, pagination.total);
     paginacionInfo.textContent = `Mostrando ${desde}-${hasta} de ${pagination.total}`;
   }
+}
+
+function puedeEditarEgreso(e) {
+  const user = typeof getUser === "function" ? (getUser() || {}) : {};
+  const isAdminOrDireccion = user.role === "admin" || user.role === "direccion";
+  const isOwner = e.created_by === user.id;
+  return (isAdminOrDireccion || isOwner) && (e.status || "activo") !== "anulado";
+}
+
+function bindEditarButtons(egresos) {
+  document.querySelectorAll("[data-editar-egreso]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.editarEgreso);
+      const egreso = egresos.find((item) => Number(item.id) === id);
+      if (!egreso) return;
+      currentEgreso = egreso;
+      editarEgresoModal();
+    });
+  });
 }
 
 function bindVerDetalleButtons(egresos){
