@@ -796,10 +796,10 @@ function editarEgresoModal(){
       </div>
 
       <!-- MOTIVO DEL CAMBIO -->
-      <div class="field span12" style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
-        <label style="color: #92400e; font-weight: 600;">MOTIVO DEL CAMBIO *</label>
-        <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required style="margin-top: 8px;">
-        <div class="note" style="color: #78350f; margin-top: 4px;">Obligatorio: Explicá por qué estás modificando este egreso</div>
+      <div class="field span12 edit-motivo">
+        <label>MOTIVO DEL CAMBIO *</label>
+        <input type="text" id="edit_motivo" placeholder="Ej: Corrección de monto erróneo" required>
+        <div class="note">Obligatorio: Explicá por qué estás modificando este egreso</div>
       </div>
 
       <!-- BOTONES -->
