@@ -29,6 +29,7 @@ import {
   findEgresoByTransferIds,
   findEgresoByComprobanteSha256,
   formatDuplicateMessage,
+  isTruncatedTransferId,
 } from "../utils/egresoDuplicates.js";
 
 // Almacenamiento de comprobantes
@@ -487,8 +488,17 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
       return res.status(400).json({ message: "usuario_casino es obligatorio para ese concepto" });
     }
 
+    const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
+    if (!["USD", "ARS", "USDT"].includes(monedaNorm)) {
+      return res.status(400).json({ message: "Moneda inválida. Debe ser USD, ARS o USDT" });
+    }
+
     // Normalizar id_transferencia: null explícito = sin ID (checkbox "Sin ID")
-    const idTrim = id_transferencia === null ? null : String(id_transferencia || "").trim() || null;
+    // USDT no trae un hash usable: el recorte de la billetera no se guarda ni se compara.
+    let idTrim = id_transferencia === null ? null : String(id_transferencia || "").trim() || null;
+    if ((monedaNorm === "USDT" || monedaNorm === "USD") && idTrim && isTruncatedTransferId(idTrim)) {
+      idTrim = null;
+    }
 
     // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
     if (!esCierreCaja) {
@@ -497,6 +507,12 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
       // id_transferencia puede ser null (checkbox "Sin ID") o un valor alfanumérico válido
       if (idTrim !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTrim)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido: solo letras, números, guiones y guiones bajos" });
+      }
+
+      if (idTrim && isTruncatedTransferId(idTrim)) {
+        return res.status(400).json({
+          message: "El ID está cortado y no identifica la transferencia. Pegá el hash completo o marcá Sin ID.",
+        });
       }
 
       // Bloquear ID ya usado en cualquier empresa (no solo la misma)
@@ -518,12 +534,6 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
 
     if (requireNonEmpty(empresa_cuenta_salida, "empresa_cuenta_salida")) return res.status(400).json({ message: "empresa_cuenta_salida es obligatoria" });
     if (!(await isValidEmpresa(empresa_cuenta_salida))) return res.status(400).json({ message: "empresa_salida inválida" });
-
-    // Validar moneda primero (antes de validar monto mínimo)
-    const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
-    if (!["USD", "ARS", "USDT"].includes(monedaNorm)) {
-      return res.status(400).json({ message: "Moneda inválida. Debe ser USD, ARS o USDT" });
-    }
 
     // Validar tipo_transaccion
     const tipoTransaccion = String(tipo_transaccion || "SALIDA").trim().toUpperCase();
@@ -2272,13 +2282,16 @@ router.put("/:id", auth, writeLimiter, async (req, res) => {
     }
 
     // id_transferencia puede ser null explícito (checkbox "Sin ID")
-    const idTransferenciaNorm = esCierreCajaFinal
+    let idTransferenciaNorm = esCierreCajaFinal
       ? null
       : (
           sendsIdTransferencia
             ? (id_transferencia === null ? null : normText(id_transferencia))
             : normText(oldEgreso.id_transferencia)
         );
+    if ((monedaFinal === "USDT" || monedaFinal === "USD") && idTransferenciaNorm && isTruncatedTransferId(idTransferenciaNorm)) {
+      idTransferenciaNorm = null;
+    }
 
     const cuentaReceptoraNorm = esCierreCajaFinal
       ? null
@@ -2361,6 +2374,19 @@ router.put("/:id", auth, writeLimiter, async (req, res) => {
     if (!esCierreCajaFinal) {
       if (idTransferenciaNorm !== null && !/^[a-zA-Z0-9\-_]+$/.test(idTransferenciaNorm)) {
         return res.status(400).json({ message: "ID TRANSFERENCIA inválido" });
+      }
+
+      if (
+        monedaFinal !== "USDT" &&
+        monedaFinal !== "USD" &&
+        sendsIdTransferencia &&
+        idTransferenciaNorm &&
+        isTruncatedTransferId(idTransferenciaNorm) &&
+        idTransferenciaNorm !== normText(oldEgreso.id_transferencia)
+      ) {
+        return res.status(400).json({
+          message: "El ID está cortado y no identifica la transferencia. Pegá el hash completo o marcá Sin ID.",
+        });
       }
 
       if ((sendsEtiqueta || sendsCuentaReceptora) && !cuentaReceptoraNorm) {

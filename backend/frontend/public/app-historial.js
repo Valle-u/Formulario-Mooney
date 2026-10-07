@@ -964,14 +964,19 @@ function editarEgresoModal(){
       const monedaRaw = document.getElementById('edit_moneda').value;
       const monedaEdit = ['ARS', 'USD', 'USDT'].includes(monedaRaw) ? monedaRaw : 'ARS';
       const sinIdEdit = document.getElementById('edit_sin_id_transferencia')?.checked ?? false;
-      const idTransferenciaEdit = sinIdEdit ? null : (document.getElementById('edit_id_transferencia')?.value?.trim() || null);
+      const idIngresadoEdit = document.getElementById('edit_id_transferencia')?.value?.trim() || "";
+      const idCortadoEdit = /…|\.{2,}/.test(idIngresadoEdit) || (/^0x[0-9a-f]+$/i.test(idIngresadoEdit) && !/^0x[0-9a-f]{64}$/i.test(idIngresadoEdit));
+      const idOpcionalEdit = monedaEdit === "USDT" || monedaEdit === "USD";
+      const idTransferenciaEdit = (sinIdEdit || (idOpcionalEdit && (!idIngresadoEdit || idCortadoEdit)))
+        ? null
+        : (idIngresadoEdit || null);
       const cuentaReceptoraEdit = document.getElementById('edit_cuenta_receptora')?.value?.trim() || null;
 
       if(!esCierreCajaEdit && !cuentaReceptoraEdit){
         toast("Faltan datos", "Completa CUENTA RECEPTORA", "warning");
         return;
       }
-      if(!esCierreCajaEdit && !sinIdEdit && !idTransferenciaEdit){
+      if(!esCierreCajaEdit && monedaEdit !== "USDT" && monedaEdit !== "USD" && !sinIdEdit && !idTransferenciaEdit){
         toast("Faltan datos", "Completa ID TRANSFERENCIA o marca 'Sin ID de transferencia'", "warning");
         return;
       }
