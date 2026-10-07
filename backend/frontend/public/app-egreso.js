@@ -120,6 +120,8 @@ function toggleCamposPremio(){
       }
     }
   }
+
+  syncIdTransferenciaRequerido();
 }
 
 function fileLabel(){
@@ -158,6 +160,50 @@ function setInputValue(id, value) {
   return true;
 }
 
+function idTransferenciaIncompleto(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/…|\.{2,}/.test(text)) return true;
+  const cleaned = text.replace(/[^a-zA-Z0-9\-_]/g, "");
+  return /^0x[0-9a-f]+$/i.test(cleaned) && !/^0x[0-9a-f]{64}$/i.test(cleaned);
+}
+
+function monedaDelFormulario() {
+  const sel = IS_USD_PAGE
+    ? document.getElementById("moneda_usd_page")
+    : document.getElementById("moneda");
+  return String(sel?.value || (IS_USD_PAGE ? "USDT" : "ARS")).trim().toUpperCase();
+}
+
+function movimientoEsUsdt() {
+  return monedaDelFormulario() === "USDT";
+}
+
+function idNoEsObligatorio() {
+  const moneda = monedaDelFormulario();
+  return moneda === "USDT" || moneda === "USD";
+}
+
+function syncIdTransferenciaRequerido() {
+  const input = document.getElementById("id_transferencia");
+  const sinId = document.getElementById("sin_id_transferencia");
+  if (!input || sinId?.checked) return;
+  const etiqueta = document.getElementById("etiqueta")?.value || "";
+  const cierre = typeof getEtiquetaFlags === "function" && getEtiquetaFlags(etiqueta).cierre_caja;
+  if (cierre || idNoEsObligatorio()) input.removeAttribute("required");
+  else input.setAttribute("required", "required");
+}
+
+function marcarSinIdPorHashCortado() {
+  const sinId = document.getElementById("sin_id_transferencia");
+  const input = document.getElementById("id_transferencia");
+  if (input) input.value = "";
+  if (sinId && !sinId.checked) {
+    sinId.checked = true;
+    sinId.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
 function applyGateFields(fields) {
   if (!fields || typeof fields !== "object") return [];
   const applied = [];
@@ -169,7 +215,7 @@ function applyGateFields(fields) {
     autoCalcularTurno();
   }
 
-  if (fields.id_transferencia) {
+  if (fields.id_transferencia && !movimientoEsUsdt()) {
     const sinId = document.getElementById("sin_id_transferencia");
     if (sinId?.checked) {
       sinId.checked = false;
@@ -239,6 +285,15 @@ async function autocompletarDesdeComprobante(file) {
     if (mySeq !== gateScanSeq) return;
 
     const applied = applyGateFields(data?.fields || {});
+    if (data?.id_incompleto && !data?.fields?.id_transferencia && !idNoEsObligatorio()) {
+      marcarSinIdPorHashCortado();
+      toast(
+        "Hash incompleto",
+        "La captura muestra el ID cortado, así que no se usó. Quedó marcado Sin ID. Si tenés el hash completo, destildá y pegalo.",
+        "warning",
+        10000
+      );
+    }
     if (applied.length) {
       toast(
         "Autocompletado",
@@ -395,12 +450,7 @@ function wireSinIdTransferencia(){
     } else {
       input.disabled = false;
       input.style.opacity = "1";
-      // Restaurar required solo si no es ENTRADA ni Cierre de Caja
-      const etiqueta = document.getElementById("etiqueta")?.value || "";
-      const tipo = document.getElementById("tipo_transaccion")?.value || "";
-      if(!getEtiquetaFlags(etiqueta).cierre_caja && tipo !== "ENTRADA"){
-        input.setAttribute("required", "required");
-      }
+      syncIdTransferenciaRequerido();
     }
   });
 }
@@ -725,6 +775,24 @@ async function checkIdTransferenciaDuplicado() {
   const idValue = idInput.value.trim();
   const empresaValue = empresaInput.value;
 
+  if (idNoEsObligatorio() && (!idValue || idTransferenciaIncompleto(idValue))) {
+    if (feedbackDiv) {
+      feedbackDiv.textContent = "";
+      feedbackDiv.className = "";
+    }
+    idInput.style.borderColor = "";
+    return;
+  }
+
+  if (idTransferenciaIncompleto(idValue)) {
+    if (feedbackDiv) {
+      feedbackDiv.className = "validation-error";
+      feedbackDiv.textContent = "Este ID está cortado y no identifica la transferencia. Pegá el hash completo o marcá Sin ID.";
+    }
+    idInput.style.borderColor = "#dc3545";
+    return;
+  }
+
   // Limpiar feedback
   if (feedbackDiv) {
     feedbackDiv.textContent = "";
@@ -973,8 +1041,8 @@ function validarCampo(campo){
       return true;
 
     case 'id_transferencia':
-      // Si el checkbox "Sin ID" está marcado, siempre válido
-      if(document.getElementById("sin_id_transferencia")?.checked){
+      // USD y USDT pueden ir sin ID. El checkbox "Sin ID" también lo deja vacío.
+      if(idNoEsObligatorio() || document.getElementById("sin_id_transferencia")?.checked){
         mostrarExito(campo);
         return true;
       }
@@ -1200,9 +1268,12 @@ async function handleEgresoSubmit(e){
       usuario_casino: document.getElementById("usuario_casino").value.trim(),
       cuenta_salida: document.getElementById("cuenta_salida").value.trim(),
       empresa_cuenta_salida: document.getElementById("empresa_salida").value,
-      id_transferencia: document.getElementById("sin_id_transferencia")?.checked
-        ? null
-        : document.getElementById("id_transferencia").value.trim(),
+      id_transferencia: (() => {
+        if (document.getElementById("sin_id_transferencia")?.checked) return null;
+        const id = document.getElementById("id_transferencia").value.trim();
+        if (idNoEsObligatorio() && (!id || idTransferenciaIncompleto(id))) return null;
+        return id;
+      })(),
       etiqueta: etiquetaActual,
       otro_concepto: document.getElementById("otro_concepto").value.trim(),
       notas: document.getElementById("notas").value.trim()
@@ -1243,13 +1314,17 @@ async function handleEgresoSubmit(e){
 
     // Para cierre de caja, cuenta_receptora e id_transferencia NO son obligatorios
     const sinIdChecked = document.getElementById("sin_id_transferencia")?.checked;
+    const idLibre = sinIdChecked || idNoEsObligatorio();
     if(!esCierreCaja) {
       if(!payload.cuenta_receptora) throw new Error("Completá CUENTA RECEPTORA.");
-      if(!sinIdChecked) {
+      if(!idLibre) {
         if(!payload.id_transferencia) throw new Error("Completá ID TRANSFERENCIA.");
-        if(!/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
-          throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
+        if(idTransferenciaIncompleto(payload.id_transferencia)) {
+          throw new Error("El ID está cortado y no identifica la transferencia. Pegá el hash completo o marcá Sin ID.");
         }
+      }
+      if(payload.id_transferencia && !/^[a-zA-Z0-9\-_]+$/.test(payload.id_transferencia)) {
+        throw new Error("ID TRANSFERENCIA: solo letras, números, guiones y guiones bajos.");
       }
     }
 
@@ -1614,6 +1689,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (tipoSelect) {
       tipoSelect.addEventListener('change', handleTipoTransaccionChange);
     }
+    document.getElementById("moneda_usd_page")?.addEventListener("change", () => {
+      syncIdTransferenciaRequerido();
+      const idInput = document.getElementById("id_transferencia");
+      const feedbackDiv = document.getElementById("id_transferencia_feedback");
+      if (idNoEsObligatorio() && idInput && idTransferenciaIncompleto(idInput.value)) {
+        idInput.value = "";
+        idInput.style.borderColor = "";
+        if (feedbackDiv) {
+          feedbackDiv.textContent = "";
+          feedbackDiv.className = "";
+        }
+      }
+    });
+    syncIdTransferenciaRequerido();
   }
 
   const inputComprobante = document.getElementById("comprobante");

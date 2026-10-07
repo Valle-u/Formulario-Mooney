@@ -106,7 +106,7 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
       }
 
       const empresas = await getActiveEmpresas();
-      const { fields, filled } = mapExtractionToEgresoFields(gate?.extraction, empresas);
+      const { fields, filled, id_incompleto } = mapExtractionToEgresoFields(gate?.extraction, empresas);
       const candidateIds = [
         ...(fields._ids_candidato || []),
         fields.id_transferencia,
@@ -143,6 +143,7 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
         forensic_status: gate?.forensic_status || null,
         fields,
         filled,
+        id_incompleto: Boolean(id_incompleto),
         warning,
         block: Boolean(warning?.block),
         comprobante_sha256: fileSha,

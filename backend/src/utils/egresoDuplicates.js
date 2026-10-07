@@ -13,6 +13,18 @@ export function looksLikeUuid(value) {
 }
 
 /**
+ * Hash de billetera mostrado cortado (0x7d...7bba) o dirección 0x que no es
+ * el hash completo de 64 hex. No identifica una transferencia.
+ */
+export function isTruncatedTransferId(raw) {
+  if (raw == null || String(raw).trim() === "") return false;
+  const text = String(raw).trim();
+  if (/…|\.{2,}/.test(text)) return true;
+  const cleaned = text.replace(/[^a-zA-Z0-9\-_]/g, "");
+  return /^0x[0-9a-f]+$/i.test(cleaned) && !/^0x[0-9a-f]{64}$/i.test(cleaned);
+}
+
+/**
  * Busca egreso activo que ya use alguno de estos IDs (cualquier empresa).
  * @param {string[]} ids
  */

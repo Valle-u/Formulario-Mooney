@@ -6,7 +6,7 @@
 
 import crypto from "crypto";
 import { EMPRESAS_SALIDA } from "../utils/validators.js";
-import { looksLikeUuid } from "../utils/egresoDuplicates.js";
+import { isTruncatedTransferId, looksLikeUuid } from "../utils/egresoDuplicates.js";
 
 const DEFAULT_TIMEOUT_MS = 90_000;
 
@@ -104,7 +104,7 @@ export function formatMontoARS(monto) {
 }
 
 export function sanitizeIdTransferencia(raw) {
-  if (!raw) return null;
+  if (!raw || isTruncatedTransferId(raw)) return null;
   const cleaned = String(raw).replace(/[^a-zA-Z0-9\-_]/g, "");
   return cleaned || null;
 }
@@ -201,8 +201,9 @@ export function mapExtractionToEgresoFields(extraction, empresasActivas = EMPRES
   const coelsa = sanitizeIdTransferencia(extraction.coelsa_id);
   const id = (codigo && looksLikeUuid(codigo) && coelsa) ? coelsa : (codigo || coelsa);
   if (id) fields.id_transferencia = id;
-  // Exponer ambos para chequeo de duplicados en la ruta
+  // Exponer ambos para chequeo de duplicados en la ruta. El recorte no entra.
   fields._ids_candidato = [codigo, coelsa].filter(Boolean);
+  const idIncompleto = !id && [extraction.codigo_operacion, extraction.coelsa_id].some(isTruncatedTransferId);
 
   const cuentaSalida = cleanPersonName(extraction.nombre_emisor);
   if (cuentaSalida) fields.cuenta_salida = cuentaSalida;
@@ -218,7 +219,7 @@ export function mapExtractionToEgresoFields(extraction, empresasActivas = EMPRES
   if (empresa) fields.empresa_salida = empresa;
 
   const filled = Object.keys(fields).filter((k) => !k.startsWith("_"));
-  return { fields, filled };
+  return { fields, filled, id_incompleto: idIncompleto };
 }
 
 /** subject_id único por intento: el dedup de GATE es por subject+sha256 (chat). */
