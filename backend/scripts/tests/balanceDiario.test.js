@@ -9,6 +9,11 @@ import {
   egresosDesdeCsv,
   armarCuadreUsdt,
   filaInicioCarga,
+  fechaIsoDeRegistro,
+  listarDias,
+  normalizarPlanilla,
+  registrosDelDia,
+  parseMonto,
   OUTPUT_COLUMNS,
 } from "../../src/services/balanceDiario.js";
 
@@ -221,4 +226,117 @@ test("USDT marca discrepancia si el cierre de hoy no coincide", () => {
   assert.equal(r.cuentas[0].saldo_calculado, 6);
   assert.equal(r.cuentas[0].diferencia, 4);
   assert.equal(r.hay_discrepancia, true);
+});
+
+test("el rango parte el CSV por día y cada día usa su planilla", () => {
+  const rango = listarDias("2026-10-01", "2026-10-09");
+  assert.equal(rango.ok, true);
+  assert.equal(rango.dias.length, 9);
+  assert.equal(rango.dias[0], "2026-10-01");
+  assert.equal(rango.dias[8], "2026-10-09");
+  assert.equal(listarDias("2026-10-09", "2026-10-01").ok, false);
+  assert.equal(listarDias("2026-01-01", "2026-03-01").ok, false);
+
+  const registros = [
+    { banco: "HG.Cash", id: "1", id_interno: "", fecha_hora: "01/10/2026 10:00:00", direccion: "entrante", titular: "Ana", titular_cuenta: "Cuenta", importe: "100", es_rechazada: false, es_iva: false },
+    { banco: "HG.Cash", id: "2", id_interno: "", fecha_hora: "02/10/2026 11:00:00", direccion: "entrante", titular: "Ana", titular_cuenta: "Cuenta", importe: "100", es_rechazada: false, es_iva: false },
+  ];
+  assert.equal(fechaIsoDeRegistro(registros[0]), "2026-10-01");
+  assert.equal(registrosDelDia(registros, "2026-10-01").length, 1);
+
+  const planillaDia1 = [
+    [],
+    ["", "Nombre de cliente"],
+    ["", "Ana", "100", "10:00"],
+  ];
+  const dia1 = transformar({
+    registros: registrosDelDia(registros, "2026-10-01"),
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: planillaDia1,
+    planillaFecha: "2026-10-01",
+  });
+  const dia2 = transformar({
+    registros: registrosDelDia(registros, "2026-10-02"),
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: [[], ["", "Nombre de cliente"]],
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(dia1.salida.length, 1);
+  assert.equal(dia1.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(dia1.salida[0].FECHA, "01/10/2026");
+  assert.equal(dia1.revisar.length, 0);
+  assert.equal(dia2.salida.length, 1);
+  assert.equal(dia2.salida[0].FECHA, "02/10/2026");
+  assert.equal(dia2.revisar.length, 1);
+});
+
+test("la planilla lee 2000 como dos mil pesos y la hora como HH:MM", () => {
+  const hora2001 = 1201 / 1440;
+  const hora2102 = 1262 / 1440;
+  const filas = normalizarPlanilla([
+    [],
+    ["", "Nombre de cliente", "Monto", "Hora"],
+    ["", "Santiago Nahuel Fernandez", 2000, hora2001],
+    ["", "PARMA JAVIER ALE", 7000, hora2102],
+  ]);
+  assert.equal(filas[2][2], "2000");
+  assert.equal(filas[2][3], "20:01");
+  assert.equal(filas[3][2], "7000");
+  assert.equal(filas[3][3], "21:02");
+  assert.equal(parseMonto(filas[2][2]), 200000);
+  assert.equal(parseMonto(filas[3][2]), 700000);
+
+  const santiago = transformar({
+    registros: [{
+      banco: "HG.Cash", id: "1", id_interno: "", fecha_hora: "02/10/2026 20:00:32",
+      direccion: "entrante", titular: "Santiago Nahuel Fernandez", titular_cuenta: "Cuenta",
+      importe: "2000", es_rechazada: false, es_iva: false,
+    }],
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: filas,
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(santiago.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(santiago.revisar.length, 0);
+});
+
+test("una hora mal cargada en la planilla no impide el deposito", () => {
+  const planilla = [
+    [],
+    ["", "Nombre de cliente"],
+    ["", "PARMA JAVIER ALE", "7000", "21:02"],
+    ["", "Santiago Nahuel Fernandez", "2000", "10:00"],
+    ["", "Santiago Nahuel Fernandez", "2000", "20:05"],
+  ];
+  const parma = transformar({
+    registros: [{
+      banco: "HG.Cash", id: "p", id_interno: "", fecha_hora: "02/10/2026 20:01:59",
+      direccion: "entrante", titular: "PARMA JAVIER ALE", titular_cuenta: "Cuenta",
+      importe: "7000", es_rechazada: false, es_iva: false,
+    }],
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: planilla,
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(parma.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(parma.revisar.length, 0);
+
+  const santiago = transformar({
+    registros: [{
+      banco: "HG.Cash", id: "s", id_interno: "", fecha_hora: "02/10/2026 20:00:32",
+      direccion: "entrante", titular: "Santiago Nahuel Fernandez", titular_cuenta: "Cuenta",
+      importe: "2000", es_rechazada: false, es_iva: false,
+    }],
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: planilla,
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(santiago.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(santiago.cuadre.planilla_consumidas, 1);
+  assert.equal(santiago.cuadre.planilla_sin_match, 2);
 });

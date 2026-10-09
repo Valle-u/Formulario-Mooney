@@ -353,9 +353,44 @@ export function filaBalance(banco, idv, fecha, titularCuenta, tipoOut, titular, 
 }
 
 function parseHoraPlanilla(s) {
-  const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (!m) return null;
   return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function montoPlano(v) {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    if (Number.isInteger(v)) return String(v);
+    const red = Math.round(v * 100) / 100;
+    return String(red);
+  }
+  return v == null ? "" : String(v).trim();
+}
+
+function horaPlana(v) {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const frac = ((v % 1) + 1) % 1;
+    const total = Math.round(frac * 24 * 60);
+    const mins = ((total % 1440) + 1440) % 1440;
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  }
+  const s = v == null ? "" : String(v).trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return s;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+
+/** La planilla guarda 2000; el formato de la hoja lo muestra como $2.000. Se lee el número. */
+export function normalizarPlanilla(filas) {
+  return (filas || []).map((row, index) => {
+    const celdas = (row || []).map((c) => (c == null ? "" : c));
+    if (index < 2) return celdas.map((c) => String(c));
+    if (celdas.length > 2) celdas[2] = montoPlano(celdas[2]);
+    if (celdas.length > 3) celdas[3] = horaPlana(celdas[3]);
+    return celdas.map((c) => (typeof c === "number" ? String(c) : String(c)));
+  });
 }
 
 function fechaMinutosBanco(fechaHora) {
@@ -422,15 +457,17 @@ function matchDeposito(cargas, nombre, monto, fechaHoraBanco) {
 
   const mejorCandidato = (lista) => {
     const candidatos = lista.filter((e) => !e.consumida && !e.es_discrepancia && montosCercanos(e.monto, monto));
-    const conHora = candidatos.filter((e) => distHora(e.hora_min) != null);
-    const enTolerancia = conHora.filter((e) => horasCercanas(e.hora_min, bkMin));
-    const sinHora = candidatos.filter((e) => distHora(e.hora_min) == null);
-    const elegibles = enTolerancia.length ? enTolerancia : sinHora;
+    if (!candidatos.length) return null;
+    // La hora de la planilla la carga un empleado y puede estar mal. No descarta
+    // un depósito con el mismo nombre e importe. Si hay varios, se prefiere el
+    // que cae dentro de la ventana y, si ninguno cae, el de hora más cercana.
+    const enTolerancia = candidatos.filter((e) => horasCercanas(e.hora_min, bkMin));
+    const elegibles = enTolerancia.length ? enTolerancia : candidatos;
     let mejor = null;
     let mejorKey = null;
     for (const e of elegibles) {
       const dist = distHora(e.hora_min);
-      const key = [Math.abs(e.monto - monto), dist == null ? 0 : dist];
+      const key = [Math.abs(e.monto - monto), dist == null ? 10000 : dist];
       if (!mejor || key[0] < mejorKey[0] || (key[0] === mejorKey[0] && key[1] < mejorKey[1])) {
         mejor = e;
         mejorKey = key;
@@ -638,7 +675,67 @@ export function claveMovimiento(row) {
  * @param {string[][]} planillaFilas matriz de la pestaña del día (con encabezados)
  * @param {string} planillaFecha YYYY-MM-DD
  */
-export function transformar({ bancos, egresos, planillaFilas, planillaFecha, rivenTitular }) {
+export function fechaIsoDeRegistro(reg) {
+  const fh = fmtFecha(reg?.fecha_hora);
+  const m = fh.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return "";
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+export function diaSiguiente(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+export function listarDias(desde, hasta) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || desde > hasta) {
+    return { ok: false, message: "Elegí un rango válido: desde no puede ser posterior a hasta" };
+  }
+  const dias = [];
+  let cur = desde;
+  while (cur && cur <= hasta) {
+    dias.push(cur);
+    if (dias.length > 31) return { ok: false, message: "El rango máximo es 31 días" };
+    cur = diaSiguiente(cur);
+  }
+  return { ok: true, dias };
+}
+
+export function registrosDelDia(registros, fechaISO) {
+  return (registros || []).filter((r) => fechaIsoDeRegistro(r) === fechaISO);
+}
+
+export function sumarCuadres(cuadres) {
+  const base = {
+    planilla_total_pesos: 0,
+    planilla_sin_marcadores_pesos: 0,
+    planilla_filas: 0,
+    planilla_consumidas: 0,
+    planilla_sin_match: 0,
+    marcadores_20k: 0,
+    marcadores_20k_pesos: 0,
+    marcadores_pendientes: 0,
+    banco_deposito_pesos: 0,
+    banco_deposito_filas: 0,
+    banco_discrepancia_pesos: 0,
+    banco_discrepancia_filas: 0,
+    banco_depositos_pesos: 0,
+    diferencia_pesos: 0,
+    entrantes_sin_etiqueta_pesos: 0,
+  };
+  for (const c of cuadres || []) {
+    for (const k of Object.keys(base)) base[k] += Number(c[k]) || 0;
+  }
+  const red = (n) => Math.round(n * 100) / 100;
+  for (const k of Object.keys(base)) base[k] = Number.isInteger(base[k]) ? base[k] : red(base[k]);
+  base.diferencia_pesos = red(base.planilla_sin_marcadores_pesos - base.banco_depositos_pesos);
+  return base;
+}
+
+export function transformar({ bancos, egresos, planillaFilas, planillaFecha, rivenTitular, registros, bancosPresentes: bancosForzados }) {
   const cargas = cargarPlanillaFilas(planillaFilas || [], planillaFecha);
   const { salidas, porBancoMonto, porId, todas } = indexarEgresos(egresos || []);
 
@@ -646,17 +743,22 @@ export function transformar({ bancos, egresos, planillaFilas, planillaFecha, riv
   const todosRegistros = [];
   const resumenFormatos = [];
 
-  for (const archivo of bancos || []) {
-    const leido = leerBancoTexto(archivo.texto, archivo.nombre, { rivenTitular });
-    resumenFormatos.push({
-      archivo: archivo.nombre,
-      formato: leido.fmt,
-      banco: leido.banco,
-      filas: leido.registros.length,
-    });
-    for (const reg of leido.registros) {
-      bancosPresentes.add(normText(reg.banco));
-      todosRegistros.push(reg);
+  if (Array.isArray(registros)) {
+    for (const b of bancosForzados || []) bancosPresentes.add(normText(b));
+    for (const reg of registros) todosRegistros.push(reg);
+  } else {
+    for (const archivo of bancos || []) {
+      const leido = leerBancoTexto(archivo.texto, archivo.nombre, { rivenTitular });
+      resumenFormatos.push({
+        archivo: archivo.nombre,
+        formato: leido.fmt,
+        banco: leido.banco,
+        filas: leido.registros.length,
+      });
+      for (const reg of leido.registros) {
+        bancosPresentes.add(normText(reg.banco));
+        todosRegistros.push(reg);
+      }
     }
   }
 

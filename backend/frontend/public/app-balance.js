@@ -356,18 +356,26 @@ function pintarResultado(data) {
   const c = data.cuadre || {};
   const eg = data.egresosFormulario || { total: 0, hg: 0, porEmpresa: [] };
   const empresas = (eg.porEmpresa || []).map((x) => `${x.empresa}: ${x.cantidad}`).join(", ") || "ninguno";
-  document.getElementById("cuadre").textContent =
-    `Cuadre planilla (pestaña ${data.planilla?.tab || "?"}): ${c.planilla_filas ?? 0} filas, ` +
-    `$${peso(c.planilla_sin_marcadores_pesos)} sin marcadores. ` +
+  const rango = data.desde && data.hasta && data.desde !== data.hasta;
+  const diasTxt = (data.porDia || []).map((d) =>
+    `${d.fechaDD} (pestaña ${d.tab || "?"}): planilla ${d.cuadre?.planilla_filas ?? 0}, ` +
+    `depósitos ${d.cuadre?.banco_deposito_filas ?? 0} ($${peso(d.cuadre?.banco_deposito_pesos)}), ` +
+    `diferencia $${peso(d.cuadre?.diferencia_pesos)}, a revisar ${d.revisar ?? 0}`
+  );
+  const totalTxt =
+    `${rango ? "Total del rango" : `Cuadre planilla (pestaña ${data.planilla?.tab || "?"})`}: ` +
+    `${c.planilla_filas ?? 0} filas, $${peso(c.planilla_sin_marcadores_pesos)} sin marcadores. ` +
     `Depósitos etiquetados: ${c.banco_deposito_filas ?? 0} ($${peso(c.banco_deposito_pesos)}). ` +
     `Diferencia: $${peso(c.diferencia_pesos)}. ` +
     `A revisar: ${(data.revisar || []).length}. ` +
-    `Egresos del formulario ese día (sin cierre de caja): ${eg.total}. HG.Cash: ${eg.hg}. ${empresas}.`;
+    `Egresos del formulario en el rango (sin cierre de caja): ${eg.total}. HG.Cash: ${eg.hg}. ${empresas}.`;
+  const lineas = rango ? [...diasTxt, totalTxt] : [totalTxt];
+  document.getElementById("cuadre").innerHTML = lineas.map((t) => `<div>${escapeHtml(t)}</div>`).join("");
 
   pintarChips();
   pintarTablas();
 
-  const fecha = data.fechaDD || data.fecha;
+  const fecha = data.desde && data.hasta ? `${data.desde}_${data.hasta}` : (data.fechaDD || data.fecha);
   const cols = data.columnas || [];
   document.getElementById("btnDescBalance").onclick = () =>
     descargarCsv(`balance_${fecha}.csv`, cols, data.filas || []);
@@ -375,24 +383,33 @@ function pintarResultado(data) {
     descargarCsv(`revisar_${fecha}.csv`, cols.concat(["Motivo"]), data.revisar || []);
 }
 
+function rangoElegido() {
+  const desde = document.getElementById("desde").value;
+  const hasta = document.getElementById("hasta").value;
+  if (!desde || !hasta) return { error: "Elegí desde y hasta." };
+  if (desde > hasta) return { error: "Desde no puede ser posterior a hasta." };
+  return { desde, hasta };
+}
+
 async function generar(e) {
   e.preventDefault();
-  const fecha = document.getElementById("fecha").value;
+  const rango = rangoElegido();
   const input = document.getElementById("bancos");
   const estado = document.getElementById("balanceEstado");
-  if (!fecha || !input.files?.length) {
-    toast("Falta algo", "Elegí el día y al menos un CSV.", "error");
+  if (rango.error || !input.files?.length) {
+    toast("Falta algo", rango.error || "Elegí al menos un CSV.", "error");
     return;
   }
   const fd = new FormData();
-  fd.append("fecha", fecha);
+  fd.append("desde", rango.desde);
+  fd.append("hasta", rango.hasta);
   for (const file of input.files) fd.append("bancos", file);
 
   const btn = document.getElementById("btnGenerar");
   btn.disabled = true;
   estado.textContent = "Leyendo planilla de cargas y cruzando egresos…";
   try {
-    const data = await api("/api/balance/generar", { method: "POST", body: fd, timeout: 120000 });
+    const data = await api("/api/balance/generar", { method: "POST", body: fd, timeout: 180000 });
     pintarResultado(data);
     estado.textContent = `${(data.filas || []).length} filas de balance.`;
     toast("Listo", `${(data.filas || []).length} filas. Revisá los avisos antes de cargar.`, "success");
@@ -405,10 +422,11 @@ async function generar(e) {
 }
 
 async function generarUsdt() {
-  const fecha = document.getElementById("fecha").value;
+  const rango = rangoElegido();
+  const fecha = rango.hasta;
   const estado = document.getElementById("balanceEstado");
-  if (!fecha) {
-    toast("Falta el día", "Elegí la fecha del balance.", "error");
+  if (rango.error) {
+    toast("Falta el día", "Elegí hasta qué día querés el balance USDT.", "error");
     return;
   }
   const btn = document.getElementById("btnGenerarUsdt");
@@ -479,7 +497,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => { window.location.href = "egreso.html"; }, 1200);
     return;
   }
-  document.getElementById("fecha").value = hoyISO();
+  document.getElementById("desde").value = hoyISO();
+  document.getElementById("hasta").value = hoyISO();
   document.getElementById("balanceForm").addEventListener("submit", generar);
   document.getElementById("btnGenerarUsdt").addEventListener("click", generarUsdt);
   document.getElementById("btnDescUsdt").addEventListener("click", descargarUsdt);
