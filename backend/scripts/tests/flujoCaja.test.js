@@ -1,10 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { armarFlujoCaja, ingresosArsDesdeBalance, periodoMes } from "../../src/services/flujoCaja.js";
+import { armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../../src/services/flujoCaja.js";
 
 test("periodoMes cubre el mes completo, incluido febrero bisiesto", () => {
   assert.deepEqual(periodoMes(2026, 9), { desde: "2026-09-01", hasta: "2026-09-30" });
   assert.deepEqual(periodoMes(2024, 2), { desde: "2024-02-01", hasta: "2024-02-29" });
+});
+
+test("el inicio de octubre sale del ultimo dia de septiembre", () => {
+  assert.deepEqual(mesAnterior("2026-10-01"), { desde: "2026-09-01", hasta: "2026-09-30" });
+  assert.deepEqual(mesAnterior("2026-03-01"), { desde: "2026-02-01", hasta: "2026-02-28" });
+  assert.deepEqual(mesAnterior("2024-03-01"), { desde: "2024-02-01", hasta: "2024-02-29" });
+  assert.deepEqual(mesAnterior("2026-01-01"), { desde: "2025-12-01", hasta: "2025-12-31" });
 });
 
 test("separa ARS y USDT y calcula cuanto entro, salio y quedo", () => {
