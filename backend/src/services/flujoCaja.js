@@ -11,6 +11,13 @@ export function periodoMes(anio, mes) {
   return { desde, hasta };
 }
 
+/** Mes calendario anterior al inicio del período (el 1/10 devuelve septiembre). */
+export function mesAnterior(desde) {
+  const [y, m] = String(desde).split("-").map(Number);
+  const prev = new Date(Date.UTC(y, m - 2, 1));
+  return periodoMes(prev.getUTCFullYear(), prev.getUTCMonth() + 1);
+}
+
 function redondear(n) {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 }

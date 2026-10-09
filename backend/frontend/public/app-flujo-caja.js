@@ -2,7 +2,7 @@ const ROLES_FLUJO = new Set(["admin", "direccion", "encargado"]);
 
 const NOTAS = {
   ARS: "El ingreso sale del balance mensual etiquetado al cargar el CSV. Las salidas y los cierres salen de este formulario. Quedó es inicio + entró − salió.",
-  USDT: "Las entradas se toman de los movimientos ENTRADA y las salidas del resto. El inicio es el último cierre de cada billetera antes del mes. Quedó es inicio + entró − salió.",
+  USDT: "Las entradas se toman de los movimientos ENTRADA y las salidas del resto. El inicio es el cierre de caja del último día del mes anterior. Quedó es inicio + entró − salió.",
   USD: "Mismo criterio que USDT, en dólares. No se mezcla con el flujo USDT.",
 };
 
@@ -71,12 +71,13 @@ function cierreHtml(moneda, flujo) {
   return `<p class="note flujo-cierre">Cierre cargado (${cuentas}): <strong>${formato(moneda, flujo.cierre_declarado)}</strong>. Diferencia contra el saldo calculado: <strong class="${claseNum(flujo.diferencia)}">${formato(moneda, flujo.diferencia)}</strong>.</p>`;
 }
 
-function bloque(moneda, flujo) {
+function bloque(moneda, flujo, fechaInicio) {
+  const cuando = fechaInicio ? ` del ${fechaCorta(fechaInicio)}` : " del mes anterior";
   const inicioCuentas = flujo.cuentas_inicio === 1
-    ? "1 cierre anterior"
+    ? `1 cierre${cuando}`
     : flujo.cuentas_inicio > 1
-      ? `${flujo.cuentas_inicio} cierres anteriores`
-      : "sin cierre anterior";
+      ? `${flujo.cuentas_inicio} cierres${cuando}`
+      : `sin cierre${cuando}`;
   return `<section class="card">
     <div class="card-header">Flujo ${moneda}</div>
     <div class="card-body">
@@ -98,7 +99,8 @@ function bloque(moneda, flujo) {
 function render(data) {
   const root = document.getElementById("flujoResultado");
   const { ARS, USDT, USD } = data.flujos;
-  root.innerHTML = bloque("ARS", ARS) + bloque("USDT", USDT) + bloque("USD", USD);
+  const fechaInicio = data.periodo.inicio_fecha;
+  root.innerHTML = bloque("ARS", ARS, fechaInicio) + bloque("USDT", USDT, fechaInicio) + bloque("USD", USD, fechaInicio);
   root.style.display = "";
   const desde = fechaCorta(data.periodo.desde);
   const hasta = fechaCorta(data.periodo.hasta);

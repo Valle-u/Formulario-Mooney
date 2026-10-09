@@ -1,7 +1,7 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import { query } from "../config/db.js";
-import { armarFlujoCaja, ingresosArsDesdeBalance, periodoMes } from "../services/flujoCaja.js";
+import { armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../services/flujoCaja.js";
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
 
 const router = express.Router();
@@ -45,9 +45,20 @@ router.get("/", auth, requireConciliador, async (req, res) => {
       return res.status(400).json({ message: "Elegí un mes válido" });
     }
     const { desde, hasta } = periodoMes(anio, mes);
+    const anterior = mesAnterior(desde);
+    const ultimoDia = await query(
+      `SELECT MAX(fecha)::text AS fecha
+       FROM egresos
+       WHERE status IS DISTINCT FROM 'anulado'
+         AND etiqueta = 'Cierre de Caja'
+         AND fecha >= $1::date
+         AND fecha <= $2::date`,
+      [anterior.desde, anterior.hasta]
+    );
+    const fechaInicio = ultimoDia.rows[0]?.fecha || null;
 
     const [cierresAntes, cierresEnPeriodo, movimientos] = await Promise.all([
-      ultimosCierres("fecha < $1::date", [desde]),
+      fechaInicio ? ultimosCierres("fecha = $1::date", [fechaInicio]) : Promise.resolve([]),
       ultimosCierres("fecha >= $1::date AND fecha <= $2::date", [desde, hasta]),
       query(
         `SELECT
@@ -93,7 +104,7 @@ router.get("/", auth, requireConciliador, async (req, res) => {
     });
 
     return res.json({
-      periodo: { anio, mes, desde, hasta },
+      periodo: { anio, mes, desde, hasta, inicio_fecha: fechaInicio },
       ingresos_ars: {
         movimientos: ingresosArs.reduce((s, g) => s + g.n, 0),
         aviso: avisoBalance,
