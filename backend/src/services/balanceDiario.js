@@ -638,7 +638,67 @@ export function claveMovimiento(row) {
  * @param {string[][]} planillaFilas matriz de la pestaña del día (con encabezados)
  * @param {string} planillaFecha YYYY-MM-DD
  */
-export function transformar({ bancos, egresos, planillaFilas, planillaFecha, rivenTitular }) {
+export function fechaIsoDeRegistro(reg) {
+  const fh = fmtFecha(reg?.fecha_hora);
+  const m = fh.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return "";
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+export function diaSiguiente(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+export function listarDias(desde, hasta) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || desde > hasta) {
+    return { ok: false, message: "Elegí un rango válido: desde no puede ser posterior a hasta" };
+  }
+  const dias = [];
+  let cur = desde;
+  while (cur && cur <= hasta) {
+    dias.push(cur);
+    if (dias.length > 31) return { ok: false, message: "El rango máximo es 31 días" };
+    cur = diaSiguiente(cur);
+  }
+  return { ok: true, dias };
+}
+
+export function registrosDelDia(registros, fechaISO) {
+  return (registros || []).filter((r) => fechaIsoDeRegistro(r) === fechaISO);
+}
+
+export function sumarCuadres(cuadres) {
+  const base = {
+    planilla_total_pesos: 0,
+    planilla_sin_marcadores_pesos: 0,
+    planilla_filas: 0,
+    planilla_consumidas: 0,
+    planilla_sin_match: 0,
+    marcadores_20k: 0,
+    marcadores_20k_pesos: 0,
+    marcadores_pendientes: 0,
+    banco_deposito_pesos: 0,
+    banco_deposito_filas: 0,
+    banco_discrepancia_pesos: 0,
+    banco_discrepancia_filas: 0,
+    banco_depositos_pesos: 0,
+    diferencia_pesos: 0,
+    entrantes_sin_etiqueta_pesos: 0,
+  };
+  for (const c of cuadres || []) {
+    for (const k of Object.keys(base)) base[k] += Number(c[k]) || 0;
+  }
+  const red = (n) => Math.round(n * 100) / 100;
+  for (const k of Object.keys(base)) base[k] = Number.isInteger(base[k]) ? base[k] : red(base[k]);
+  base.diferencia_pesos = red(base.planilla_sin_marcadores_pesos - base.banco_depositos_pesos);
+  return base;
+}
+
+export function transformar({ bancos, egresos, planillaFilas, planillaFecha, rivenTitular, registros, bancosPresentes: bancosForzados }) {
   const cargas = cargarPlanillaFilas(planillaFilas || [], planillaFecha);
   const { salidas, porBancoMonto, porId, todas } = indexarEgresos(egresos || []);
 
@@ -646,17 +706,22 @@ export function transformar({ bancos, egresos, planillaFilas, planillaFecha, riv
   const todosRegistros = [];
   const resumenFormatos = [];
 
-  for (const archivo of bancos || []) {
-    const leido = leerBancoTexto(archivo.texto, archivo.nombre, { rivenTitular });
-    resumenFormatos.push({
-      archivo: archivo.nombre,
-      formato: leido.fmt,
-      banco: leido.banco,
-      filas: leido.registros.length,
-    });
-    for (const reg of leido.registros) {
-      bancosPresentes.add(normText(reg.banco));
-      todosRegistros.push(reg);
+  if (Array.isArray(registros)) {
+    for (const b of bancosForzados || []) bancosPresentes.add(normText(b));
+    for (const reg of registros) todosRegistros.push(reg);
+  } else {
+    for (const archivo of bancos || []) {
+      const leido = leerBancoTexto(archivo.texto, archivo.nombre, { rivenTitular });
+      resumenFormatos.push({
+        archivo: archivo.nombre,
+        formato: leido.fmt,
+        banco: leido.banco,
+        filas: leido.registros.length,
+      });
+      for (const reg of leido.registros) {
+        bancosPresentes.add(normText(reg.banco));
+        todosRegistros.push(reg);
+      }
     }
   }
 

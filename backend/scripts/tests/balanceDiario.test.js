@@ -9,6 +9,9 @@ import {
   egresosDesdeCsv,
   armarCuadreUsdt,
   filaInicioCarga,
+  fechaIsoDeRegistro,
+  listarDias,
+  registrosDelDia,
   OUTPUT_COLUMNS,
 } from "../../src/services/balanceDiario.js";
 
@@ -221,4 +224,48 @@ test("USDT marca discrepancia si el cierre de hoy no coincide", () => {
   assert.equal(r.cuentas[0].saldo_calculado, 6);
   assert.equal(r.cuentas[0].diferencia, 4);
   assert.equal(r.hay_discrepancia, true);
+});
+
+test("el rango parte el CSV por día y cada día usa su planilla", () => {
+  const rango = listarDias("2026-10-01", "2026-10-09");
+  assert.equal(rango.ok, true);
+  assert.equal(rango.dias.length, 9);
+  assert.equal(rango.dias[0], "2026-10-01");
+  assert.equal(rango.dias[8], "2026-10-09");
+  assert.equal(listarDias("2026-10-09", "2026-10-01").ok, false);
+  assert.equal(listarDias("2026-01-01", "2026-03-01").ok, false);
+
+  const registros = [
+    { banco: "HG.Cash", id: "1", id_interno: "", fecha_hora: "01/10/2026 10:00:00", direccion: "entrante", titular: "Ana", titular_cuenta: "Cuenta", importe: "100", es_rechazada: false, es_iva: false },
+    { banco: "HG.Cash", id: "2", id_interno: "", fecha_hora: "02/10/2026 11:00:00", direccion: "entrante", titular: "Ana", titular_cuenta: "Cuenta", importe: "100", es_rechazada: false, es_iva: false },
+  ];
+  assert.equal(fechaIsoDeRegistro(registros[0]), "2026-10-01");
+  assert.equal(registrosDelDia(registros, "2026-10-01").length, 1);
+
+  const planillaDia1 = [
+    [],
+    ["", "Nombre de cliente"],
+    ["", "Ana", "100", "10:00"],
+  ];
+  const dia1 = transformar({
+    registros: registrosDelDia(registros, "2026-10-01"),
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: planillaDia1,
+    planillaFecha: "2026-10-01",
+  });
+  const dia2 = transformar({
+    registros: registrosDelDia(registros, "2026-10-02"),
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: [[], ["", "Nombre de cliente"]],
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(dia1.salida.length, 1);
+  assert.equal(dia1.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(dia1.salida[0].FECHA, "01/10/2026");
+  assert.equal(dia1.revisar.length, 0);
+  assert.equal(dia2.salida.length, 1);
+  assert.equal(dia2.salida[0].FECHA, "02/10/2026");
+  assert.equal(dia2.revisar.length, 1);
 });

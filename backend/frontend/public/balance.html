@@ -69,17 +69,21 @@
           <div class="card-header">Balance diario desde CSV de banco</div>
           <div class="card-body">
             <p class="note">
-              Subí el extracto del día (Lohas, HG.Cash y/o Riven Flow). Los egresos salen de este formulario
-              y la planilla de cargas se lee sola de Google Sheets. El resultado se puede descargar o cargar
-              en el balance mensual. El balance USDT no usa el extracto: sale de los movimientos y los cierres
-              cargados en el formulario.
+              Subí el extracto (Lohas, HG.Cash y/o Riven Flow). Si el CSV trae varios días, elegí desde y hasta:
+              cada día se cruza con la planilla y los egresos de esa fecha. Lo que cae afuera del rango no entra
+              al balance. El resultado se puede descargar o cargar en el balance mensual. El balance USDT no usa
+              el extracto: toma el día Hasta.
             </p>
             <form id="balanceForm" class="grid">
               <div class="field span3">
-                <label for="fecha">DÍA</label>
-                <input id="fecha" type="date" required>
+                <label for="desde">DESDE</label>
+                <input id="desde" type="date" required>
               </div>
-              <div class="field span6">
+              <div class="field span3">
+                <label for="hasta">HASTA</label>
+                <input id="hasta" type="date" required>
+              </div>
+              <div class="field span3">
                 <label for="bancos">CSV DEL BANCO (uno o varios)</label>
                 <input id="bancos" type="file" accept=".csv,text/csv" multiple required>
               </div>

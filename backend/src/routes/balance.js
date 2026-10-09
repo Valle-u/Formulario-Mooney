@@ -10,9 +10,12 @@ import {
   transformar,
   resumenEtiquetas,
   armarCuadreUsdt,
-  contarFechasFuera,
   contarDirecciones,
+  fechaIsoDeRegistro,
   isoAFecha,
+  listarDias,
+  registrosDelDia,
+  sumarCuadres,
   leerBancoTexto,
   planillaPareceValida,
   normText,
@@ -59,65 +62,47 @@ async function cierresEnFecha(fechaSQL, params) {
   return result.rows;
 }
 
+const EGRESOS_SELECT = `
+  SELECT
+      to_char(fecha, 'YYYY-MM-DD') AS fecha_iso,
+      to_char(fecha, 'DD/MM/YYYY') AS fecha,
+      to_char(hora, 'HH24:MI') AS hora,
+      empresa_salida,
+      cuenta_salida,
+      COALESCE(id_transferencia, '') AS id_transferencia,
+      COALESCE(cuenta_receptora, '') AS cuenta_receptora,
+      etiqueta,
+      COALESCE(tipo_transaccion, 'SALIDA') AS tipo_transaccion,
+      monto_raw,
+      monto::text AS monto,
+      COALESCE(moneda, 'ARS') AS moneda
+   FROM egresos
+   WHERE status IS DISTINCT FROM 'anulado'`;
+
 async function egresosDelDia(fechaISO) {
   const result = await query(
-    `SELECT
-        to_char(fecha, 'DD/MM/YYYY') AS fecha,
-        to_char(hora, 'HH24:MI') AS hora,
-        empresa_salida,
-        cuenta_salida,
-        COALESCE(id_transferencia, '') AS id_transferencia,
-        COALESCE(cuenta_receptora, '') AS cuenta_receptora,
-        etiqueta,
-        COALESCE(tipo_transaccion, 'SALIDA') AS tipo_transaccion,
-        monto_raw,
-        monto::text AS monto,
-        COALESCE(moneda, 'ARS') AS moneda
-     FROM egresos
-     WHERE fecha = $1::date
-       AND status IS DISTINCT FROM 'anulado'
+    `${EGRESOS_SELECT}
+       AND fecha = $1::date
      ORDER BY hora, id`,
     [fechaISO]
   );
   return result.rows;
 }
 
-function avisosDeCorrida({ resultado, egresos, fechaDDMMAAAA, archivosVacios }) {
-  const avisos = [];
-  const { fuera, otras } = contarFechasFuera(resultado.registros, fechaDDMMAAAA);
-  if (fuera > 0) {
-    const detalle = otras.map((o) => `${o.cantidad} del ${o.fecha}`).join(", ");
-    avisos.push({
-      nivel: "aviso",
-      codigo: "fecha_fuera",
-      mensaje: `${fuera} movimiento(s) del CSV no son del ${fechaDDMMAAAA}${detalle ? ` (${detalle})` : ""}. Revisá que no sea el extracto de otro día.`,
-    });
+async function egresosDelRango(desde, hasta) {
+  const result = await query(
+    `${EGRESOS_SELECT}
+       AND fecha >= $1::date
+       AND fecha <= $2::date
+     ORDER BY fecha, hora, id`,
+    [desde, hasta]
+  );
+  const porDia = new Map();
+  for (const row of result.rows) {
+    if (!porDia.has(row.fecha_iso)) porDia.set(row.fecha_iso, []);
+    porDia.get(row.fecha_iso).push(row);
   }
-  for (const v of archivosVacios) {
-    avisos.push({
-      nivel: "aviso",
-      codigo: "csv_vacio",
-      mensaje: `${v} no tiene movimientos válidos. Si ese banco tuvo egresos, van a entrar como filas extra.`,
-    });
-  }
-
-  const presentes = new Set(resultado.bancosPresentes);
-  const faltantes = new Map();
-  for (const e of egresos) {
-    if (normText(e.etiqueta) === "cierre de caja") continue;
-    const key = normText(e.empresa_salida);
-    if (!key || presentes.has(key)) continue;
-    if (!faltantes.has(key)) faltantes.set(key, e.empresa_salida);
-  }
-  if (faltantes.size) {
-    const nombres = [...faltantes.values()].join(", ");
-    avisos.push({
-      nivel: "aviso",
-      codigo: "bancos_faltantes",
-      mensaje: `Sin CSV de: ${nombres}. Esos egresos se agregan como filas extra (no se cruzan con el banco).`,
-    });
-  }
-  return avisos;
+  return porDia;
 }
 
 router.post("/generar", auth, requireConciliador, (req, res) => {
@@ -129,10 +114,14 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
       return res.status(400).json({ message });
     }
     try {
-      const fecha = String(req.body?.fecha || "").trim();
-      if (!fechaValida(fecha)) {
-        return res.status(400).json({ message: "Elegí el día del balance (YYYY-MM-DD)" });
+      const fechaSuelta = String(req.body?.fecha || "").trim();
+      const desde = String(req.body?.desde || fechaSuelta).trim();
+      const hasta = String(req.body?.hasta || fechaSuelta).trim();
+      const rango = listarDias(desde, hasta);
+      if (!rango.ok) {
+        return res.status(400).json({ message: rango.message });
       }
+      const dias = rango.dias;
       const files = req.files || [];
       if (!files.length) {
         return res.status(400).json({ message: "Subí al menos un CSV de banco" });
@@ -171,59 +160,173 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
         }
       }
 
-      const planilla = await leerPlanillaDia(fecha);
-      if (!planillaPareceValida(planilla.values)) {
-        const celda = String((planilla.values?.[1] || [])[1] ?? "");
-        return res.status(400).json({
-          message: `La pestaña ${planilla.tab} no parece la planilla de cargas (columna B, fila 2: "${celda || "vacía"}").`,
+      const todosRegistros = leidos.flatMap((l) => l.registros);
+      const bancosArchivo = leidos.map((l) => l.banco);
+      const egresosPorDia = await egresosDelRango(desde, hasta);
+      const lecturas = await Promise.all(dias.map(async (dia) => {
+        try {
+          return { dia, planilla: await leerPlanillaDia(dia), error: null };
+        } catch (e) {
+          return { dia, planilla: null, error: e.message || "No pude leer la planilla" };
+        }
+      }));
+
+      if (dias.length === 1) {
+        const unica = lecturas[0];
+        if (unica.error || !unica.planilla) {
+          return res.status(400).json({ message: unica.error || "No pude leer la planilla de cargas" });
+        }
+        if (!planillaPareceValida(unica.planilla.values)) {
+          const celda = String((unica.planilla.values?.[1] || [])[1] ?? "");
+          return res.status(400).json({
+            message: `La pestaña ${unica.planilla.tab} no parece la planilla de cargas (columna B, fila 2: "${celda || "vacía"}").`,
+          });
+        }
+      }
+
+      const salida = [];
+      const revisar = [];
+      const salidaUsdt = [];
+      const porDia = [];
+      const avisos = [];
+      const egresos = [];
+
+      for (const lectura of lecturas) {
+        const dia = lectura.dia;
+        let filasPlanilla = [];
+        let tab = String(Number(dia.slice(8, 10)));
+        if (lectura.error || !lectura.planilla) {
+          avisos.push({
+            nivel: "aviso",
+            codigo: "planilla",
+            mensaje: `Día ${isoAFecha(dia)}: no pude leer la planilla de cargas. Los depósitos de ese día quedan sin etiqueta.`,
+          });
+        } else if (!planillaPareceValida(lectura.planilla.values)) {
+          tab = lectura.planilla.tab;
+          avisos.push({
+            nivel: "aviso",
+            codigo: "planilla",
+            mensaje: `La pestaña ${lectura.planilla.tab} (${isoAFecha(dia)}) no parece la planilla de cargas. Los depósitos de ese día quedan sin etiqueta.`,
+          });
+        } else {
+          filasPlanilla = lectura.planilla.values;
+          tab = lectura.planilla.tab;
+        }
+
+        const egresosDia = egresosPorDia.get(dia) || [];
+        egresos.push(...egresosDia);
+        const resultado = transformar({
+          registros: registrosDelDia(todosRegistros, dia),
+          bancosPresentes: bancosArchivo,
+          egresos: egresosDia,
+          planillaFilas: filasPlanilla,
+          planillaFecha: dia,
+          rivenTitular,
+        });
+        salida.push(...resultado.salida);
+        revisar.push(...resultado.revisar);
+        salidaUsdt.push(...resultado.salidaUsdt);
+        porDia.push({
+          fecha: dia,
+          fechaDD: isoAFecha(dia),
+          tab,
+          cuadre: resultado.cuadre,
+          filas: resultado.salida.length,
+          revisar: resultado.revisar.length,
         });
       }
 
-      const egresos = await egresosDelDia(fecha);
-      const cierresAyer = await cierresEnFecha("fecha = $1::date - 1", [fecha]);
-      const cierresHoy = egresos.filter((e) => normText(e.etiqueta) === "cierre de caja");
-      const usdt = armarCuadreUsdt({ cierresAyer, movimientos: egresos, cierresHoy });
+      const fueraMap = new Map();
+      let fuera = 0;
+      for (const reg of todosRegistros) {
+        const iso = fechaIsoDeRegistro(reg);
+        if (iso && iso >= desde && iso <= hasta) continue;
+        fuera += 1;
+        const etiqueta = iso ? isoAFecha(iso) : "sin fecha";
+        fueraMap.set(etiqueta, (fueraMap.get(etiqueta) || 0) + 1);
+      }
+      if (fuera > 0) {
+        const detalle = [...fueraMap.entries()].map(([f, n]) => `${n} del ${f}`).join(", ");
+        avisos.push({
+          nivel: "aviso",
+          codigo: "fecha_fuera",
+          mensaje: `${fuera} movimiento(s) del CSV quedan afuera del rango ${isoAFecha(desde)} a ${isoAFecha(hasta)} (${detalle}). No entran al balance.`,
+        });
+      }
+      for (const l of leidos) {
+        if (!l.registros.length) {
+          avisos.push({
+            nivel: "aviso",
+            codigo: "csv_vacio",
+            mensaje: `${l.nombre} no tiene movimientos válidos. Si ese banco tuvo egresos, van a entrar como filas extra.`,
+          });
+        }
+      }
+      const presentes = new Set(bancosArchivo.map((b) => normText(b)));
+      const faltantes = new Map();
+      for (const e of egresos) {
+        if (normText(e.etiqueta) === "cierre de caja") continue;
+        const key = normText(e.empresa_salida);
+        if (!key || presentes.has(key)) continue;
+        if (!faltantes.has(key)) faltantes.set(key, e.empresa_salida);
+      }
+      if (faltantes.size) {
+        avisos.push({
+          nivel: "aviso",
+          codigo: "bancos_faltantes",
+          mensaje: `Sin CSV de: ${[...faltantes.values()].join(", ")}. Esos egresos se agregan como filas extra (no se cruzan con el banco).`,
+        });
+      }
+
       const porEmpresa = new Map();
       for (const e of egresos) {
         if (normText(e.etiqueta) === "cierre de caja") continue;
         const nombre = e.empresa_salida || "(sin empresa)";
         porEmpresa.set(nombre, (porEmpresa.get(nombre) || 0) + 1);
       }
-      const resultado = transformar({
-        bancos: leidos.map((l) => ({ nombre: l.nombre, texto: l.texto })),
-        egresos,
-        planillaFilas: planilla.values,
-        planillaFecha: fecha,
-        rivenTitular,
+      const egresosHasta = egresosPorDia.get(hasta) || [];
+      const cierresAyer = await cierresEnFecha("fecha = $1::date - 1", [hasta]);
+      const usdt = armarCuadreUsdt({
+        cierresAyer,
+        movimientos: egresosHasta,
+        cierresHoy: egresosHasta.filter((e) => normText(e.etiqueta) === "cierre de caja"),
       });
+      const cuadre = sumarCuadres(porDia.map((d) => d.cuadre));
+      const fechaDD = desde === hasta
+        ? isoAFecha(desde)
+        : `${isoAFecha(desde)} a ${isoAFecha(hasta)}`;
 
-      const fechaDD = isoAFecha(fecha);
-      const avisos = avisosDeCorrida({
-        resultado,
-        egresos,
-        fechaDDMMAAAA: fechaDD,
-        archivosVacios: resultado.resumenFormatos.filter((f) => f.filas === 0).map((f) => f.archivo),
-      });
-
-      const { registros, ...resto } = resultado;
       return res.json({
-        fecha,
+        fecha: hasta,
+        desde,
+        hasta,
         fechaDD,
+        desdeDD: isoAFecha(desde),
+        hastaDD: isoAFecha(hasta),
         tab: tabDestinoBalance(),
-        planilla: { tab: planilla.tab, filas: resto.cuadre.planilla_filas },
-        bancos: resto.resumenFormatos,
+        planilla: {
+          tab: porDia.map((d) => d.tab).filter(Boolean).join(", "),
+          filas: cuadre.planilla_filas,
+        },
+        porDia,
+        bancos: leidos.map((l) => ({
+          archivo: l.nombre,
+          formato: l.fmt,
+          banco: l.banco,
+          filas: l.registros.length,
+        })),
         avisos,
-        cuadre: resto.cuadre,
-        resumen: resumenEtiquetas(resto.salida),
+        cuadre,
+        resumen: resumenEtiquetas(salida),
         egresosFormulario: {
           total: [...porEmpresa.values()].reduce((s, n) => s + n, 0),
           hg: [...porEmpresa.entries()].filter(([empresa]) => normText(empresa) === "hg.cash").reduce((s, [, n]) => s + n, 0),
           porEmpresa: [...porEmpresa.entries()].map(([empresa, cantidad]) => ({ empresa, cantidad })),
         },
         usdt,
-        filas: resto.salida,
-        revisar: resto.revisar,
-        filasUsdt: resto.salidaUsdt,
+        filas: salida,
+        revisar,
+        filasUsdt: salidaUsdt,
         columnas: OUTPUT_COLUMNS,
       });
     } catch (e) {
