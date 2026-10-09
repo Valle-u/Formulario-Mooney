@@ -492,8 +492,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!requireAuth()) return;
   await initCommonUI();
   const u = getUser?.();
-  if (u && !["admin", "direccion", "encargado"].includes(u.role)) {
-    toast("Sin acceso", "Esta pantalla es para admin, dirección o encargado.", "error");
+  if (u && !["admin", "direccion"].includes(u.role)) {
+    toast("Sin acceso", "Esta pantalla es para admin o dirección.", "error");
     setTimeout(() => { window.location.href = "egreso.html"; }, 1200);
     return;
   }

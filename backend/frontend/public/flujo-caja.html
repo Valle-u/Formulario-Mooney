@@ -33,6 +33,15 @@
     .num-pos { color: #10b981; }
     .num-neg { color: #ef4444; }
     .flujo-cierre { margin: 0 0 12px; }
+    .flujo-alerta {
+      background: #fef3c7;
+      color: #78350f;
+      border: 1px solid #b45309;
+      border-left: 4px solid #b45309;
+      padding: 10px 12px;
+      border-radius: 4px;
+      margin: 0 0 12px;
+    }
     .flujo-dia { border-top: 1px solid var(--border); padding: 8px 0; }
     .flujo-dia summary { cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
     .flujo-dia table { margin-top: 8px; }
@@ -52,10 +61,10 @@
         <nav class="topbar-center nav-desktop">
           <a href="egreso.html" class="nav-item">Retiros</a>
           <a href="consulta-egresos.html" class="nav-item">Historial</a>
-          <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+          <a href="flujo-usd.html" data-no-encargado="1" class="nav-item">Flujo USD/USDT</a>
           <a href="balance.html" class="nav-item" data-requires-encargado="1">Balance</a>
           <a href="flujo-caja.html" class="nav-item active" data-requires-encargado="1">Flujo de caja</a>
-          <a href="cierres-caja.html" class="nav-item">Cierres</a>
+          <a href="cierres-caja.html" data-no-encargado="1" class="nav-item">Cierres</a>
           <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
           <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
           <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -75,10 +84,10 @@
         <nav class="mobile-nav">
           <a href="egreso.html" class="mobile-item">Retiros</a>
           <a href="consulta-egresos.html" class="mobile-item">Historial</a>
-          <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+          <a href="flujo-usd.html" data-no-encargado="1" class="mobile-item">Flujo USD/USDT</a>
           <a href="balance.html" class="mobile-item" data-requires-encargado="1">Balance</a>
           <a href="flujo-caja.html" class="mobile-item active" data-requires-encargado="1">Flujo de caja</a>
-          <a href="cierres-caja.html" class="mobile-item">Cierres</a>
+          <a href="cierres-caja.html" data-no-encargado="1" class="mobile-item">Cierres</a>
           <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
           <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
           <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>

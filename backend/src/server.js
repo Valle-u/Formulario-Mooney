@@ -128,10 +128,8 @@ if (!fs.existsSync(uploadsPath)) {
   console.log('📂 Created uploads directory:', uploadsPath);
 }
 
-// Servir archivos de uploads (comprobantes)
-// Esto permite acceder a los PDFs subidos vía URL
-app.use(`/${UPLOAD_DIR}`, express.static(uploadsPath));
-console.log(`📤 Serving uploads from: /${UPLOAD_DIR}`);
+// Los comprobantes no se publican en /uploads. Se entregan por
+// GET /api/egresos/:id/comprobante, que aplica el permiso del rol.
 
 // Cache-busting automático: reemplaza ?v=AUTO con ?v={mtime} en HTML
 const htmlCache = new Map();
@@ -141,7 +139,10 @@ function serveHtmlWithCacheBusting(req, res, next) {
   if (htmlFile === '/') htmlFile = '/index.html';
   if (!htmlFile.endsWith('.html')) return next();
 
-  const filePath = path.join(frontendPath, htmlFile);
+  const filePath = path.resolve(frontendPath, `.${htmlFile}`);
+  if (!filePath.startsWith(path.resolve(frontendPath) + path.sep) && filePath !== path.resolve(frontendPath, "index.html")) {
+    return next();
+  }
   if (!fs.existsSync(filePath)) return next();
 
   try {

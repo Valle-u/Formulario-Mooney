@@ -91,6 +91,11 @@ function clearLogsFilters(){
 document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("logsTable")) return;
   if(!requireAuth()) return;
+  const role = getUser()?.role;
+  if (role !== "admin" && role !== "direccion") {
+    window.location.replace("egreso.html");
+    return;
+  }
   await initCommonUI();
   document.getElementById("btnLoadLogs")?.addEventListener("click", () => { logsOffset = 0; loadLogs(); });
   document.getElementById("btnClearLogsFilters")?.addEventListener("click", clearLogsFilters);

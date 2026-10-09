@@ -1,4 +1,5 @@
-const ROLES_FLUJO = new Set(["admin", "direccion", "encargado"]);
+const ROLES_FLUJO = new Set(["admin", "direccion"]);
+const CACHE_KEY = "mooney-flujo-caja";
 
 const NOTAS = {
   ARS: "El ingreso sale del balance mensual etiquetado al cargar el CSV. Las salidas y los cierres salen de este formulario. Quedó es inicio + entró − salió.",
@@ -63,6 +64,16 @@ function diasHtml(moneda, dias) {
   `).join("");
 }
 
+function alertaRedireccion(moneda, flujo) {
+  const r = flujo.redireccion;
+  if (!r || !r.movimientos) return "";
+  if (r.diferencia === 0) {
+    return `<p class="note">Redirección de capital: entró ${formato(moneda, r.entro)} y salió ${formato(moneda, r.salio)}. No se suma al flujo.</p>`;
+  }
+  const falta = r.diferencia > 0 ? "la salida" : "la entrada";
+  return `<p class="flujo-alerta">Redirección de capital: entró ${formato(moneda, r.entro)} y salió ${formato(moneda, r.salio)}. Hay una diferencia de ${formato(moneda, Math.abs(r.diferencia))} porque falta cargar ${falta}.</p>`;
+}
+
 function cierreHtml(moneda, flujo) {
   if (flujo.cierre_declarado == null) {
     return `<p class="note flujo-cierre">Sin cierre cargado en el mes. Quedó es el saldo calculado.</p>`;
@@ -88,6 +99,7 @@ function bloque(moneda, flujo, fechaInicio) {
         <div class="flujo-kpi"><span>Quedó</span><strong class="${claseNum(flujo.quedo)}">${formato(moneda, flujo.quedo)}</strong></div>
       </div>
       <p class="note">Inicio: ${inicioCuentas}. ${NOTAS[moneda]}</p>
+      ${alertaRedireccion(moneda, flujo)}
       ${cierreHtml(moneda, flujo)}
       <h3 style="margin:0 0 8px">Por etiqueta</h3>
       ${tablaEtiquetas(moneda, flujo.por_etiqueta)}
@@ -96,7 +108,37 @@ function bloque(moneda, flujo, fechaInicio) {
   </section>`;
 }
 
-function render(data) {
+function claveMes(anio, mes) {
+  return `${anio}-${String(mes).padStart(2, "0")}`;
+}
+
+function leerTodo() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    return data && typeof data === "object" ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+function leerMes(anio, mes) {
+  const item = leerTodo()[claveMes(anio, mes)];
+  if (!item?.data?.flujos) return null;
+  return item;
+}
+
+function guardarMes(anio, mes, data) {
+  const todo = leerTodo();
+  todo[claveMes(anio, mes)] = { cuando: new Date().toISOString(), data };
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(todo));
+  } catch {
+    /* si el navegador no guarda, el flujo igual queda en pantalla */
+  }
+}
+
+function render(data, guardado) {
   const root = document.getElementById("flujoResultado");
   const { ARS, USDT, USD } = data.flujos;
   const fechaInicio = data.periodo.inicio_fecha;
@@ -108,7 +150,14 @@ function render(data) {
   const origen = ing.aviso
     ? `No pude leer los ingresos del balance: ${ing.aviso}`
     : `Ingresos en pesos: ${ing.movimientos || 0} movimientos del balance cargado.`;
-  document.getElementById("flujoEstado").textContent = `Período ${desde} al ${hasta}. ${origen}`;
+  let extra = "";
+  if (guardado) {
+    const cuando = new Date(guardado);
+    if (!Number.isNaN(cuando.getTime())) {
+      extra = ` Guardado ${cuando.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}. Ver flujo lo actualiza.`;
+    }
+  }
+  document.getElementById("flujoEstado").textContent = `Período ${desde} al ${hasta}. ${origen}${extra}`;
 }
 
 async function cargar(ev) {
@@ -125,9 +174,10 @@ async function cargar(ev) {
   estado.textContent = "Armando el flujo…";
   try {
     const data = await api(`/api/flujo-caja?anio=${anio}&mes=${mes}`);
+    guardarMes(anio, mes, data);
     render(data);
   } catch (e) {
-    document.getElementById("flujoResultado").style.display = "none";
+    if (!leerMes(anio, mes)) document.getElementById("flujoResultado").style.display = "none";
     estado.textContent = e.message || "No pude armar el flujo de caja";
   } finally {
     btn.disabled = false;
@@ -143,10 +193,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   mes.value = mesActual();
   document.getElementById("flujoForm").addEventListener("submit", cargar);
   if (!ROLES_FLUJO.has(getUser().role)) {
-    document.getElementById("flujoEstado").textContent = "Esta sección es para admin, dirección o encargado.";
-    document.getElementById("btnVer").disabled = true;
-    mes.disabled = true;
+    window.location.replace("egreso.html");
     return;
   }
-  cargar({ preventDefault() {} });
+  const [anio, mesNum] = mes.value.split("-").map(Number);
+  const guardado = leerMes(anio, mesNum);
+  if (guardado) render(guardado.data, guardado.cuando);
+  else cargar({ preventDefault() {} });
 });

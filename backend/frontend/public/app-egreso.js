@@ -819,9 +819,13 @@ async function checkIdTransferenciaDuplicado() {
 
     const data = await response.json();
 
-    if (data.exists && feedbackDiv) {
+    if (data.exists && data.egreso && feedbackDiv) {
       feedbackDiv.className = "validation-error";
       feedbackDiv.textContent = `Este ID ya existe en ${empresaValue} (Egreso #${data.egreso.id} - ${data.egreso.etiqueta} - $${data.egreso.monto} ${data.egreso.moneda})`;
+      idInput.style.borderColor = "#dc3545";
+    } else if (data.exists && feedbackDiv) {
+      feedbackDiv.className = "validation-error";
+      feedbackDiv.textContent = `Este ID ya está usado en ${empresaValue}`;
       idInput.style.borderColor = "#dc3545";
     } else if (feedbackDiv) {
       feedbackDiv.className = "validation-success";
@@ -1649,6 +1653,10 @@ async function confirmarYEnviarEgreso(){
 document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("egresoForm")) return;
   if(!requireAuth()) return;
+  if (IS_USD_PAGE && getUser()?.role === "encargado") {
+    window.location.replace("egreso.html");
+    return;
+  }
   await initCommonUI();
 
   populateEtiquetas();

@@ -24,11 +24,11 @@ import { leerPlanillaDia, escribirBalanceMensual, tabDestinoBalance } from "../s
 
 const router = express.Router();
 
-const ROLES_BALANCE = new Set(["admin", "direccion", "encargado"]);
+const ROLES_BALANCE = new Set(["admin", "direccion"]);
 
 function requireConciliador(req, res, next) {
   if (!ROLES_BALANCE.has(req.user?.role)) {
-    return res.status(403).json({ message: "Solo admin, dirección o encargado" });
+    return res.status(403).json({ message: "Solo admin o dirección" });
   }
   return next();
 }

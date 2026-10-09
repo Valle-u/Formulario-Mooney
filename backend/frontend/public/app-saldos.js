@@ -808,6 +808,10 @@ function cerrarModalSaldos() {
 document.addEventListener("DOMContentLoaded", async () => {
   if(!location.pathname.includes("saldos.html")) return;
   if(!requireAuth()) return;
+  if (getUser()?.role !== "admin") {
+    window.location.replace("egreso.html");
+    return;
+  }
   await initCommonUI();
   initSaldosPage();
   const cuentaSel = document.getElementById('filtro_cuenta');

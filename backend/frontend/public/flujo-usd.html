@@ -32,10 +32,10 @@
     <nav class="topbar-center nav-desktop">
       <a href="egreso.html" class="nav-item">Retiros</a>
       <a href="consulta-egresos.html" class="nav-item">Historial</a>
-      <a href="flujo-usd.html" class="nav-item active">Flujo USD/USDT</a>
+      <a href="flujo-usd.html" data-no-encargado="1" class="nav-item active">Flujo USD/USDT</a>
       <a href="balance.html" class="nav-item" data-requires-encargado="1">Balance</a>
       <a href="flujo-caja.html" class="nav-item" data-requires-encargado="1">Flujo de caja</a>
-      <a href="cierres-caja.html" class="nav-item">Cierres</a>
+      <a href="cierres-caja.html" data-no-encargado="1" class="nav-item">Cierres</a>
       <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
@@ -60,10 +60,10 @@
     <nav class="mobile-nav">
       <a href="egreso.html" class="mobile-item">Retiros</a>
       <a href="consulta-egresos.html" class="mobile-item">Historial</a>
-      <a href="flujo-usd.html" class="mobile-item active">Flujo USD/USDT</a>
+      <a href="flujo-usd.html" data-no-encargado="1" class="mobile-item active">Flujo USD/USDT</a>
       <a href="balance.html" class="mobile-item" data-requires-encargado="1">Balance</a>
       <a href="flujo-caja.html" class="mobile-item" data-requires-encargado="1">Flujo de caja</a>
-      <a href="cierres-caja.html" class="mobile-item">Cierres</a>
+      <a href="cierres-caja.html" data-no-encargado="1" class="mobile-item">Cierres</a>
       <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
       <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
       <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
@@ -168,7 +168,7 @@
                     </label>
                     <select id="etiqueta" required></select>
                     <div class="note">Elegí el motivo de la transferencia</div>
-                    <div class="note">Si necesitas cargar un cierre, usa <a href="cierres-caja.html">Cierres de Caja</a>.</div>
+                    <div class="note" data-no-encargado="1">Si necesitas cargar un cierre, usa <a href="cierres-caja.html" data-no-encargado="1">Cierres de Caja</a>.</div>
                   </div>
 
                   <div class="field span4 hidden" id="wrap_otro">
