@@ -457,15 +457,17 @@ function matchDeposito(cargas, nombre, monto, fechaHoraBanco) {
 
   const mejorCandidato = (lista) => {
     const candidatos = lista.filter((e) => !e.consumida && !e.es_discrepancia && montosCercanos(e.monto, monto));
-    const conHora = candidatos.filter((e) => distHora(e.hora_min) != null);
-    const enTolerancia = conHora.filter((e) => horasCercanas(e.hora_min, bkMin));
-    const sinHora = candidatos.filter((e) => distHora(e.hora_min) == null);
-    const elegibles = enTolerancia.length ? enTolerancia : sinHora;
+    if (!candidatos.length) return null;
+    // La hora de la planilla la carga un empleado y puede estar mal. No descarta
+    // un depósito con el mismo nombre e importe. Si hay varios, se prefiere el
+    // que cae dentro de la ventana y, si ninguno cae, el de hora más cercana.
+    const enTolerancia = candidatos.filter((e) => horasCercanas(e.hora_min, bkMin));
+    const elegibles = enTolerancia.length ? enTolerancia : candidatos;
     let mejor = null;
     let mejorKey = null;
     for (const e of elegibles) {
       const dist = distHora(e.hora_min);
-      const key = [Math.abs(e.monto - monto), dist == null ? 0 : dist];
+      const key = [Math.abs(e.monto - monto), dist == null ? 10000 : dist];
       if (!mejor || key[0] < mejorKey[0] || (key[0] === mejorKey[0] && key[1] < mejorKey[1])) {
         mejor = e;
         mejorKey = key;

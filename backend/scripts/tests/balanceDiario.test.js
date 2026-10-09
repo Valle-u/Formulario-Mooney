@@ -302,3 +302,41 @@ test("la planilla lee 2000 como dos mil pesos y la hora como HH:MM", () => {
   assert.equal(santiago.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
   assert.equal(santiago.revisar.length, 0);
 });
+
+test("una hora mal cargada en la planilla no impide el deposito", () => {
+  const planilla = [
+    [],
+    ["", "Nombre de cliente"],
+    ["", "PARMA JAVIER ALE", "7000", "21:02"],
+    ["", "Santiago Nahuel Fernandez", "2000", "10:00"],
+    ["", "Santiago Nahuel Fernandez", "2000", "20:05"],
+  ];
+  const parma = transformar({
+    registros: [{
+      banco: "HG.Cash", id: "p", id_interno: "", fecha_hora: "02/10/2026 20:01:59",
+      direccion: "entrante", titular: "PARMA JAVIER ALE", titular_cuenta: "Cuenta",
+      importe: "7000", es_rechazada: false, es_iva: false,
+    }],
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: planilla,
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(parma.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(parma.revisar.length, 0);
+
+  const santiago = transformar({
+    registros: [{
+      banco: "HG.Cash", id: "s", id_interno: "", fecha_hora: "02/10/2026 20:00:32",
+      direccion: "entrante", titular: "Santiago Nahuel Fernandez", titular_cuenta: "Cuenta",
+      importe: "2000", es_rechazada: false, es_iva: false,
+    }],
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: planilla,
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(santiago.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(santiago.cuadre.planilla_consumidas, 1);
+  assert.equal(santiago.cuadre.planilla_sin_match, 2);
+});
