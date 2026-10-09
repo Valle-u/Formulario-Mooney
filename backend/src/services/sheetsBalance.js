@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { google } from "googleapis";
-import { OUTPUT_COLUMNS, filasAMatriz, claveMovimiento, filaInicioCarga } from "./balanceDiario.js";
+import { OUTPUT_COLUMNS, filasAMatriz, claveMovimiento, filaInicioCarga, normalizarPlanilla } from "./balanceDiario.js";
 
 export const TAB_BALANCE_MENSUAL = "Balance Mensual Bancario";
 
@@ -68,13 +68,13 @@ export async function leerPlanillaDia(fechaISO) {
     res = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `'${tab}'`,
-      valueRenderOption: "FORMATTED_VALUE",
+      valueRenderOption: "UNFORMATTED_VALUE",
     });
   } catch (e) {
     const msg = e?.message || String(e);
     throw new Error(`No pude leer la pestaña "${tab}" de la planilla de cargas del ${fechaISO}. ${msg}`);
   }
-  const values = (res.data.values || []).map((row) => row.map((c) => (c == null ? "" : String(c))));
+  const values = normalizarPlanilla(res.data.values || []);
   return { tab, values, fecha: fechaISO };
 }
 

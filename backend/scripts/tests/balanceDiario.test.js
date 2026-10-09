@@ -11,7 +11,9 @@ import {
   filaInicioCarga,
   fechaIsoDeRegistro,
   listarDias,
+  normalizarPlanilla,
   registrosDelDia,
+  parseMonto,
   OUTPUT_COLUMNS,
 } from "../../src/services/balanceDiario.js";
 
@@ -268,4 +270,35 @@ test("el rango parte el CSV por día y cada día usa su planilla", () => {
   assert.equal(dia2.salida.length, 1);
   assert.equal(dia2.salida[0].FECHA, "02/10/2026");
   assert.equal(dia2.revisar.length, 1);
+});
+
+test("la planilla lee 2000 como dos mil pesos y la hora como HH:MM", () => {
+  const hora2001 = 1201 / 1440;
+  const hora2102 = 1262 / 1440;
+  const filas = normalizarPlanilla([
+    [],
+    ["", "Nombre de cliente", "Monto", "Hora"],
+    ["", "Santiago Nahuel Fernandez", 2000, hora2001],
+    ["", "PARMA JAVIER ALE", 7000, hora2102],
+  ]);
+  assert.equal(filas[2][2], "2000");
+  assert.equal(filas[2][3], "20:01");
+  assert.equal(filas[3][2], "7000");
+  assert.equal(filas[3][3], "21:02");
+  assert.equal(parseMonto(filas[2][2]), 200000);
+  assert.equal(parseMonto(filas[3][2]), 700000);
+
+  const santiago = transformar({
+    registros: [{
+      banco: "HG.Cash", id: "1", id_interno: "", fecha_hora: "02/10/2026 20:00:32",
+      direccion: "entrante", titular: "Santiago Nahuel Fernandez", titular_cuenta: "Cuenta",
+      importe: "2000", es_rechazada: false, es_iva: false,
+    }],
+    bancosPresentes: ["HG.Cash"],
+    egresos: [],
+    planillaFilas: filas,
+    planillaFecha: "2026-10-02",
+  });
+  assert.equal(santiago.salida[0].Etiqueta, "[Unidad M] Deposito de cliente");
+  assert.equal(santiago.revisar.length, 0);
 });

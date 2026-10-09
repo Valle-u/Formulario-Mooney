@@ -353,9 +353,44 @@ export function filaBalance(banco, idv, fecha, titularCuenta, tipoOut, titular, 
 }
 
 function parseHoraPlanilla(s) {
-  const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (!m) return null;
   return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function montoPlano(v) {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    if (Number.isInteger(v)) return String(v);
+    const red = Math.round(v * 100) / 100;
+    return String(red);
+  }
+  return v == null ? "" : String(v).trim();
+}
+
+function horaPlana(v) {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const frac = ((v % 1) + 1) % 1;
+    const total = Math.round(frac * 24 * 60);
+    const mins = ((total % 1440) + 1440) % 1440;
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  }
+  const s = v == null ? "" : String(v).trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return s;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+
+/** La planilla guarda 2000; el formato de la hoja lo muestra como $2.000. Se lee el número. */
+export function normalizarPlanilla(filas) {
+  return (filas || []).map((row, index) => {
+    const celdas = (row || []).map((c) => (c == null ? "" : c));
+    if (index < 2) return celdas.map((c) => String(c));
+    if (celdas.length > 2) celdas[2] = montoPlano(celdas[2]);
+    if (celdas.length > 3) celdas[3] = horaPlana(celdas[3]);
+    return celdas.map((c) => (typeof c === "number" ? String(c) : String(c)));
+  });
 }
 
 function fechaMinutosBanco(fechaHora) {
