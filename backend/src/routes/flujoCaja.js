@@ -5,11 +5,11 @@ import { armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
 
 const router = express.Router();
-const ROLES = new Set(["admin", "direccion", "encargado"]);
+const ROLES = new Set(["admin", "direccion"]);
 
 function requireConciliador(req, res, next) {
   if (!ROLES.has(req.user?.role)) {
-    return res.status(403).json({ message: "Solo admin, dirección o encargado" });
+    return res.status(403).json({ message: "Solo admin o dirección" });
   }
   return next();
 }

@@ -639,9 +639,12 @@ function hydrateTopbar(){
   document.querySelectorAll("[data-admin-only='1']")
     .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion") ? "" : "none");
 
-  // data-requires-encargado="1" -> Admin, direccion y encargado (para logs)
+  // data-requires-encargado="1" -> admin y dirección. El encargado no entra.
   document.querySelectorAll("[data-requires-encargado='1']")
-    .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion" || u.role === "encargado") ? "" : "none");
+    .forEach(a => a.style.display = (u.role === "admin" || u.role === "direccion") ? "" : "none");
+
+  document.querySelectorAll("[data-no-encargado='1']")
+    .forEach(a => { if (u.role === "encargado") a.style.display = "none"; });
 }
 
 function logout(){

@@ -22,6 +22,11 @@ router.post("/", auth, requireAdminOrDireccion, async (req, res) => {
       return res.status(400).json({ message: "role inválido" });
     }
 
+    if (req.user.role !== "admin" && role === "admin") {
+      await auditLog(req, { action:"USER_CREATE_FAIL", entity:"users", success:false, status_code:403, details:{ reason:"direccion_cannot_create_admin", username } });
+      return res.status(403).json({ message: "Dirección no puede asignar rol admin" });
+    }
+
     // Validar contraseña fuerte
     const passwordError = validatePasswordStrength(password);
     if (passwordError) {
@@ -58,8 +63,8 @@ router.post("/", auth, requireAdminOrDireccion, async (req, res) => {
   }
 });
 
-// GET /api/users - Listar usuarios (acceso para usuarios autenticados)
-router.get("/", auth, async (req, res) => {
+// GET /api/users - Listar usuarios (admin y dirección)
+router.get("/", auth, requireAdminOrDireccion, async (req, res) => {
   try {
     const isAdmin = req.user?.role === "admin";
     const fields = isAdmin

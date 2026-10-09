@@ -32,9 +32,14 @@ function flujoVacio() {
     diferencia: null,
     cuentas_inicio: 0,
     cuentas_cierre: 0,
+    redireccion: { entro: 0, salio: 0, movimientos: 0, diferencia: 0 },
     por_etiqueta: [],
     por_dia: [],
   };
+}
+
+function esRedireccion(etiqueta) {
+  return normText(etiqueta).includes("redireccion de capital");
 }
 
 function claveEtiqueta(moneda, etiqueta) {
@@ -70,6 +75,13 @@ export function armarFlujoCaja({ movimientos = [], cierresAntes = [], cierresEnP
     const etiqueta = mov.etiqueta || "(sin etiqueta)";
     const fecha = mov.fecha;
 
+    if (esRedireccion(etiqueta)) {
+      if (entrada) flujo.redireccion.entro = redondear(flujo.redireccion.entro + monto);
+      else flujo.redireccion.salio = redondear(flujo.redireccion.salio + monto);
+      flujo.redireccion.movimientos += cantidad;
+      continue;
+    }
+
     if (entrada) flujo.entro = redondear(flujo.entro + monto);
     else flujo.salio = redondear(flujo.salio + monto);
 
@@ -99,6 +111,7 @@ export function armarFlujoCaja({ movimientos = [], cierresAntes = [], cierresEnP
   }
 
   for (const flujo of Object.values(flujos)) {
+    flujo.redireccion.diferencia = redondear(flujo.redireccion.entro - flujo.redireccion.salio);
     flujo.quedo = redondear(flujo.inicio + flujo.entro - flujo.salio);
     if (flujo.cierre_declarado != null) {
       flujo.diferencia = redondear(flujo.cierre_declarado - flujo.quedo);

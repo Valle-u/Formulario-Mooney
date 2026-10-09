@@ -355,6 +355,13 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_UPLOAD_MB *
  * Retorna: { exists: boolean, egreso: {...} | null }
  * IMPORTANTE: Debe estar ANTES del POST / para que Express lo matchee correctamente
  */
+function puedeVerCreador(viewerRole, creatorRole) {
+  if (viewerRole === "admin" || viewerRole === "direccion") return true;
+  if (viewerRole === "encargado") return creatorRole === "empleado" || creatorRole === "encargado";
+  if (viewerRole === "empleado") return creatorRole === "empleado";
+  return false;
+}
+
 router.get("/check-id-transferencia", auth, async (req, res) => {
   try {
     const { empresa_salida, id_transferencia } = req.query;
@@ -376,9 +383,10 @@ router.get("/check-id-transferencia", auth, async (req, res) => {
 
     // Buscar si existe
     const result = await query(
-      `SELECT id, fecha, monto, moneda, etiqueta, created_by, status
-       FROM egresos
-       WHERE empresa_salida = $1 AND id_transferencia = $2
+      `SELECT e.id, e.fecha, e.monto, e.moneda, e.etiqueta, e.created_by, e.status, u.role AS creator_role
+       FROM egresos e
+       JOIN users u ON u.id = e.created_by
+       WHERE e.empresa_salida = $1 AND e.id_transferencia = $2
        LIMIT 1`,
       [empresa_salida, id_transferencia]
     );
@@ -391,6 +399,10 @@ router.get("/check-id-transferencia", auth, async (req, res) => {
     }
 
     const egreso = result.rows[0];
+
+    if (!puedeVerCreador(req.user.role, egreso.creator_role)) {
+      return res.json({ exists: true, egreso: null });
+    }
 
     return res.json({
       exists: true,
@@ -491,6 +503,10 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
     const monedaNorm = String(moneda || "ARS").trim().toUpperCase();
     if (!["USD", "ARS", "USDT"].includes(monedaNorm)) {
       return res.status(400).json({ message: "Moneda inválida. Debe ser USD, ARS o USDT" });
+    }
+
+    if (req.user.role === "encargado" && (esCierreCaja || monedaNorm !== "ARS")) {
+      return res.status(403).json({ message: "El encargado solo puede cargar retiros en pesos" });
     }
 
     // Normalizar id_transferencia: null explícito = sin ID (checkbox "Sin ID")
@@ -1129,6 +1145,9 @@ router.get("/saldos/csv", auth, requireAdmin, exportLimiter, async (req, res) =>
 // GET /api/egresos/cierres/kpi - Cobertura de cierres por dia/turno (3 slots por dia)
 router.get("/cierres/kpi", auth, async (req, res) => {
   try {
+    if (req.user.role === "encargado") {
+      return res.status(403).json({ message: "El encargado no tiene acceso a cierres" });
+    }
     const todayISO = localDateToISO(new Date());
     const defaultDesde = shiftISODate(todayISO, -2);
 
@@ -1272,6 +1291,9 @@ router.get("/cierres/kpi", auth, async (req, res) => {
 // GET /api/egresos/cierres/resumen-dia - Totales ARS/USDT de cierres de un usuario en una fecha
 router.get("/cierres/resumen-dia", auth, async (req, res) => {
   try {
+    if (req.user.role === "encargado") {
+      return res.status(403).json({ message: "El encargado no tiene acceso a cierres" });
+    }
     const todayISO = localDateToISO(new Date());
     const defaultFecha = shiftISODate(todayISO, -1);
     const fecha = parseFechaQueryFlexible(req.query.fecha, defaultFecha, "fecha");
@@ -1395,6 +1417,9 @@ router.get("/cierres/resumen-dia", auth, async (req, res) => {
 // GET /api/egresos/cierres/csv - Exportar cierres de caja filtrados (incluye legacy)
 router.get("/cierres/csv", auth, exportLimiter, async (req, res) => {
   try {
+    if (req.user.role === "encargado") {
+      return res.status(403).json({ message: "El encargado no tiene acceso a cierres" });
+    }
     const todayISO = localDateToISO(new Date());
     const defaultDesde = shiftISODate(todayISO, -2);
 
@@ -1682,14 +1707,15 @@ router.get("/", auth, async (req, res) => {
     const isEncargado = req.user.role === "encargado";
     const isEmpleado = req.user.role === "empleado";
 
-    if (isEncargado) {
-      // Encargados ven egresos de empleados y encargados
+    if (isAdminOrDireccion) {
+      // Ven todos: no se agrega filtro.
+    } else if (isEncargado) {
       where.push(`u.role IN ('empleado', 'encargado')`);
     } else if (isEmpleado) {
-      // Empleados solo ven egresos de empleados
       where.push(`u.role = 'empleado'`);
+    } else {
+      return res.status(403).json({ message: "Rol sin acceso al historial" });
     }
-    // Admin y Dirección ven todos (no se agrega filtro)
 
     const lim = Math.min(Number(limit || 50), 200);
     const off = Math.max(Number(offset || 0), 0);
@@ -2113,55 +2139,17 @@ router.get("/:id/comprobante", auth, async (req, res) => {
       details: { filename: egreso.comprobante_filename, stored_as: localName }
     });
 
+    const uploadRoot = path.resolve(process.cwd(), UPLOAD_DIR);
+    const resolved = path.resolve(filePath);
+    if (resolved !== uploadRoot && !resolved.startsWith(uploadRoot + path.sep)) {
+      return res.status(400).json({ message: "Archivo no encontrado" });
+    }
+
     console.log(`  ✅ Sirviendo archivo desde disco`);
-    return res.sendFile(filePath);
+    return res.sendFile(resolved);
   } catch (err) {
     console.error("🔥 Error sirviendo comprobante:", err);
     return res.status(500).json({ message: "Error al obtener comprobante" });
-  }
-});
-
-// ENDPOINT DE DEBUGGING - Temporal para diagnosticar el problema
-router.get("/debug/uploads", auth, requireAdmin, async (req, res) => {
-  try {
-    const uploadDir = path.join(process.cwd(), UPLOAD_DIR);
-
-    const info = {
-      uploadDir: uploadDir,
-      exists: fs.existsSync(uploadDir),
-      cwd: process.cwd(),
-      files: []
-    };
-
-    if (fs.existsSync(uploadDir)) {
-      const files = fs.readdirSync(uploadDir);
-      info.files = files.map(f => {
-        const stats = fs.statSync(path.join(uploadDir, f));
-        return {
-          name: f,
-          size: stats.size,
-          created: stats.birthtime,
-          modified: stats.mtime
-        };
-      });
-      info.totalFiles = files.length;
-    }
-
-    // También listar registros en la BD
-    const dbRecords = await query(
-      `SELECT id, comprobante_filename, comprobante_url, created_at
-       FROM egresos
-       WHERE comprobante_filename IS NOT NULL
-       ORDER BY created_at DESC
-       LIMIT 10`
-    );
-
-    info.dbRecords = dbRecords.rows;
-
-    return res.json(info);
-  } catch (err) {
-    console.error("Error en debug endpoint:", err);
-    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -2185,6 +2173,14 @@ router.put("/:id", auth, writeLimiter, async (req, res) => {
     const nuevaMoneda = req.body?.moneda ? String(req.body.moneda).toUpperCase() : null;
     if (esCierreCajaOld && nuevaMoneda && nuevaMoneda !== oldEgreso.moneda && !isAdminOrDireccion) {
       return res.status(403).json({ message: "Solo Admin/Dirección pueden cambiar la moneda de un Cierre de Caja" });
+    }
+
+    if (req.user.role === "encargado") {
+      const monedaEfectiva = String(nuevaMoneda || oldEgreso.moneda || "ARS").toUpperCase();
+      const flagsNuevas = req.body?.etiqueta ? await getEtiquetaFlags(req.body.etiqueta) : null;
+      if (esCierreCajaOld || flagsNuevas?.flag_cierre_caja || monedaEfectiva !== "ARS") {
+        return res.status(403).json({ message: "El encargado solo puede editar retiros en pesos" });
+      }
     }
 
     const {
@@ -2630,12 +2626,19 @@ router.get("/:id/history", auth, async (req, res) => {
 
     // Verificar que el egreso existe
     const checkEgreso = await query(
-      `SELECT id FROM egresos WHERE id = $1`,
+      `SELECT e.id, u.role AS creator_role
+       FROM egresos e
+       JOIN users u ON u.id = e.created_by
+       WHERE e.id = $1`,
       [id]
     );
 
     if (checkEgreso.rows.length === 0) {
       return res.status(404).json({ message: "Egreso no encontrado" });
+    }
+
+    if (!puedeVerCreador(req.user.role, checkEgreso.rows[0].creator_role)) {
+      return res.status(403).json({ message: "No tenés permisos para ver este historial" });
     }
 
     // Obtener historial

@@ -673,6 +673,10 @@ function wireEvents() {
 document.addEventListener("DOMContentLoaded", async () => {
   if (!location.pathname.includes("cierres-caja.html")) return;
   if (!requireAuth()) return;
+  if (getUser()?.role === "encargado") {
+    window.location.replace("egreso.html");
+    return;
+  }
 
   await initCommonUI();
 

@@ -201,6 +201,11 @@ function setupPasswordMatchValidation(){
 document.addEventListener("DOMContentLoaded", async () => {
   if(!document.getElementById("usersTable")) return;
   if(!requireAuth()) return;
+  const role = getUser()?.role;
+  if (role !== "admin" && role !== "direccion") {
+    window.location.replace("egreso.html");
+    return;
+  }
   await initCommonUI();
   setupPasswordMatchValidation();
   setupUsersActions();

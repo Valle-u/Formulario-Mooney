@@ -54,16 +54,38 @@ test("separa ARS y USDT y calcula cuanto entro, salio y quedo", () => {
   assert.equal(flujos.USD.cierre_declarado, null);
 });
 
-test("el neto de una etiqueta resta las salidas de las entradas", () => {
+test("la redireccion de capital no mueve el flujo", () => {
   const { flujos } = armarFlujoCaja({
     movimientos: [
       { moneda: "USDT", etiqueta: "[Unidad M] Redireccion de capital", fecha: "2026-09-01", tipo: "ENTRADA", monto: "25.50", n: 1 },
       { moneda: "USDT", etiqueta: "[Unidad M] Redireccion de capital", fecha: "2026-09-01", tipo: "SALIDA", monto: "25.50", n: 1 },
+      { moneda: "USDT", etiqueta: "[Otra] Recepcion de USDT", fecha: "2026-09-01", tipo: "ENTRADA", monto: "10", n: 1 },
     ],
   });
-  assert.equal(flujos.USDT.por_etiqueta[0].neto, 0);
-  assert.equal(flujos.USDT.por_dia[0].neto, 0);
-  assert.equal(flujos.USDT.quedo, 0);
+  assert.equal(flujos.USDT.entro, 10);
+  assert.equal(flujos.USDT.salio, 0);
+  assert.equal(flujos.USDT.quedo, 10);
+  assert.equal(flujos.USDT.por_dia[0].neto, 10);
+  assert.equal(flujos.USDT.por_etiqueta.some((f) => f.etiqueta.includes("Redireccion")), false);
+  assert.equal(flujos.USDT.redireccion.diferencia, 0);
+});
+
+test("avisa si la redireccion de capital no cierra entre entrada y salida", () => {
+  const { flujos } = armarFlujoCaja({
+    movimientos: [
+      { moneda: "ARS", etiqueta: "[Unidad M] Redirección de capital", fecha: "2026-10-01", tipo: "ENTRADA", monto: "11400000", n: 10 },
+      { moneda: "ARS", etiqueta: "[Unidad M] Redireccion de capital", fecha: "2026-10-02", tipo: "SALIDA", monto: "12900000", n: 11 },
+      { moneda: "ARS", etiqueta: "[Unidad M] Premio Pagado", fecha: "2026-10-02", tipo: "SALIDA", monto: "200", n: 1 },
+    ],
+  });
+  assert.equal(flujos.ARS.entro, 0);
+  assert.equal(flujos.ARS.salio, 200);
+  assert.equal(flujos.ARS.quedo, -200);
+  assert.equal(flujos.ARS.redireccion.entro, 11400000);
+  assert.equal(flujos.ARS.redireccion.salio, 12900000);
+  assert.equal(flujos.ARS.redireccion.diferencia, -1500000);
+  assert.equal(flujos.ARS.redireccion.movimientos, 21);
+  assert.equal(flujos.ARS.por_dia.length, 1);
 });
 
 test("el ingreso ARS sale de las entradas etiquetadas del balance y no de las salidas", () => {
