@@ -98,6 +98,25 @@ function celdaSegura(v) {
  * Escribe en la hoja "Balance Mensual Bancario" del spreadsheet del mes.
  * No pisa el encabezado. Dedup: ID|Tipo|Importe|Titular|FechaHora.
  */
+export async function leerBalanceMensual() {
+  const spreadsheetId = process.env.BALANCE_DEF_SHEET_ID;
+  if (!spreadsheetId) throw new Error("Falta BALANCE_DEF_SHEET_ID");
+  const tab = tabDestinoBalance();
+  const sheets = await getSheets();
+  let res;
+  try {
+    res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${tab}'!A:M`,
+      valueRenderOption: "FORMATTED_VALUE",
+    });
+  } catch (e) {
+    console.error("leerBalanceMensual:", e?.message || e);
+    throw new Error(`No pude leer la hoja "${tab}" del balance mensual`);
+  }
+  return res.data.values || [];
+}
+
 export async function escribirBalanceMensual(filas) {
   const spreadsheetId = process.env.BALANCE_DEF_SHEET_ID;
   if (!spreadsheetId) throw new Error("Falta BALANCE_DEF_SHEET_ID");

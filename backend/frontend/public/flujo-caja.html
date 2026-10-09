@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Flujo de caja</title>
+  <script src="boot-sidebar.js?v=AUTO"></script>
+  <link rel="stylesheet" href="styles.css?v=AUTO"/>
+  <style>
+    .flujo-periodo { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+    .flujo-periodo .field { min-width: 180px; }
+    .flujo-bloques { display: flex; flex-direction: column; gap: 16px; }
+    .flujo-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+    @media (max-width: 720px) {
+      .flujo-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .flujo-kpi {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--card2);
+    }
+    .flujo-kpi span {
+      display: block;
+      font-size: 11px;
+      letter-spacing: .25px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .flujo-kpi strong { display: block; margin-top: 6px; font-size: 18px; color: var(--text); }
+    .flujo-kpi.entro strong { color: #10b981; }
+    .flujo-kpi.salio strong { color: #ef4444; }
+    .num-pos { color: #10b981; }
+    .num-neg { color: #ef4444; }
+    .flujo-cierre { margin: 0 0 12px; }
+    .flujo-dia { border-top: 1px solid var(--border); padding: 8px 0; }
+    .flujo-dia summary { cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+    .flujo-dia table { margin-top: 8px; }
+    .flujo-vacio { color: var(--muted); margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="app-nosidebar">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" class="nav-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="nav-item" data-requires-encargado="1">Balance</a>
+          <a href="flujo-caja.html" class="nav-item active" data-requires-encargado="1">Flujo de caja</a>
+          <a href="cierres-caja.html" class="nav-item">Cierres</a>
+          <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="nav-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+          <span id="whoami" class="user-badge">—</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <span class="brand">MooneyMaker</span>
+          <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
+        </div>
+        <nav class="mobile-nav">
+          <a href="egreso.html" class="mobile-item">Retiros</a>
+          <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+          <a href="flujo-usd.html" class="mobile-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="mobile-item" data-requires-encargado="1">Balance</a>
+          <a href="flujo-caja.html" class="mobile-item active" data-requires-encargado="1">Flujo de caja</a>
+          <a href="cierres-caja.html" class="mobile-item">Cierres</a>
+          <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="mobile-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="mobile-actions">
+          <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema">TEMA</button>
+          <div id="whoamiMobile" class="user-badge">—</div>
+          <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+    </header>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <main class="content-wrap">
+      <div class="page">
+        <section class="card">
+          <div class="card-header">Flujo de caja</div>
+          <div class="card-body">
+            <p class="note">
+              Cuánto entró, cuánto salió y cuánto quedó, con el desglose por etiqueta.
+              El ingreso en pesos sale del balance mensual, con la etiqueta que quedó al cargar el CSV del banco.
+              Las salidas, los cierres y el flujo USDT salen de este formulario.
+            </p>
+            <form id="flujoForm" class="flujo-periodo">
+              <div class="field">
+                <label for="mes">MES</label>
+                <input id="mes" type="month" required>
+              </div>
+              <button class="btn btn-primary" id="btnVer" type="submit">Ver flujo</button>
+            </form>
+            <div id="flujoEstado" class="note" style="margin-top:12px"></div>
+          </div>
+        </section>
+
+        <div id="flujoResultado" class="flujo-bloques" style="display:none"></div>
+      </div>
+    </main>
+  </div>
+  <script src="app-shared.js?v=AUTO"></script>
+  <script src="app-flujo-caja.js?v=AUTO"></script>
+</body>
+</html>
