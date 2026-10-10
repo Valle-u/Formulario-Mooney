@@ -1,7 +1,7 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import { query } from "../config/db.js";
-import { armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../services/flujoCaja.js";
+import { agruparMovimientos, armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../services/flujoCaja.js";
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
 
 const router = express.Router();
@@ -70,22 +70,26 @@ router.get("/", auth, requireConciliador, async (req, res) => {
               ELSE TRIM(etiqueta)
             END AS etiqueta,
             fecha::text AS fecha,
+            to_char(hora, 'HH24:MI') AS hora,
             COALESCE(tipo_transaccion, 'SALIDA') AS tipo,
-            SUM(monto)::text AS monto,
-            COUNT(*)::int AS n
+            monto::text AS monto,
+            COALESCE(empresa_salida, '') AS empresa,
+            COALESCE(cuenta_receptora, '') AS quien,
+            COALESCE(id_transferencia, '') AS id_transferencia,
+            COALESCE(notas, '') AS nota
          FROM egresos
          WHERE status IS DISTINCT FROM 'anulado'
            AND etiqueta IS DISTINCT FROM 'Cierre de Caja'
            AND fecha >= $1::date
            AND fecha <= $2::date
-         GROUP BY 1, 2, 3, 4`,
+         ORDER BY fecha, hora, id`,
         [desde, hasta]
       ),
     ]);
 
-    const delFormulario = movimientos.rows.filter((m) => {
+    const delFormulario = agruparMovimientos(movimientos.rows.filter((m) => {
       return !(String(m.moneda).toUpperCase() === "ARS" && String(m.tipo).toUpperCase() === "ENTRADA");
-    });
+    }));
 
     let ingresosArs = [];
     let avisoBalance = null;

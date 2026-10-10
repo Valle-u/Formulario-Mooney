@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../../src/services/flujoCaja.js";
+import { agruparMovimientos, armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../../src/services/flujoCaja.js";
 
 test("periodoMes cubre el mes completo, incluido febrero bisiesto", () => {
   assert.deepEqual(periodoMes(2026, 9), { desde: "2026-09-01", hasta: "2026-09-30" });
@@ -106,11 +106,21 @@ test("el ingreso ARS sale de las entradas etiquetadas del balance y no de las sa
   assert.equal(deposito.n, 1);
   assert.equal(deposito.fecha, "2026-10-04");
   assert.equal(sinEtiqueta.monto, 300);
+  assert.equal(deposito.detalle[0].quien, "Cliente");
+  assert.equal(deposito.detalle[0].hora, "10:00");
 
   const { flujos } = armarFlujoCaja({
     cierresAntes: [{ moneda: "ARS", monto: "1000" }],
     movimientos: [
-      { moneda: "ARS", etiqueta: "[Unidad M] Premio Pagado", fecha: "2026-10-04", tipo: "SALIDA", monto: "200", n: 1 },
+      {
+        moneda: "ARS",
+        etiqueta: "[Unidad M] Premio Pagado",
+        fecha: "2026-10-04",
+        tipo: "SALIDA",
+        monto: "200",
+        n: 1,
+        detalle: [{ hora: "11:00", monto: 200, tipo: "SALIDA", quien: "Dragon", empresa: "HG.Cash", id: "", nota: "" }],
+      },
       ...ingresos,
     ],
   });
@@ -120,4 +130,19 @@ test("el ingreso ARS sale de las entradas etiquetadas del balance y no de las sa
   const filaDeposito = flujos.ARS.por_etiqueta.find((f) => f.etiqueta === "[Unidad M] Deposito de cliente");
   assert.equal(filaDeposito.entro, 1500.5);
   assert.equal(filaDeposito.salio, 0);
+  const delDia = flujos.ARS.por_dia.find((d) => d.fecha === "2026-10-04");
+  const premio = delDia.etiquetas.find((e) => e.etiqueta === "[Unidad M] Premio Pagado");
+  assert.equal(premio.detalle[0].quien, "Dragon");
+  assert.equal(premio.detalle[0].monto, 200);
+});
+
+test("agrupa los movimientos de una etiqueta y conserva cada uno", () => {
+  const grupos = agruparMovimientos([
+    { moneda: "ARS", etiqueta: "[Otra] Gasto Personal Dragon", fecha: "2026-10-06", hora: "15:10", tipo: "SALIDA", monto: "500", empresa: "HG.Cash", quien: "Dragon", id_transferencia: "abc", nota: "" },
+    { moneda: "ARS", etiqueta: "[Otra] Gasto Personal Dragon", fecha: "2026-10-06", hora: "18:40", tipo: "SALIDA", monto: "445", empresa: "HG.Cash", quien: "Dragon", id_transferencia: "", nota: "viaticos" },
+  ]);
+  assert.equal(grupos.length, 1);
+  assert.equal(grupos[0].monto, 945);
+  assert.equal(grupos[0].n, 2);
+  assert.equal(grupos[0].detalle[1].nota, "viaticos");
 });

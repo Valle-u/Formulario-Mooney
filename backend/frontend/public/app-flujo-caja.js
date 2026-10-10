@@ -1,5 +1,5 @@
 const ROLES_FLUJO = new Set(["admin", "direccion"]);
-const CACHE_KEY = "mooney-flujo-caja";
+const CACHE_KEY = "mooney-flujo-caja-v2";
 
 const NOTAS = {
   ARS: "El ingreso sale del balance mensual etiquetado al cargar el CSV. Las salidas y los cierres salen de este formulario. Quedó es inicio + entró − salió.",
@@ -39,20 +39,51 @@ function celdaLado(moneda, monto, clase) {
   return `<td class="${clase}">${formato(moneda, v)}</td>`;
 }
 
-function filaEtiqueta(moneda, fila) {
+function textoMovimiento(mov) {
+  return [mov.hora, mov.empresa, mov.quien, mov.id ? `ID ${mov.id}` : "", mov.nota]
+    .map((parte) => String(parte || "").trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function listaMovimientos(moneda, detalle) {
+  if (!Array.isArray(detalle)) {
+    return `<p class="note">Tocá Ver flujo para cargar los movimientos de esta etiqueta.</p>`;
+  }
+  if (!detalle.length) return `<p class="flujo-vacio">Sin movimientos.</p>`;
+  const filas = detalle.map((mov) => {
+    const clase = String(mov.tipo).toUpperCase() === "ENTRADA" ? "num-pos" : "num-neg";
+    return `<tr>
+      <td>${escapeHtml(textoMovimiento(mov) || "Movimiento")}</td>
+      <td class="${clase}">${formato(moneda, mov.monto)}</td>
+    </tr>`;
+  }).join("");
+  return `<table class="table flujo-movs">
+    <thead><tr><th>Movimiento</th><th>Importe</th></tr></thead>
+    <tbody>${filas}</tbody>
+  </table>`;
+}
+
+function filaEtiqueta(moneda, fila, idDetalle) {
+  const nombre = idDetalle
+    ? `<button type="button" class="flujo-dia-btn" aria-expanded="false" aria-controls="${idDetalle}">${escapeHtml(fila.etiqueta)}</button>`
+    : escapeHtml(fila.etiqueta);
+  const detalle = idDetalle
+    ? `<tr id="${idDetalle}" class="flujo-dia-detalle" hidden><td colspan="4">${listaMovimientos(moneda, fila.detalle)}</td></tr>`
+    : "";
   return `<tr>
-    <td>${escapeHtml(fila.etiqueta)}</td>
+    <td>${nombre}</td>
     ${celdaLado(moneda, fila.entro, "num-pos")}
     ${celdaLado(moneda, fila.salio, "num-neg")}
     <td>${fila.movimientos}</td>
-  </tr>`;
+  </tr>${detalle}`;
 }
 
-function tablaEtiquetas(moneda, filas) {
+function tablaEtiquetas(moneda, filas, fecha) {
   if (!filas.length) return `<p class="flujo-vacio">Sin movimientos en este mes.</p>`;
   return `<div class="table-wrap"><table class="table">
     <thead><tr><th>Etiqueta</th><th>Entró</th><th>Salió</th><th>Movimientos</th></tr></thead>
-    <tbody>${filas.map((f) => filaEtiqueta(moneda, f)).join("")}</tbody>
+    <tbody>${filas.map((f, i) => filaEtiqueta(moneda, f, fecha ? `et-${moneda}-${fecha}-${i}` : "")).join("")}</tbody>
   </table></div>`;
 }
 
@@ -73,11 +104,11 @@ function diasHtml(moneda, dias) {
       ${celdaNeto(moneda, dia.neto)}
     </tr>
     <tr id="${id}" class="flujo-dia-detalle" hidden>
-      <td colspan="4">${tablaEtiquetas(moneda, dia.etiquetas)}</td>
+      <td colspan="4">${tablaEtiquetas(moneda, dia.etiquetas, dia.fecha)}</td>
     </tr>`;
   }).join("");
   return `<h3 style="margin:16px 0 8px">Por día</h3>
-    <p class="note">Tocá la fecha para ver las etiquetas de ese día.</p>
+    <p class="note">Tocá la fecha para ver las etiquetas. Tocá una etiqueta para ver los movimientos de ese día.</p>
     <div class="table-wrap"><table class="table">
       <thead><tr><th>Fecha</th><th>Entró</th><th>Salió</th><th>Neto</th></tr></thead>
       <tbody>${filas}</tbody>
