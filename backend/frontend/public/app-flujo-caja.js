@@ -33,12 +33,17 @@ function fechaCorta(iso) {
   return `${d}/${m}/${y}`;
 }
 
+function celdaLado(moneda, monto, clase) {
+  const v = Number(monto);
+  if (!v) return "<td>—</td>";
+  return `<td class="${clase}">${formato(moneda, v)}</td>`;
+}
+
 function filaEtiqueta(moneda, fila) {
   return `<tr>
     <td>${escapeHtml(fila.etiqueta)}</td>
-    <td class="${claseNum(fila.entro)}">${formato(moneda, fila.entro)}</td>
-    <td class="${claseNum(-fila.salio)}">${formato(moneda, fila.salio)}</td>
-    <td class="${claseNum(fila.neto)}">${formato(moneda, fila.neto)}</td>
+    ${celdaLado(moneda, fila.entro, "num-pos")}
+    ${celdaLado(moneda, fila.salio, "num-neg")}
     <td>${fila.movimientos}</td>
   </tr>`;
 }
@@ -46,22 +51,32 @@ function filaEtiqueta(moneda, fila) {
 function tablaEtiquetas(moneda, filas) {
   if (!filas.length) return `<p class="flujo-vacio">Sin movimientos en este mes.</p>`;
   return `<div class="table-wrap"><table class="table">
-    <thead><tr><th>Etiqueta</th><th>Entró</th><th>Salió</th><th>Neto</th><th>Movimientos</th></tr></thead>
+    <thead><tr><th>Etiqueta</th><th>Entró</th><th>Salió</th><th>Movimientos</th></tr></thead>
     <tbody>${filas.map((f) => filaEtiqueta(moneda, f)).join("")}</tbody>
   </table></div>`;
 }
 
+function celdaNeto(moneda, monto) {
+  const v = Number(monto);
+  if (!v) return "<td>—</td>";
+  return `<td class="${claseNum(v)}">${formato(moneda, v)}</td>`;
+}
+
 function diasHtml(moneda, dias) {
   if (!dias.length) return "";
-  return `<h3 style="margin:16px 0 8px">Por día</h3>` + dias.map((dia) => `
-    <details class="flujo-dia">
-      <summary>
-        <span>${fechaCorta(dia.fecha)}</span>
-        <span>Entró ${formato(moneda, dia.entro)} · Salió ${formato(moneda, dia.salio)} · Neto <span class="${claseNum(dia.neto)}">${formato(moneda, dia.neto)}</span></span>
-      </summary>
-      ${tablaEtiquetas(moneda, dia.etiquetas)}
-    </details>
+  const filas = dias.map((dia) => `
+    <tr>
+      <td>${fechaCorta(dia.fecha)}</td>
+      ${celdaLado(moneda, dia.entro, "num-pos")}
+      ${celdaLado(moneda, dia.salio, "num-neg")}
+      ${celdaNeto(moneda, dia.neto)}
+    </tr>
   `).join("");
+  return `<h3 style="margin:16px 0 8px">Por día</h3>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Fecha</th><th>Entró</th><th>Salió</th><th>Neto</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table></div>`;
 }
 
 function alertaRedireccion(moneda, flujo) {
