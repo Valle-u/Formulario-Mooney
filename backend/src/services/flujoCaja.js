@@ -102,12 +102,13 @@ export function armarFlujoCaja({ movimientos = [], cierresAntes = [], cierresEnP
     if (entrada) dia.entro = redondear(dia.entro + monto);
     else dia.salio = redondear(dia.salio + monto);
     if (!dia.etiquetas.has(etiqueta)) {
-      dia.etiquetas.set(etiqueta, { etiqueta, entro: 0, salio: 0, movimientos: 0 });
+      dia.etiquetas.set(etiqueta, { etiqueta, entro: 0, salio: 0, movimientos: 0, detalle: [] });
     }
     const delDia = dia.etiquetas.get(etiqueta);
     if (entrada) delDia.entro = redondear(delDia.entro + monto);
     else delDia.salio = redondear(delDia.salio + monto);
     delDia.movimientos += cantidad;
+    if (Array.isArray(mov.detalle)) delDia.detalle.push(...mov.detalle);
   }
 
   for (const flujo of Object.values(flujos)) {
@@ -132,7 +133,11 @@ export function armarFlujoCaja({ movimientos = [], cierresAntes = [], cierresEnP
   for (const dia of dias.values()) {
     const flujo = flujos[dia.moneda];
     const detalle = [...dia.etiquetas.values()]
-      .map((e) => ({ ...e, neto: redondear(e.entro - e.salio) }))
+      .map((e) => ({
+        ...e,
+        neto: redondear(e.entro - e.salio),
+        detalle: [...(e.detalle || [])].sort((a, b) => String(a.hora || "").localeCompare(String(b.hora || ""))),
+      }))
       .sort((a, b) => Math.abs(b.neto) - Math.abs(a.neto) || a.etiqueta.localeCompare(b.etiqueta));
     flujo.por_dia.push({
       fecha: dia.fecha,
@@ -149,6 +154,47 @@ export function armarFlujoCaja({ movimientos = [], cierresAntes = [], cierresEnP
   }
 
   return { flujos };
+}
+
+export function agruparMovimientos(filas) {
+  const grupos = new Map();
+  for (const fila of filas) {
+    const etiqueta = fila.etiqueta || "(sin etiqueta)";
+    const tipo = String(fila.tipo || "SALIDA").toUpperCase();
+    const fecha = fila.fecha;
+    const key = `${fila.moneda}|${etiqueta}|${fecha}|${tipo}`;
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        moneda: fila.moneda,
+        etiqueta,
+        fecha,
+        tipo,
+        monto: 0,
+        n: 0,
+        detalle: [],
+      });
+    }
+    const grupo = grupos.get(key);
+    const monto = Number(fila.monto);
+    grupo.monto = redondear(grupo.monto + monto);
+    grupo.n += 1;
+    grupo.detalle.push({
+      hora: fila.hora || "",
+      monto,
+      tipo,
+      empresa: String(fila.empresa || "").trim(),
+      quien: String(fila.quien || "").trim(),
+      id: String(fila.id_transferencia || "").trim(),
+      nota: String(fila.nota || "").trim(),
+    });
+  }
+  return [...grupos.values()];
+}
+
+function horaDe(valor) {
+  const m = String(valor || "").match(/(\d{1,2}):(\d{2})/);
+  if (!m) return "";
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
 }
 
 function fechaIso(valor) {
@@ -182,11 +228,21 @@ export function ingresosArsDesdeBalance(matriz, { desde, hasta }) {
     const etiqueta = etiquetaRaw || "(sin etiqueta)";
     const key = `${etiqueta}|${fecha}`;
     if (!grupos.has(key)) {
-      grupos.set(key, { moneda: "ARS", etiqueta, fecha, tipo: "ENTRADA", monto: 0, n: 0 });
+      grupos.set(key, { moneda: "ARS", etiqueta, fecha, tipo: "ENTRADA", monto: 0, n: 0, detalle: [] });
     }
     const grupo = grupos.get(key);
-    grupo.monto = redondear(grupo.monto + cents / 100);
+    const pesos = redondear(cents / 100);
+    grupo.monto = redondear(grupo.monto + pesos);
     grupo.n += 1;
+    grupo.detalle.push({
+      hora: horaDe(row[0]),
+      monto: pesos,
+      tipo: "ENTRADA",
+      empresa: String(row[2] ?? "").trim(),
+      quien: String(row[5] ?? "").trim(),
+      id: String(row[1] ?? "").trim(),
+      nota: String(row[9] ?? "").trim(),
+    });
   }
   return [...grupos.values()];
 }
