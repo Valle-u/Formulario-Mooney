@@ -64,15 +64,20 @@ function celdaNeto(moneda, monto) {
 
 function diasHtml(moneda, dias) {
   if (!dias.length) return "";
-  const filas = dias.map((dia) => `
-    <tr>
-      <td>${fechaCorta(dia.fecha)}</td>
+  const filas = dias.map((dia) => {
+    const id = `dia-${moneda}-${dia.fecha}`;
+    return `<tr>
+      <td><button type="button" class="flujo-dia-btn" aria-expanded="false" aria-controls="${id}">${fechaCorta(dia.fecha)}</button></td>
       ${celdaLado(moneda, dia.entro, "num-pos")}
       ${celdaLado(moneda, dia.salio, "num-neg")}
       ${celdaNeto(moneda, dia.neto)}
     </tr>
-  `).join("");
+    <tr id="${id}" class="flujo-dia-detalle" hidden>
+      <td colspan="4">${tablaEtiquetas(moneda, dia.etiquetas)}</td>
+    </tr>`;
+  }).join("");
   return `<h3 style="margin:16px 0 8px">Por día</h3>
+    <p class="note">Tocá la fecha para ver las etiquetas de ese día.</p>
     <div class="table-wrap"><table class="table">
       <thead><tr><th>Fecha</th><th>Entró</th><th>Salió</th><th>Neto</th></tr></thead>
       <tbody>${filas}</tbody>
@@ -173,6 +178,15 @@ function render(data, guardado) {
     }
   }
   document.getElementById("flujoEstado").textContent = `Período ${desde} al ${hasta}. ${origen}${extra}`;
+  root.querySelectorAll(".flujo-dia-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const fila = document.getElementById(btn.getAttribute("aria-controls"));
+      if (!fila) return;
+      const abierto = fila.hidden;
+      fila.hidden = !abierto;
+      btn.setAttribute("aria-expanded", String(abierto));
+    });
+  });
 }
 
 async function cargar(ev) {
