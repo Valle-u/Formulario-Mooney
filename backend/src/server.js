@@ -108,7 +108,8 @@ const corsOptions =
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json({ limit: "1mb" }));
+// El balance mensual manda miles de filas JSON; 1mb alcanzaba para un día y no para un rango.
+app.use(express.json({ limit: "15mb" }));
 
 // Rate limiting de lectura general; login/escritura/CSV tienen límites propios
 app.use("/api", apiLimiter);
@@ -235,6 +236,11 @@ app.get("/health", async (req, res) => {
 
 app.use((err, req, res, next) => {
   console.error("🔥 ERROR GLOBAL:", err);
+  if (err?.type === "entity.too.large" || err?.status === 413) {
+    return res.status(413).json({
+      message: "El balance es demasiado grande para enviarlo de una sola vez. Probá con un rango más corto.",
+    });
+  }
   res.status(500).json({ message: "Error interno" });
 });
 
