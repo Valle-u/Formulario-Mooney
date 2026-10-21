@@ -117,6 +117,22 @@ export async function leerBalanceMensual() {
   return res.data.values || [];
 }
 
+const LOTE_ESCRITURA = 2500;
+
+async function appendEnLotes(sheets, spreadsheetId, tab, inicio, filas) {
+  let fila = inicio;
+  for (let i = 0; i < filas.length; i += LOTE_ESCRITURA) {
+    const lote = filas.slice(i, i + LOTE_ESCRITURA);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${tab}'!A${fila}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: lote },
+    });
+    fila += lote.length;
+  }
+}
+
 export async function escribirBalanceMensual(filas) {
   const spreadsheetId = process.env.BALANCE_DEF_SHEET_ID;
   if (!spreadsheetId) throw new Error("Falta BALANCE_DEF_SHEET_ID");
@@ -143,8 +159,9 @@ export async function escribirBalanceMensual(filas) {
       spreadsheetId,
       range: `'${tab}'!A1`,
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [OUTPUT_COLUMNS, ...nuevas] },
+      requestBody: { values: [OUTPUT_COLUMNS] },
     });
+    await appendEnLotes(sheets, spreadsheetId, tab, 2, nuevas);
   } else {
     const inicio = filaInicioCarga(existing);
     if (!String(existing[0]?.[12] ?? "").trim()) {
@@ -155,12 +172,7 @@ export async function escribirBalanceMensual(filas) {
         requestBody: { values: [["Etiqueta"]] },
       });
     }
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${tab}'!A${inicio}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: nuevas },
-    });
+    await appendEnLotes(sheets, spreadsheetId, tab, inicio, nuevas);
   }
   return { tab, nuevas: nuevas.length, repetidas: dataRows.length - nuevas.length };
 }

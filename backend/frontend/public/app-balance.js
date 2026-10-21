@@ -477,7 +477,7 @@ async function cargar() {
     const data = await api("/api/balance/cargar", {
       method: "POST",
       body: { fecha: balanceActual.fecha, filas: balanceActual.filas },
-      timeout: 120000,
+      timeout: 180000,
     });
     toast("Balance mensual", data.message || "Cargado", "success");
   } catch (err) {
