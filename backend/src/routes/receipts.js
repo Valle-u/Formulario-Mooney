@@ -98,7 +98,7 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
       }
 
       if (gate?.status === "failed") {
-        return res.status(502).json({
+        return res.status(424).json({
           message: gate.user_message || "GATE no pudo leer el comprobante",
           code: gate.reason || "failed",
           gate_status: gate.status,
@@ -152,8 +152,12 @@ router.post("/scan", auth, writeLimiter, (req, res) => {
       });
     } catch (err) {
       console.error("🔥 POST /api/receipts/scan ERROR:", err?.message || err);
-      const status = err?.status && Number.isInteger(err.status) ? err.status : 502;
-      return res.status(status >= 400 && status < 600 ? status : 502).json({
+      // 502/503/504 los reemplaza el proxy de Seenode por su página HTML: una falla
+      // del lector externo se informa como 424 para que el mensaje llegue al form.
+      // 401/403 del GATE (token del lector) no deben cerrar la sesión del usuario.
+      const raw = Number.isInteger(err?.status) ? err.status : 424;
+      const status = raw >= 400 && raw < 500 && raw !== 401 && raw !== 403 ? raw : 424;
+      return res.status(status).json({
         message: err?.message || "Error al escanear el comprobante",
         code: "gate_proxy_error",
       });

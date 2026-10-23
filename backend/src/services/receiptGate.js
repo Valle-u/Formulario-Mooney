@@ -265,11 +265,14 @@ export async function scanReceiptWithGate(file, opts = {}) {
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
+      const caido = res.status === 502 || res.status === 503 || res.status === 504;
       const msg =
         data?.user_message ||
         data?.error ||
         data?.message ||
-        `GATE respondió ${res.status}`;
+        (caido
+          ? "El lector de comprobantes no está disponible. Completá los datos a mano."
+          : `El lector de comprobantes respondió ${res.status}`);
       const err = new Error(msg);
       err.status = res.status;
       err.gate = data;
