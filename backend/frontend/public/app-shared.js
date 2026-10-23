@@ -539,8 +539,15 @@ async function api(path, {method="GET", body=null, auth=true, timeout=60000} = {
     const data = isJson ? await res.json().catch(()=>null) : await res.text().catch(()=>null);
 
     if(!res.ok){
-      let msg = (data && data.message) ? data.message : (data || `Error ${res.status}`);
-      if(data && data.detail) msg += ` (${data.detail})`;
+      let msg;
+      if (isJson && data && data.message) {
+        msg = data.message;
+        if (data.detail) msg += ` (${data.detail})`;
+      } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+        msg = "El servidor no está disponible en este momento. Probá de nuevo en un minuto.";
+      } else {
+        msg = `Error ${res.status}`;
+      }
       throw new Error(msg);
     }
     return data;
