@@ -17,6 +17,7 @@ import apiKeysRoutes from "./routes/apiKeys.js";
 import exportRoutes from "./routes/export.js";
 import balanceRoutes from "./routes/balance.js";
 import flujoCajaRoutes from "./routes/flujoCaja.js";
+import arqRoutes from "./routes/arq.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
@@ -199,6 +200,7 @@ app.use("/api/api-keys", apiKeysRoutes); // Gestión de API keys (admin)
 app.use("/api/export", apiKeyExportLimiter, exportRoutes); // Export para apps externas via API key
 app.use("/api/balance", balanceRoutes);
 app.use("/api/flujo-caja", flujoCajaRoutes);
+app.use("/api/arq", arqRoutes);
 
 // Health check endpoint mejorado
 import { query } from "./config/db.js";

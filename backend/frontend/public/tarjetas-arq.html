@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Tarjetas ARQ</title>
+  <script src="boot-sidebar.js?v=AUTO"></script>
+  <link rel="stylesheet" href="styles.css?v=AUTO"/>
+  <style>
+    .arq-cuentas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .arq-cuenta {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--card2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .arq-cuenta.inactiva { opacity: .55; }
+    .arq-cuenta.elegida { border-color: var(--text); }
+    .arq-cuenta h3 { margin: 0; font-size: 16px; }
+    .arq-cuenta .titular { color: var(--muted); font-size: 12px; }
+    .arq-saldo span, .arq-mini span {
+      display: block;
+      font-size: 11px;
+      letter-spacing: .25px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .arq-saldo strong { font-size: 22px; }
+    .arq-mini { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; font-size: 13px; }
+    .arq-tarjetas { display: flex; flex-wrap: wrap; gap: 6px; }
+    .num-pos { color: #10b981; }
+    .num-neg { color: #ef4444; }
+    .arq-alerta {
+      background: #fef3c7;
+      color: #78350f;
+      border: 1px solid #b45309;
+      border-left: 4px solid #b45309;
+      padding: 10px 12px;
+      border-radius: 4px;
+      margin: 0 0 12px;
+    }
+    .arq-vacio { color: var(--muted); margin: 8px 0; }
+    .arq-filtros { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
+    .arq-filtros .field { min-width: 160px; flex: 0 1 auto; }
+    .arq-dia-btn {
+      background: none;
+      border: 0;
+      padding: 0;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .arq-dia-btn[aria-expanded="true"] { font-weight: 700; }
+    .arq-dia-detalle td { padding-top: 4px; background: rgba(255,255,255,.03); }
+    .arq-fondeo-cuenta { min-width: 160px; }
+    .arq-fondeo-usd { width: 110px; }
+    #movCancelar { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app-nosidebar">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" data-no-encargado="1" class="nav-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="nav-item" data-requires-encargado="1">Balance</a>
+          <a href="flujo-caja.html" class="nav-item" data-requires-encargado="1">Flujo de caja</a>
+          <a href="tarjetas-arq.html" class="nav-item active" data-requires-encargado="1">Tarjetas ARQ</a>
+          <a href="cierres-caja.html" data-no-encargado="1" class="nav-item">Cierres</a>
+          <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="nav-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+          <span id="whoami" class="user-badge">—</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <span class="brand">MooneyMaker</span>
+          <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
+        </div>
+        <nav class="mobile-nav">
+          <a href="egreso.html" class="mobile-item">Retiros</a>
+          <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+          <a href="flujo-usd.html" data-no-encargado="1" class="mobile-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="mobile-item" data-requires-encargado="1">Balance</a>
+          <a href="flujo-caja.html" class="mobile-item" data-requires-encargado="1">Flujo de caja</a>
+          <a href="tarjetas-arq.html" class="mobile-item active" data-requires-encargado="1">Tarjetas ARQ</a>
+          <a href="cierres-caja.html" data-no-encargado="1" class="mobile-item">Cierres</a>
+          <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="mobile-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="mobile-actions">
+          <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema">TEMA</button>
+          <div id="whoamiMobile" class="user-badge">—</div>
+          <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+    </header>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <main class="content-wrap">
+      <div class="page">
+        <section class="card">
+          <div class="card-header">Cuentas ARQ</div>
+          <div class="card-body">
+            <p class="note" id="arqIntro">
+              Saldo en USD de cada cuenta: fondeos + transferencias recibidas + ajustes − consumos − transferencias enviadas.
+              Los fondeos salen de los egresos del formulario con una etiqueta de fondeo.
+            </p>
+            <div id="arqAlerta"></div>
+            <div id="arqCuentas" class="arq-cuentas"><p class="arq-vacio">Cargando…</p></div>
+            <div class="row-actions" style="margin-top:12px">
+              <button type="button" class="btn btn-ghost" id="btnNuevaCuenta">Nueva cuenta</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="movCard">
+          <div class="card-header" id="movTitulo">Cargar movimiento</div>
+          <div class="card-body">
+            <form id="movForm" class="grid" autocomplete="off">
+              <div class="field span3">
+                <label for="movTipo">TIPO</label>
+                <select id="movTipo">
+                  <option value="CONSUMO">Consumo</option>
+                  <option value="TRANSFERENCIA">Transferencia entre cuentas</option>
+                  <option value="AJUSTE">Ajuste de saldo</option>
+                </select>
+              </div>
+              <div class="field span3">
+                <label for="movCuenta" id="movCuentaLabel">CUENTA</label>
+                <select id="movCuenta" required></select>
+              </div>
+              <div class="field span3" data-solo="CONSUMO">
+                <label for="movTarjeta">TARJETA</label>
+                <select id="movTarjeta"></select>
+              </div>
+              <div class="field span3" data-solo="TRANSFERENCIA">
+                <label for="movDestino">CUENTA QUE RECIBE</label>
+                <select id="movDestino"></select>
+              </div>
+              <div class="field span3" data-solo="CONSUMO">
+                <label for="movServicio">SERVICIO</label>
+                <input id="movServicio" list="servicioLista" maxlength="80" placeholder="Meta, Cursor, Seenode…">
+                <datalist id="servicioLista"></datalist>
+              </div>
+              <div class="field span3">
+                <label for="movFecha">FECHA</label>
+                <input id="movFecha" type="date" required>
+              </div>
+              <div class="field span3">
+                <label for="movHora">HORA (OPCIONAL)</label>
+                <input id="movHora" type="time">
+              </div>
+              <div class="field span3">
+                <label for="movMonto" id="movMontoLabel">MONTO EN USD</label>
+                <input id="movMonto" inputmode="decimal" required placeholder="21,50">
+              </div>
+              <div class="field span3" data-solo="CONSUMO">
+                <label for="movMoneda">SE PAGÓ EN</label>
+                <select id="movMoneda">
+                  <option value="USD">USD</option>
+                  <option value="ARS">Pesos (ARS)</option>
+                </select>
+              </div>
+              <div class="field span3" id="movOrigenCampo" hidden>
+                <label for="movOrigen">PESOS PAGADOS</label>
+                <input id="movOrigen" inputmode="decimal" placeholder="30.000,00">
+              </div>
+              <div class="field span12">
+                <label for="movNotas" id="movNotasLabel">NOTAS</label>
+                <input id="movNotas" maxlength="1000">
+              </div>
+              <div class="field span12 row-actions">
+                <button type="submit" class="btn btn-primary" id="movGuardar">Guardar movimiento</button>
+                <button type="button" class="btn btn-ghost" id="movCancelar">Cancelar edición</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="card" id="fondeosCard">
+          <div class="card-header">Fondeos a completar</div>
+          <div class="card-body">
+            <p class="note">
+              Sin asignar: el egreso tiene una etiqueta de fondeo genérica (por ejemplo Costo MegaMooneyMaker); elegí a qué cuenta fue.
+              Pendiente: se fondeó en pesos; cargá cuántos USD acreditó ARQ. Hasta entonces no suma al saldo.
+            </p>
+            <div id="fondeosLista"><p class="arq-vacio">Cargando…</p></div>
+          </div>
+        </section>
+
+        <section class="card" id="detalleCard" style="display:none">
+          <div class="card-header" id="detalleTitulo">Detalle de la cuenta</div>
+          <div class="card-body">
+            <form id="detalleForm" class="arq-filtros">
+              <div class="field">
+                <label for="detDesde">DESDE</label>
+                <input id="detDesde" type="date">
+              </div>
+              <div class="field">
+                <label for="detHasta">HASTA</label>
+                <input id="detHasta" type="date">
+              </div>
+              <div class="field">
+                <label for="detTarjeta">TARJETA</label>
+                <select id="detTarjeta"></select>
+              </div>
+              <div class="field">
+                <label for="detServicio">SERVICIO</label>
+                <select id="detServicio"></select>
+              </div>
+              <button class="btn btn-primary" type="submit">Ver</button>
+            </form>
+            <div id="detalleLista"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">Etiquetas de fondeo</div>
+          <div class="card-body">
+            <p class="note">
+              Cada egreso con una de estas etiquetas es un fondeo. Si la etiqueta tiene cuenta (por ejemplo Fondeo Cuenta G RODRIGUEZ), el fondeo va directo a esa cuenta.
+              Si es genérica, cada egreso aparece en "Fondeos a completar" para elegir la cuenta.
+            </p>
+            <div id="etiquetasLista"></div>
+            <form id="etiquetaForm" class="arq-filtros" style="margin-top:12px">
+              <div class="field" style="min-width:260px">
+                <label for="etiquetaValor">ETIQUETA</label>
+                <select id="etiquetaValor" required></select>
+              </div>
+              <div class="field">
+                <label for="etiquetaCuenta">CUENTA</label>
+                <select id="etiquetaCuenta"></select>
+              </div>
+              <button class="btn btn-primary" type="submit">Guardar etiqueta</button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="cuentaModal" class="modal-backdrop" style="display:none">
+    <div class="modal-content" style="max-width:520px;width:90%">
+      <div class="modal-header">
+        <h3 id="cuentaModalTitulo">Nueva cuenta</h3>
+        <button type="button" class="btn-close" data-cerrar="cuentaModal" aria-label="Cerrar">×</button>
+      </div>
+      <form id="cuentaForm" autocomplete="off">
+        <div class="modal-body grid">
+          <div class="field span6"><label for="cuNombre">NOMBRE</label><input id="cuNombre" maxlength="80" required placeholder="Cuenta Fernando"></div>
+          <div class="field span6"><label for="cuTitular">TITULAR</label><input id="cuTitular" maxlength="120"></div>
+          <div class="field span6"><label for="cuBilletera">BILLETERA</label><input id="cuBilletera" maxlength="40" placeholder="ARQ"></div>
+          <div class="field span6"><label for="cuAlias">ALIAS</label><input id="cuAlias" maxlength="80"></div>
+          <div class="field span6"><label for="cuWallet">WALLET</label><input id="cuWallet" maxlength="120"></div>
+          <div class="field span6"><label for="cuTelefono">TELÉFONO VINCULADO</label><input id="cuTelefono" maxlength="40"></div>
+          <div class="field span12"><label for="cuNotas">NOTAS</label><input id="cuNotas" maxlength="1000"></div>
+          <div class="field span12" id="cuActivaCampo">
+            <label><input type="checkbox" id="cuActiva"> Cuenta activa</label>
+          </div>
+          <p class="note span12">No cargues contraseñas acá.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-cerrar="cuentaModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="tarjetaModal" class="modal-backdrop" style="display:none">
+    <div class="modal-content" style="max-width:420px;width:90%">
+      <div class="modal-header">
+        <h3 id="tarjetaModalTitulo">Nueva tarjeta</h3>
+        <button type="button" class="btn-close" data-cerrar="tarjetaModal" aria-label="Cerrar">×</button>
+      </div>
+      <form id="tarjetaForm" autocomplete="off">
+        <div class="modal-body grid">
+          <div class="field span6">
+            <label for="taTipo">TIPO</label>
+            <select id="taTipo"><option value="global">Global</option><option value="local">Local</option></select>
+          </div>
+          <div class="field span6"><label for="taUltimos4">ÚLTIMOS 4</label><input id="taUltimos4" maxlength="4" inputmode="numeric" pattern="[0-9]{4}"></div>
+          <div class="field span12"><label for="taAlias">ALIAS</label><input id="taAlias" maxlength="80" placeholder="Meta Ads"></div>
+          <div class="field span12" id="taActivaCampo">
+            <label><input type="checkbox" id="taActiva"> Tarjeta activa</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-cerrar="tarjetaModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app-shared.js?v=AUTO"></script>
+  <script src="app-tarjetas-arq.js?v=AUTO"></script>
+</body>
+</html>
