@@ -106,7 +106,7 @@ router.get("/resumen", async (req, res) => {
          FROM arq_cuentas ORDER BY is_active DESC, nombre`
       ),
       query(
-        `SELECT id, cuenta_id, tipo, alias, ultimos4, is_active
+        `SELECT id, cuenta_id, tipo, alias, nombre_tarjeta, ultimos4, is_active
          FROM arq_tarjetas ORDER BY cuenta_id, id`
       ),
       leerFondeos(),
@@ -265,7 +265,7 @@ function datosTarjeta(body) {
   const ultimos4 = texto(body.ultimos4, 4);
   if (tipo !== "global" && tipo !== "local") return { error: "Elegí si la tarjeta es global o local" };
   if (ultimos4 && !/^\d{4}$/.test(ultimos4)) return { error: "Los últimos 4 dígitos tienen que ser números" };
-  return { tarjeta: { tipo, alias: texto(body.alias, 80), ultimos4 } };
+  return { tarjeta: { tipo, alias: texto(body.alias, 80), nombre_tarjeta: texto(body.nombre_tarjeta, 80), ultimos4 } };
 }
 
 router.post("/tarjetas", async (req, res) => {
@@ -275,8 +275,8 @@ router.post("/tarjetas", async (req, res) => {
     const { error, tarjeta } = datosTarjeta(req.body || {});
     if (error) return res.status(400).json({ message: error });
     const { rows } = await query(
-      `INSERT INTO arq_tarjetas (cuenta_id, tipo, alias, ultimos4) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [cuentaId, tarjeta.tipo, tarjeta.alias, tarjeta.ultimos4]
+      `INSERT INTO arq_tarjetas (cuenta_id, tipo, alias, nombre_tarjeta, ultimos4) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [cuentaId, tarjeta.tipo, tarjeta.alias, tarjeta.nombre_tarjeta, tarjeta.ultimos4]
     );
     await auditLog(req, { action: "ARQ_TARJETA_CREATE", entity: "arq_tarjetas", entity_id: rows[0].id, status_code: 201, details: { cuenta_id: cuentaId, ...tarjeta } });
     return res.status(201).json({ id: Number(rows[0].id) });
@@ -295,9 +295,9 @@ router.put("/tarjetas/:id", async (req, res) => {
     const activa = req.body?.is_active === undefined ? null : !!req.body.is_active;
     const { rowCount } = await query(
       `UPDATE arq_tarjetas
-       SET tipo = $1, alias = $2, ultimos4 = $3, is_active = COALESCE($4, is_active), updated_at = NOW()
-       WHERE id = $5`,
-      [tarjeta.tipo, tarjeta.alias, tarjeta.ultimos4, activa, id]
+       SET tipo = $1, alias = $2, nombre_tarjeta = $3, ultimos4 = $4, is_active = COALESCE($5, is_active), updated_at = NOW()
+       WHERE id = $6`,
+      [tarjeta.tipo, tarjeta.alias, tarjeta.nombre_tarjeta, tarjeta.ultimos4, activa, id]
     );
     if (!rowCount) return res.status(404).json({ message: "La tarjeta no existe" });
     await auditLog(req, { action: "ARQ_TARJETA_UPDATE", entity: "arq_tarjetas", entity_id: id, status_code: 200, details: { ...tarjeta, is_active: activa } });
