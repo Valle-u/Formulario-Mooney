@@ -641,8 +641,10 @@ async function guardarTarjeta(ev) {
    ========================= */
 
 async function refrescar() {
-  await Promise.all([cargarResumen(), cargarFondeos()]);
-  if (estado.cuentaDetalle) await cargarDetalle();
+  // Los fondeos y el detalle arman sus selectores con las cuentas del resumen:
+  // si se cargan antes, la lista de cuentas queda vacía.
+  await cargarResumen();
+  await Promise.all([cargarFondeos(), estado.cuentaDetalle ? cargarDetalle() : null]);
 }
 
 function manejarClick(ev) {
