@@ -5,6 +5,9 @@ export const INICIO_SEGUIMIENTO = "2026-09-01";
 
 const TIPOS = new Set(["CONSUMO", "TRANSFERENCIA", "AJUSTE"]);
 const MONEDAS_USD = new Set(["USD", "USDT"]);
+// Tope de un monto: muy por encima de cualquier movimiento real y lejos del
+// límite de NUMERIC(18,2), para que un valor absurdo no llegue a la base.
+const MAX_CENTAVOS = 100_000_000_000_00;
 
 function redondear(n) {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -15,14 +18,24 @@ function texto(v, max) {
   return s ? s.slice(0, max) : null;
 }
 
-function idValido(v) {
+export function idValido(v) {
   const n = Number(v);
-  return Number.isInteger(n) && n > 0 ? n : null;
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
 
-function montoCentavos(v) {
-  if (typeof v === "number") return Number.isFinite(v) ? Math.round(v * 100) : null;
-  return parseMonto(v);
+/** Monto en centavos, o null si no es un número o se pasa del tope. */
+export function montoCentavos(v) {
+  const c = typeof v === "number" ? (Number.isFinite(v) ? Math.round(v * 100) : null) : parseMonto(v);
+  if (c == null || Math.abs(c) > MAX_CENTAVOS) return null;
+  return c;
+}
+
+/** YYYY-MM-DD que existe en el calendario (el 31/02 no pasa) y no después de 2100. */
+export function fechaValida(s) {
+  const v = String(s || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v && v <= "2100-12-31";
 }
 
 /**
@@ -112,9 +125,7 @@ export function validarMovimiento(body = {}) {
   if (!cuentaId) return { error: "Elegí la cuenta" };
 
   const fecha = String(body.fecha || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(`${fecha}T00:00:00Z`))) {
-    return { error: "La fecha no es válida" };
-  }
+  if (!fechaValida(fecha)) return { error: "La fecha no es válida" };
   if (fecha < INICIO_SEGUIMIENTO) {
     return { error: `El seguimiento arranca el ${INICIO_SEGUIMIENTO.split("-").reverse().join("/")}` };
   }
@@ -123,7 +134,7 @@ export function validarMovimiento(body = {}) {
   if (hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) return { error: "La hora no es válida" };
 
   const centavos = montoCentavos(body.monto_usd);
-  if (centavos == null || centavos === 0) return { error: "Cargá el monto en USD" };
+  if (centavos == null || centavos === 0) return { error: "Cargá un monto en USD válido" };
   if (tipo !== "AJUSTE" && centavos < 0) return { error: "El monto tiene que ser positivo" };
 
   const monedaOrigen = String(body.moneda_origen || "USD").toUpperCase();

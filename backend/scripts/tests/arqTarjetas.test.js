@@ -1,6 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { INICIO_SEGUIMIENTO, calcularSaldos, resolverFondeo, validarMovimiento } from "../../src/services/arqTarjetas.js";
+import { INICIO_SEGUIMIENTO, calcularSaldos, fechaValida, idValido, montoCentavos, resolverFondeo, validarMovimiento } from "../../src/services/arqTarjetas.js";
+
+test("rechaza montos absurdos antes de llegar a la base", () => {
+  assert.equal(montoCentavos("21,50"), 2150);
+  assert.equal(montoCentavos(1e308), null);
+  assert.equal(montoCentavos("1e20"), null);
+  assert.equal(montoCentavos("abc"), null);
+  assert.match(validarMovimiento({ tipo: "CONSUMO", cuenta_id: 1, servicio: "Meta", fecha: "2026-10-22", monto_usd: 1e15 }).error, /válido/);
+});
+
+test("solo acepta fechas que existen e ids enteros seguros", () => {
+  assert.equal(fechaValida("2026-02-28"), true);
+  assert.equal(fechaValida("2026-02-31"), false);
+  assert.equal(fechaValida("2026-13-01"), false);
+  assert.equal(fechaValida("2101-01-01"), false);
+  assert.equal(fechaValida("2026-10-22' OR 1=1"), false);
+  assert.equal(idValido("12"), 12);
+  assert.equal(idValido("1.5"), null);
+  assert.equal(idValido("9007199254740993"), null);
+  assert.equal(idValido("-3"), null);
+});
 
 test("un fondeo en USDT toma el monto del egreso y la cuenta de la etiqueta", () => {
   assert.deepEqual(

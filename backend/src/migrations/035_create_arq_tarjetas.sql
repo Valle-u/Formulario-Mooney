@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS arq_etiquetas_fondeo (
 -- Datos que el egreso no tiene: la cuenta (si la etiqueta no la define),
 -- los USD que acreditó ARQ (si se fondeó en ARS) o que no era un fondeo.
 CREATE TABLE IF NOT EXISTS arq_fondeos (
-  egreso_id     BIGINT PRIMARY KEY REFERENCES egresos(id),
+  -- Sin el egreso este dato no significa nada: se borra con él.
+  egreso_id     BIGINT PRIMARY KEY REFERENCES egresos(id) ON DELETE CASCADE,
   cuenta_id     BIGINT REFERENCES arq_cuentas(id),
   monto_usd     NUMERIC(18,2) CHECK (monto_usd IS NULL OR monto_usd > 0),
   descartado    BOOLEAN NOT NULL DEFAULT FALSE,

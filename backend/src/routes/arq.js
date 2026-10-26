@@ -2,26 +2,27 @@ import express from "express";
 import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { query } from "../config/db.js";
 import { auditLog } from "../utils/audit.js";
-import { INICIO_SEGUIMIENTO, calcularSaldos, resolverFondeo, validarMovimiento } from "../services/arqTarjetas.js";
-import { parseMonto } from "../services/balanceDiario.js";
+import { writeLimiter } from "../middleware/rateLimiter.js";
+import {
+  INICIO_SEGUIMIENTO,
+  calcularSaldos,
+  fechaValida,
+  idValido as idParam,
+  montoCentavos,
+  resolverFondeo,
+  validarMovimiento,
+} from "../services/arqTarjetas.js";
 
 const router = express.Router();
 router.use(auth, requireAdminOrDireccion);
+// Toda escritura pasa por el mismo límite que las altas y ediciones de egresos.
+router.use((req, res, next) => (req.method === "GET" ? next() : writeLimiter(req, res, next)));
 
 const ESTADOS_FONDEO = new Set(["ok", "pendiente", "sin_asignar", "descartado"]);
-
-function idParam(v) {
-  const n = Number(v);
-  return Number.isInteger(n) && n > 0 ? n : null;
-}
 
 function texto(v, max) {
   const s = String(v ?? "").trim();
   return s ? s.slice(0, max) : null;
-}
-
-function fechaValida(s) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 }
 
 async function leerFondeos() {
@@ -446,8 +447,8 @@ router.put("/fondeos/:egresoId", async (req, res) => {
     }
     let montoUsd = null;
     if (body.monto_usd != null && body.monto_usd !== "") {
-      const c = typeof body.monto_usd === "number" ? Math.round(body.monto_usd * 100) : parseMonto(body.monto_usd);
-      if (c == null || c <= 0) return res.status(400).json({ message: "Los USD acreditados tienen que ser mayores a 0" });
+      const c = montoCentavos(body.monto_usd);
+      if (c == null || c <= 0) return res.status(400).json({ message: "Los USD acreditados tienen que ser un monto mayor a 0" });
       montoUsd = c / 100;
     }
     const descartado = !!body.descartado;
