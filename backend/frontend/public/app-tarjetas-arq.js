@@ -100,7 +100,7 @@ function renderCuentas() {
     const s = c.saldo || {};
     const transferido = (s.transferido_entrada || 0) - (s.transferido_salida || 0);
     const tarjetas = c.tarjetas.length
-      ? c.tarjetas.map((t) => `<button type="button" class="badge${t.is_active ? "" : " no"}" data-accion="editar-tarjeta" data-cuenta="${c.id}" data-id="${t.id}" title="Editar tarjeta">${escapeHtml(nombreTarjeta(t))}</button>`).join("")
+      ? c.tarjetas.map((t) => `<button type="button" class="badge${t.is_active ? "" : " no"}" data-accion="editar-tarjeta" data-cuenta="${c.id}" data-id="${t.id}" title="${escapeHtml(t.nombre_tarjeta ? `${t.nombre_tarjeta} · editar tarjeta` : "Editar tarjeta")}">${escapeHtml(nombreTarjeta(t))}</button>`).join("")
       : `<span class="note">Sin tarjetas</span>`;
     const clases = ["arq-cuenta"];
     if (!c.is_active) clases.push("inactiva");
@@ -606,6 +606,7 @@ function abrirTarjeta(cuentaId, tarjetaId) {
   document.getElementById("taTipo").value = t?.tipo || "global";
   document.getElementById("taUltimos4").value = t?.ultimos4 || "";
   document.getElementById("taAlias").value = t?.alias || "";
+  document.getElementById("taNombre").value = t?.nombre_tarjeta || "";
   document.getElementById("taActivaCampo").hidden = !t;
   document.getElementById("taActiva").checked = t ? !!t.is_active : true;
   abrirModal("tarjetaModal");
@@ -617,6 +618,7 @@ async function guardarTarjeta(ev) {
     tipo: document.getElementById("taTipo").value,
     ultimos4: document.getElementById("taUltimos4").value,
     alias: document.getElementById("taAlias").value,
+    nombre_tarjeta: document.getElementById("taNombre").value,
   };
   try {
     if (estado.editandoTarjeta) {
