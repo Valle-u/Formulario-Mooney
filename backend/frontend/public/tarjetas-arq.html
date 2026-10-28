@@ -60,6 +60,19 @@
     .arq-fondeo-cuenta { min-width: 160px; }
     .arq-fondeo-usd { width: 110px; }
     #movCancelar { display: none; }
+    .arq-subtitulo { margin: 16px 0 8px; font-size: 14px; }
+    .arq-tarjeta-alta {
+      display: grid;
+      grid-template-columns: 110px 90px 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 8px;
+    }
+    .arq-tarjeta-alta label { font-size: 11px; }
+    .arq-tarjeta-alta .field { grid-column: auto; }
+    @media (max-width: 720px) {
+      .arq-tarjeta-alta { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -264,7 +277,7 @@
   </div>
 
   <div id="cuentaModal" class="modal-backdrop" style="display:none">
-    <div class="modal-content" style="max-width:520px;width:90%">
+    <div class="modal-content" style="max-width:680px;width:92%">
       <div class="modal-header">
         <h3 id="cuentaModalTitulo">Nueva cuenta</h3>
         <button type="button" class="btn-close" data-cerrar="cuentaModal" aria-label="Cerrar">×</button>
@@ -280,6 +293,38 @@
           <div class="field span12"><label for="cuNotas">NOTAS</label><input id="cuNotas" maxlength="1000"></div>
           <div class="field span12" id="cuActivaCampo">
             <label class="config-check"><input type="checkbox" id="cuActiva"> Cuenta activa</label>
+          </div>
+          <div class="span12" id="cuAltaExtra">
+            <h4 class="arq-subtitulo">Tarjetas</h4>
+            <div id="cuTarjetas"></div>
+            <button type="button" class="btn btn-ghost btn-small" id="cuAgregarTarjeta">+ Agregar tarjeta</button>
+
+            <h4 class="arq-subtitulo">Etiqueta de fondeo</h4>
+            <p class="note">Los egresos del formulario con esta etiqueta suman al saldo de la cuenta.</p>
+            <div class="grid">
+              <div class="field span12">
+                <label for="cuEtiquetaModo">ETIQUETA</label>
+                <select id="cuEtiquetaModo">
+                  <option value="ninguna">Sin etiqueta por ahora</option>
+                  <option value="existente">Usar una etiqueta que ya existe</option>
+                  <option value="nueva">Crear una etiqueta nueva</option>
+                </select>
+              </div>
+              <div class="field span12" id="cuEtiquetaExistenteCampo" hidden>
+                <label for="cuEtiquetaExistente">ETIQUETA EXISTENTE</label>
+                <select id="cuEtiquetaExistente"></select>
+              </div>
+              <div class="field span6" data-etiqueta-nueva hidden>
+                <label for="cuEtiquetaCategoria">CATEGORÍA</label>
+                <input id="cuEtiquetaCategoria" list="cuCategorias" maxlength="40" placeholder="BlackDragon">
+                <datalist id="cuCategorias"></datalist>
+              </div>
+              <div class="field span6" data-etiqueta-nueva hidden>
+                <label for="cuEtiquetaNombre">NOMBRE DE LA ETIQUETA</label>
+                <input id="cuEtiquetaNombre" maxlength="70" placeholder="Fondeo ARQ Fernando">
+              </div>
+              <p class="note span12" id="cuEtiquetaVista" data-etiqueta-nueva hidden></p>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
