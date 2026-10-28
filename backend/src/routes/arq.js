@@ -1,7 +1,8 @@
 import express from "express";
 import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
-import { query } from "../config/db.js";
+import { pool, query } from "../config/db.js";
 import { auditLog } from "../utils/audit.js";
+import { invalidateCache } from "../utils/optionsCache.js";
 import { writeLimiter } from "../middleware/rateLimiter.js";
 import {
   INICIO_SEGUIMIENTO,
@@ -217,22 +218,125 @@ function datosCuenta(body) {
   };
 }
 
+// La etiqueta de fondeo al crear una cuenta: ninguna, una existente o una nueva.
+// Crear etiquetas del formulario es solo de admin, igual que en Configuración.
+function datosEtiquetaAlta(body, rol) {
+  const e = body.etiqueta;
+  if (!e || !e.modo || e.modo === "ninguna") return { etiqueta: null };
+  if (e.modo === "existente") {
+    const valor = texto(e.etiqueta, 80);
+    if (!valor) return { error: "Elegí la etiqueta de fondeo" };
+    return { etiqueta: { nueva: false, valor } };
+  }
+  if (e.modo === "nueva") {
+    if (rol !== "admin") return { error: "Solo un admin puede crear etiquetas nuevas", status: 403 };
+    const categoria = texto(e.categoria, 40);
+    const nombre = texto(e.nombre, 70);
+    if (!nombre) return { error: "Escribí el nombre de la etiqueta" };
+    if (categoria && /[[\]]/.test(categoria)) return { error: "La categoría no puede tener corchetes" };
+    const valor = (categoria && !nombre.startsWith("[") ? `[${categoria}] ${nombre}` : nombre).slice(0, 80);
+    return { etiqueta: { nueva: true, valor, categoria } };
+  }
+  return { error: "Opción de etiqueta inválida" };
+}
+
+class ErrorAlta extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Alta completa: cuenta, sus tarjetas y su etiqueta de fondeo en una sola transacción.
 router.post("/cuentas", async (req, res) => {
+  const body = req.body || {};
+  const c = datosCuenta(body);
+  if (!c.nombre) return res.status(400).json({ message: "Poné un nombre para la cuenta" });
+
+  const listaTarjetas = Array.isArray(body.tarjetas) ? body.tarjetas : [];
+  if (listaTarjetas.length > 20) return res.status(400).json({ message: "Demasiadas tarjetas de una vez" });
+  const tarjetas = [];
+  for (const [i, t] of listaTarjetas.entries()) {
+    const { error, tarjeta } = datosTarjeta(t || {});
+    if (error) return res.status(400).json({ message: `Tarjeta ${i + 1}: ${error}` });
+    tarjetas.push(tarjeta);
+  }
+
+  const etq = datosEtiquetaAlta(body, req.user.role);
+  if (etq.error) return res.status(etq.status || 400).json({ message: etq.error });
+
+  const client = await pool.connect();
   try {
-    const c = datosCuenta(req.body || {});
-    if (!c.nombre) return res.status(400).json({ message: "Poné un nombre para la cuenta" });
-    const { rows } = await query(
+    await client.query("BEGIN");
+    const { rows } = await client.query(
       `INSERT INTO arq_cuentas (nombre, titular, billetera, alias, wallet, telefono, notas, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id`,
       [c.nombre, c.titular, c.billetera, c.alias, c.wallet, c.telefono, c.notas, req.user.id]
     );
-    await auditLog(req, { action: "ARQ_CUENTA_CREATE", entity: "arq_cuentas", entity_id: rows[0].id, status_code: 201, details: { nombre: c.nombre } });
-    return res.status(201).json({ id: Number(rows[0].id) });
+    const cuentaId = Number(rows[0].id);
+
+    for (const t of tarjetas) {
+      await client.query(
+        `INSERT INTO arq_tarjetas (cuenta_id, tipo, alias, nombre_tarjeta, ultimos4) VALUES ($1, $2, $3, $4, $5)`,
+        [cuentaId, t.tipo, t.alias, t.nombre_tarjeta, t.ultimos4]
+      );
+    }
+
+    if (etq.etiqueta) {
+      const { valor, nueva, categoria } = etq.etiqueta;
+      if (nueva) {
+        const orden = await client.query(
+          `SELECT COALESCE(MAX(sort_order), -1) + 1 AS siguiente FROM select_options WHERE option_type = 'etiqueta'`
+        );
+        try {
+          await client.query(
+            `INSERT INTO select_options (option_type, value, category, sort_order) VALUES ('etiqueta', $1, $2, $3)`,
+            [valor, categoria || null, orden.rows[0].siguiente]
+          );
+        } catch (e) {
+          if (e.code === "23505") throw new ErrorAlta(409, `Ya existe la etiqueta "${valor}": elegila como existente`);
+          throw e;
+        }
+      } else {
+        const existe = await client.query(
+          `SELECT 1 FROM select_options WHERE option_type = 'etiqueta' AND value = $1`,
+          [valor]
+        );
+        if (!existe.rows.length) throw new ErrorAlta(400, "Esa etiqueta no existe en el formulario");
+      }
+      const vinculada = await client.query(
+        `SELECT c.nombre FROM arq_etiquetas_fondeo ef JOIN arq_cuentas c ON c.id = ef.cuenta_id WHERE ef.etiqueta = $1`,
+        [valor]
+      );
+      if (vinculada.rows.length) {
+        throw new ErrorAlta(409, `La etiqueta ya fondea la cuenta ${vinculada.rows[0].nombre}`);
+      }
+      await client.query(
+        `INSERT INTO arq_etiquetas_fondeo (etiqueta, cuenta_id) VALUES ($1, $2)
+         ON CONFLICT (etiqueta) DO UPDATE SET cuenta_id = EXCLUDED.cuenta_id`,
+        [valor, cuentaId]
+      );
+    }
+
+    await client.query("COMMIT");
+    if (etq.etiqueta?.nueva) invalidateCache();
+    await auditLog(req, {
+      action: "ARQ_CUENTA_CREATE",
+      entity: "arq_cuentas",
+      entity_id: cuentaId,
+      status_code: 201,
+      details: { nombre: c.nombre, tarjetas: tarjetas.length, etiqueta: etq.etiqueta },
+    });
+    return res.status(201).json({ id: cuentaId });
   } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (e instanceof ErrorAlta) return res.status(e.status).json({ message: e.message });
     if (e.code === "23505") return res.status(409).json({ message: "Ya hay una cuenta con ese nombre" });
     console.error("arq cuenta create:", e.message);
     return res.status(500).json({ message: "No pude crear la cuenta" });
+  } finally {
+    client.release();
   }
 });
 

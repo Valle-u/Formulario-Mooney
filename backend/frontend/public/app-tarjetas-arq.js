@@ -306,8 +306,8 @@ function filaFondeo(f) {
     <td>${fechaCorta(f.fecha)} ${escapeHtml(f.hora || "")}</td>
     <td>${escapeHtml(f.etiqueta)}<div class="note">Egreso #${f.egreso_id}${origen ? ` · ${escapeHtml(origen)}` : ""}${f.nota ? ` · ${escapeHtml(f.nota)}` : ""}</div></td>
     <td>${monto}</td>
-    <td><select class="arq-fondeo-cuenta" data-campo="cuenta">${opcionesCuentas({ vacio: "Elegí la cuenta", soloActivas: false })}</select></td>
-    <td>${usdCampo}</td>
+    <td class="field"><select class="arq-fondeo-cuenta" data-campo="cuenta">${opcionesCuentas({ vacio: "Elegí la cuenta", soloActivas: false })}</select></td>
+    <td class="field">${usdCampo}</td>
     <td class="row-actions">
       <button type="button" class="btn btn-primary btn-small" data-accion="guardar-fondeo">Guardar</button>
       <button type="button" class="btn btn-ghost btn-small" data-accion="descartar-fondeo">No es fondeo</button>
@@ -574,8 +574,92 @@ function abrirCuenta(id) {
   }
   document.getElementById("cuActivaCampo").hidden = !c;
   document.getElementById("cuActiva").checked = c ? !!c.is_active : true;
+  // Tarjetas y etiqueta solo en el alta; después se manejan desde la tarjeta de la cuenta.
+  document.getElementById("cuAltaExtra").hidden = !!c;
+  if (!c) prepararAltaCuenta();
   abrirModal("cuentaModal");
   document.getElementById("cuNombre").focus();
+}
+
+function agregarTarjetaAlta() {
+  const fila = document.createElement("div");
+  fila.className = "arq-tarjeta-alta";
+  fila.innerHTML = `
+    <div class="field"><label>TIPO</label><select data-campo="tipo"><option value="global">Global</option><option value="local">Local</option></select></div>
+    <div class="field"><label>ÚLTIMOS 4</label><input data-campo="ultimos4" maxlength="4" inputmode="numeric"></div>
+    <div class="field"><label>NOMBRE EN LA TARJETA</label><input data-campo="nombre_tarjeta" maxlength="80"></div>
+    <div class="field"><label>ALIAS</label><input data-campo="alias" maxlength="80" placeholder="Meta Ads"></div>
+    <button type="button" class="btn btn-ghost btn-small" data-quitar-tarjeta title="Quitar tarjeta">Quitar</button>`;
+  fila.querySelector("[data-quitar-tarjeta]").addEventListener("click", () => fila.remove());
+  document.getElementById("cuTarjetas").appendChild(fila);
+}
+
+function etiquetasLibres() {
+  const usadas = new Set((estado.etiquetas?.etiquetas || []).map((e) => e.etiqueta));
+  return (estado.etiquetas?.disponibles || []).filter((v) => !usadas.has(v));
+}
+
+function prepararAltaCuenta() {
+  document.getElementById("cuTarjetas").innerHTML = "";
+  agregarTarjetaAlta();
+  const esAdmin = getUser().role === "admin";
+  const modo = document.getElementById("cuEtiquetaModo");
+  modo.querySelector('option[value="nueva"]').hidden = !esAdmin;
+  modo.value = esAdmin ? "nueva" : "ninguna";
+  document.getElementById("cuEtiquetaExistente").innerHTML = `<option value="">Elegí la etiqueta</option>` +
+    etiquetasLibres().map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  const categorias = new Set();
+  for (const v of estado.etiquetas?.disponibles || []) {
+    const m = /^\[([^\]]+)\]/.exec(v);
+    if (m) categorias.add(m[1].trim());
+  }
+  document.getElementById("cuCategorias").innerHTML =
+    [...categorias].sort().map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
+  document.getElementById("cuEtiquetaCategoria").value = "";
+  document.getElementById("cuEtiquetaNombre").value = "";
+  actualizarEtiquetaAlta();
+}
+
+function valorEtiquetaNueva() {
+  const categoria = document.getElementById("cuEtiquetaCategoria").value.trim();
+  const nombre = document.getElementById("cuEtiquetaNombre").value.trim();
+  if (!nombre) return "";
+  return categoria && !nombre.startsWith("[") ? `[${categoria}] ${nombre}` : nombre;
+}
+
+function actualizarEtiquetaAlta() {
+  const modo = document.getElementById("cuEtiquetaModo").value;
+  document.getElementById("cuEtiquetaExistenteCampo").hidden = modo !== "existente";
+  document.querySelectorAll("[data-etiqueta-nueva]").forEach((el) => { el.hidden = modo !== "nueva"; });
+  const nombreEtq = document.getElementById("cuEtiquetaNombre");
+  const nombreCuenta = document.getElementById("cuNombre").value.trim();
+  // Sugiere el nombre mientras no lo hayan escrito a mano.
+  if (modo === "nueva" && (!nombreEtq.value || nombreEtq.dataset.sugerido === nombreEtq.value) && nombreCuenta) {
+    nombreEtq.value = `Fondeo ARQ ${nombreCuenta}`;
+    nombreEtq.dataset.sugerido = nombreEtq.value;
+  }
+  const valor = valorEtiquetaNueva();
+  document.getElementById("cuEtiquetaVista").textContent = valor
+    ? `Se crea la etiqueta "${valor}" en el formulario y queda vinculada a esta cuenta.`
+    : "";
+}
+
+function datosAltaCuenta() {
+  const tarjetas = [...document.querySelectorAll("#cuTarjetas .arq-tarjeta-alta")]
+    .map((fila) => Object.fromEntries([...fila.querySelectorAll("[data-campo]")].map((el) => [el.dataset.campo, el.value])))
+    // Una fila sin ningún dato no es una tarjeta.
+    .filter((t) => t.ultimos4.trim() || t.nombre_tarjeta.trim() || t.alias.trim());
+  const modo = document.getElementById("cuEtiquetaModo").value;
+  let etiqueta = { modo: "ninguna" };
+  if (modo === "existente") etiqueta = { modo, etiqueta: document.getElementById("cuEtiquetaExistente").value };
+  if (modo === "nueva") {
+    etiqueta = {
+      modo,
+      categoria: document.getElementById("cuEtiquetaCategoria").value,
+      nombre: document.getElementById("cuEtiquetaNombre").value,
+    };
+  }
+  return { tarjetas, etiqueta };
 }
 
 async function guardarCuenta(ev) {
@@ -587,7 +671,10 @@ async function guardarCuenta(ev) {
       body.is_active = document.getElementById("cuActiva").checked;
       await api(`/api/arq/cuentas/${estado.editandoCuenta}`, { method: "PUT", body });
     } else {
+      Object.assign(body, datosAltaCuenta());
       await api("/api/arq/cuentas", { method: "POST", body });
+      // Si se creó una etiqueta, el resto del formulario la tiene que ver.
+      if (body.etiqueta.modo === "nueva") reloadSelectOptions();
     }
     cerrarModal("cuentaModal");
     toast("Listo", "Cuenta guardada", "success");
@@ -709,6 +796,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("etiquetaForm").addEventListener("submit", guardarEtiqueta);
   document.getElementById("btnNuevaCuenta").addEventListener("click", () => abrirCuenta(null));
   document.getElementById("cuentaForm").addEventListener("submit", guardarCuenta);
+  document.getElementById("cuAgregarTarjeta").addEventListener("click", agregarTarjetaAlta);
+  ["cuEtiquetaModo", "cuEtiquetaCategoria", "cuEtiquetaNombre", "cuNombre"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", actualizarEtiquetaAlta);
+  });
+  document.getElementById("cuEtiquetaModo").addEventListener("change", actualizarEtiquetaAlta);
   document.getElementById("tarjetaForm").addEventListener("submit", guardarTarjeta);
 
   limpiarMovimiento({ mantener: false });
