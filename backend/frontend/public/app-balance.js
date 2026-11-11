@@ -43,6 +43,8 @@ function escapeHtml(s) {
 const filtrosTabla = { balance: {}, revisar: {} };
 let etiquetaActiva = "";
 let popoverCtx = null;
+// Filas de "A revisar" tildadas para etiquetar en masa.
+const seleccionRevisar = new Set();
 
 function valorCelda(row, col) {
   return String(row[col] ?? "");
@@ -152,18 +154,26 @@ function renderTabla(el, filas, columnas, tablaId, filasBase) {
     return;
   }
   const tope = filas.slice(0, 400);
-  const head = `<thead><tr>${columnas.map((c) => {
+  const conSel = tablaId === "revisar";
+  const todasSel = conSel && filas.length > 0 && filas.every((f) => seleccionRevisar.has(f));
+  const thSel = conSel
+    ? `<th><input type="checkbox" id="selTodasRevisar" title="Seleccionar todas las filas filtradas"${todasSel ? " checked" : ""}></th>`
+    : "";
+  const ncols = columnas.length + (conSel ? 1 : 0);
+  const head = `<thead><tr>${thSel}${columnas.map((c) => {
     const activo = filtrosTabla[tablaId] && filtrosTabla[tablaId][c] instanceof Set;
     return `<th>${escapeHtml(c.trim())}<button type="button" class="th-filtro${activo ? " activo" : ""}" data-tabla="${tablaId}" data-col="${escapeHtml(c)}">▾</button></th>`;
   }).join("")}</tr></thead>`;
-  const body = tope.map((f, i) => `<tr data-fila-idx="${i}">${columnas.map((c) => {
+  const body = tope.map((f, i) => `<tr data-fila-idx="${i}">${conSel
+    ? `<td><input type="checkbox" class="sel-fila-revisar"${seleccionRevisar.has(f) ? " checked" : ""}></td>`
+    : ""}${columnas.map((c) => {
     if (tablaId === "revisar" && c === "Etiqueta") return `<td>${htmlSelectEtiqueta(f)}</td>`;
     return `<td>${escapeHtml(f[c] ?? "")}</td>`;
   }).join("")}</tr>`).join("");
   const extra = filas.length > tope.length
-    ? `<tr><td colspan="${columnas.length}" class="muted">Mostrando ${tope.length} de ${filas.length}. El CSV descargado trae todas.</td></tr>`
+    ? `<tr><td colspan="${ncols}" class="muted">Mostrando ${tope.length} de ${filas.length}. El CSV descargado trae todas.</td></tr>`
     : (filas.length !== filasBase.length
-      ? `<tr><td colspan="${columnas.length}" class="muted">${filas.length} de ${filasBase.length} filas con el filtro actual.</td></tr>`
+      ? `<tr><td colspan="${ncols}" class="muted">${filas.length} de ${filasBase.length} filas con el filtro actual.</td></tr>`
       : "");
   el.innerHTML = head + `<tbody>${body}${extra}</tbody>`;
   el.querySelectorAll(".th-filtro").forEach((btn) => {
@@ -181,7 +191,64 @@ function renderTabla(el, filas, columnas, tablaId, filasBase) {
         if (fila && sel.value) aplicarEtiquetaManual(fila, sel.value);
       });
     });
+    el.querySelectorAll("input.sel-fila-revisar").forEach((chk) => {
+      chk.addEventListener("change", () => {
+        const fila = tope[Number(chk.closest("tr")?.dataset.filaIdx)];
+        if (!fila) return;
+        if (chk.checked) seleccionRevisar.add(fila);
+        else seleccionRevisar.delete(fila);
+        const todas = document.getElementById("selTodasRevisar");
+        if (todas) todas.checked = filas.every((f) => seleccionRevisar.has(f));
+        pintarMasivo();
+      });
+    });
+    const todas = document.getElementById("selTodasRevisar");
+    if (todas) {
+      todas.addEventListener("change", () => {
+        for (const f of filas) {
+          if (todas.checked) seleccionRevisar.add(f);
+          else seleccionRevisar.delete(f);
+        }
+        pintarTablas();
+      });
+    }
+    pintarMasivo();
   }
+}
+
+function pintarMasivo() {
+  const box = document.getElementById("masivoRevisar");
+  if (!box) return;
+  const vigentes = new Set(balanceActual?.revisar || []);
+  for (const f of [...seleccionRevisar]) if (!vigentes.has(f)) seleccionRevisar.delete(f);
+  const n = seleccionRevisar.size;
+  box.style.display = vigentes.size ? "flex" : "none";
+  document.getElementById("masivoCuenta").textContent = n
+    ? `${n} seleccionada(s)`
+    : "Tildá filas (o la casilla del encabezado para todas las filtradas) y etiquetalas juntas.";
+  const sel = document.getElementById("selMasivo");
+  const previo = sel.value;
+  sel.innerHTML = `<option value="">Elegir etiqueta</option>` + opcionesEtiqueta().map((e) =>
+    `<option value="${escapeHtml(e)}"${e === previo ? " selected" : ""}>${escapeHtml(e)}</option>`
+  ).join("");
+  sel.disabled = !n;
+  document.getElementById("btnAplicarMasivo").disabled = !n;
+  document.getElementById("btnLimpiarSel").disabled = !n;
+}
+
+function aplicarMasivo() {
+  const etiqueta = document.getElementById("selMasivo").value;
+  const filas = [...seleccionRevisar];
+  if (!filas.length) return;
+  if (!etiqueta) {
+    toast("Falta la etiqueta", "Elegí qué etiqueta aplicar a las filas seleccionadas.", "error");
+    return;
+  }
+  if (!confirm(`¿Etiquetar ${filas.length} movimiento(s) como "${etiqueta}"?`)) return;
+  aplicarEtiquetaManual(filas, etiqueta);
+  seleccionRevisar.clear();
+  document.getElementById("selMasivo").value = "";
+  pintarMasivo();
 }
 
 function mismaOperacion(a, b) {
@@ -221,7 +288,7 @@ function pintarChips() {
   });
 }
 
-function aplicarEtiquetaManual(filaRevisar, etiqueta) {
+function etiquetarFila(filaRevisar, etiqueta) {
   const origen = (balanceActual.filas || []).find((f) => !String(f.Etiqueta || "").trim() && mismaOperacion(f, filaRevisar));
   if (origen) {
     origen.Etiqueta = etiqueta;
@@ -236,7 +303,15 @@ function aplicarEtiquetaManual(filaRevisar, etiqueta) {
       if (!ya) balanceActual.filas.push({ ...origen, "Tipo de transferencia": invertido });
     }
   }
-  balanceActual.revisar = (balanceActual.revisar || []).filter((r) => r !== filaRevisar);
+}
+
+/** Etiqueta una fila de "A revisar" o varias (array) y repinta una sola vez. */
+function aplicarEtiquetaManual(filasRevisar, etiqueta) {
+  const lista = Array.isArray(filasRevisar) ? filasRevisar : [filasRevisar];
+  for (const f of lista) etiquetarFila(f, etiqueta);
+  const hechas = new Set(lista);
+  for (const f of lista) seleccionRevisar.delete(f);
+  balanceActual.revisar = (balanceActual.revisar || []).filter((r) => !hechas.has(r));
   balanceActual.resumen = resumenDesdeFilas(balanceActual.filas || []);
   const cuadre = document.getElementById("cuadre");
   if (cuadre) {
@@ -346,6 +421,7 @@ function pintarResultado(data) {
   etiquetaActiva = "";
   filtrosTabla.balance = {};
   filtrosTabla.revisar = {};
+  seleccionRevisar.clear();
   cerrarFiltro();
   document.getElementById("resultadoCard").style.display = "";
   const avisos = document.getElementById("avisos");
@@ -503,6 +579,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnGenerarUsdt").addEventListener("click", generarUsdt);
   document.getElementById("btnDescUsdt").addEventListener("click", descargarUsdt);
   document.getElementById("btnCargar").addEventListener("click", cargar);
+  document.getElementById("btnAplicarMasivo").addEventListener("click", aplicarMasivo);
+  document.getElementById("btnLimpiarSel").addEventListener("click", () => {
+    seleccionRevisar.clear();
+    pintarTablas();
+  });
   document.addEventListener("click", (ev) => {
     const pop = document.getElementById("filtroPopover");
     if (!pop || pop.style.display === "none") return;
