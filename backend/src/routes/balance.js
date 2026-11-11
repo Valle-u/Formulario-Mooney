@@ -16,7 +16,7 @@ import {
   listarDias,
   registrosDelDia,
   sumarCuadres,
-  leerBancoTexto,
+  leerBancoArchivo,
   planillaPareceValida,
   normText,
 } from "../services/balanceDiario.js";
@@ -124,16 +124,15 @@ router.post("/generar", auth, requireConciliador, (req, res) => {
       const dias = rango.dias;
       const files = req.files || [];
       if (!files.length) {
-        return res.status(400).json({ message: "Subí al menos un CSV de banco" });
+        return res.status(400).json({ message: "Subí al menos un extracto de banco (CSV o Excel)" });
       }
 
       const rivenTitular = process.env.RIVEN_TITULAR || "";
       const leidos = [];
       for (const file of files) {
         const nombre = file.originalname || "banco.csv";
-        const texto = file.buffer.toString("utf8");
         try {
-          leidos.push({ nombre, texto, ...leerBancoTexto(texto, nombre, { rivenTitular }) });
+          leidos.push({ nombre, ...leerBancoArchivo(file.buffer, nombre, { rivenTitular }) });
         } catch (e) {
           if (e.code === "FORMATO") {
             return res.status(400).json({ message: e.message });

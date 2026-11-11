@@ -71,7 +71,7 @@
           <div class="card-header">Balance diario desde CSV de banco</div>
           <div class="card-body">
             <p class="note">
-              Subí el extracto (Lohas, HG.Cash y/o Riven Flow). Si el CSV trae varios días, elegí desde y hasta:
+              Subí el extracto (Lohas, HG.Cash y/o Riven Flow en CSV; PepePay en Excel). Si el extracto trae varios días, elegí desde y hasta:
               cada día se cruza con la planilla y los egresos de esa fecha. Lo que cae afuera del rango no entra
               al balance. El resultado se puede descargar o cargar en el balance mensual. El balance USDT no usa
               el extracto: toma el día Hasta.
@@ -86,8 +86,8 @@
                 <input id="hasta" type="date" required>
               </div>
               <div class="field span3">
-                <label for="bancos">CSV DEL BANCO (uno o varios)</label>
-                <input id="bancos" type="file" accept=".csv,text/csv" multiple required>
+                <label for="bancos">EXTRACTO DEL BANCO (CSV o Excel, uno o varios)</label>
+                <input id="bancos" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple required>
               </div>
               <div class="field span3" style="align-self:end; display:flex; flex-direction:column; gap:8px">
                 <button class="btn btn-primary" id="btnGenerar" type="submit">Generar balance</button>

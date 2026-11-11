@@ -4,6 +4,8 @@
  * ya corregidas: valor absoluto, pre-pasada por ID, extras solo de bancos ausentes.
  */
 
+import { esXlsx, leerXlsx } from "../utils/xlsx.js";
+
 const AR_OFFSET_MS = -3 * 60 * 60 * 1000;
 
 export const OUTPUT_COLUMNS = [
@@ -36,10 +38,13 @@ const TIPOS_IVA_LOHAS = new Set([
 export const BANCO_LOHAS = "Lohas";
 export const BANCO_HG = "HG.Cash";
 export const BANCO_RIVEN = "Riven Flow";
+export const BANCO_PEPEPAY = "PepePay";
+// El extracto de PepePay no trae el titular de la cuenta.
+const PEPEPAY_TITULAR = "Logística cate sas";
 
 const BANCOS_USDT = ["trustwallet", "trust wallet", "binance", "bybit", "exodus"];
 
-const BANCO_POR_FORMATO = { lohas: BANCO_LOHAS, hg: BANCO_HG, riven: BANCO_RIVEN };
+const BANCO_POR_FORMATO = { lohas: BANCO_LOHAS, hg: BANCO_HG, riven: BANCO_RIVEN, pepepay: BANCO_PEPEPAY };
 
 export function rstripChars(s, chars) {
   let i = s.length;
@@ -139,6 +144,7 @@ function esEstadoRechazada(s) {
 
 export function detectarFormato(headers) {
   const h = new Set((headers || []).map((x) => String(x).trim()));
+  if (h.has("TXID") && h.has("Destinatario") && h.has("Concepto")) return "pepepay";
   if (h.has("Nombre Destino") && h.has("Tipo") && h.has("ID")) return "lohas";
   if (h.has("ID Externo") || h.has("Código COELSA") || h.has("Dirección")) return "hg";
   if (h.has("Merchant Order No") || h.has("Conttraparte")) return "riven";
@@ -208,6 +214,44 @@ function adaptRiven(r, rivenTitular) {
   };
 }
 
+// Excel guarda fechas y horas como número si la celda tiene formato de fecha.
+function fechaPepePay(fecha, hora) {
+  let f = String(fecha || "").trim();
+  let h = String(hora || "").trim();
+  if (/^\d+(\.\d+)?$/.test(f)) {
+    const dt = new Date(Math.round((Number(f) - 25569) * 86400000));
+    f = dt.toISOString().slice(0, 10);
+  }
+  if (/^0?\.\d+$|^0$/.test(h)) {
+    const seg = Math.round(Number(h) * 86400);
+    h = `${pad2(Math.floor(seg / 3600))}:${pad2(Math.floor(seg / 60) % 60)}:${pad2(seg % 60)}`;
+  }
+  const m = f.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return `${f} ${h}`.trim();
+  return `${m[3]}/${m[2]}/${m[1]} ${h}`.trim();
+}
+
+// Débito y Crédito vienen al revés de lo que dicen (los ingresos están en "Débito"):
+// el sentido sale de Tipo y el monto de la columna que tenga valor.
+function adaptPepePay(r) {
+  const tipo = String(r.Tipo || "").trim().toUpperCase();
+  const esComision = tipo === "COMMISSION";
+  return {
+    banco: BANCO_PEPEPAY,
+    // La comisión trae como TXID el ID del ingreso que la generó: se identifica con su propio ID.
+    id: String((esComision ? r.ID : r.TXID) || r.ID || "").trim(),
+    id_interno: String(r.ID || "").trim(),
+    fecha_hora: fechaPepePay(r.Fecha, r.Hora),
+    titular_cuenta: PEPEPAY_TITULAR,
+    direccion: tipo === "INCOME" ? "entrante" : "saliente",
+    titular: limpiarNombre(r.Destinatario),
+    importe: String(r["Débito"] || "").trim() || String(r["Crédito"] || "").trim(),
+    tipo_raw: r.Tipo || "",
+    es_iva: esComision,
+    es_rechazada: esEstadoRechazada(r.Estado),
+  };
+}
+
 export function primeraLinea(text) {
   const s = String(text).replace(/^\uFEFF/, "");
   const i = s.indexOf("\n");
@@ -271,9 +315,17 @@ function matrixAObjetos(matrix) {
   return { headers, filas };
 }
 
-export function leerBancoTexto(text, nombreArchivo, { rivenTitular = "" } = {}) {
-  const delim = detectarDelim(text);
-  const matrix = parseCsv(text, delim);
+export function leerBancoTexto(text, nombreArchivo, opciones = {}) {
+  return leerBancoMatriz(parseCsv(text, detectarDelim(text)), nombreArchivo, opciones);
+}
+
+/** CSV o Excel (.xlsx), según el contenido del archivo. */
+export function leerBancoArchivo(buffer, nombreArchivo, opciones = {}) {
+  if (esXlsx(buffer)) return leerBancoMatriz(leerXlsx(buffer), nombreArchivo, opciones);
+  return leerBancoTexto(buffer.toString("utf8"), nombreArchivo, opciones);
+}
+
+function leerBancoMatriz(matrix, nombreArchivo, { rivenTitular = "" } = {}) {
   const { headers, filas } = matrixAObjetos(matrix);
   const fmt = detectarFormato(headers);
   if (!fmt) {
@@ -289,6 +341,7 @@ export function leerBancoTexto(text, nombreArchivo, { rivenTitular = "" } = {}) 
     if (fmt === "lohas" && !/^\d+$/.test(idv.replace(/,/g, "").replace(/\./g, ""))) continue;
     if (fmt === "lohas") registros.push(adaptLohas(r));
     else if (fmt === "hg") registros.push(adaptHg(r));
+    else if (fmt === "pepepay") registros.push(adaptPepePay(r));
     else registros.push(adaptRiven(r, rivenTitular));
   }
   return { fmt, banco: BANCO_POR_FORMATO[fmt], registros, columnas: headers };
