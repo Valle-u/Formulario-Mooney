@@ -127,7 +127,13 @@
               <button type="button" class="btn btn-primary" id="btnCargar">Cargar en balance mensual</button>
             </div>
             <h3 style="margin:16px 0 8px">A revisar</h3>
-            <p class="note" style="margin:0 0 8px">Elegí una etiqueta en la fila para corregirla. Sale de esta lista y queda en el balance que se descarga o se carga.</p>
+            <p class="note" style="margin:0 0 8px">Elegí una etiqueta en la fila para corregirla, o tildá varias filas y etiquetalas juntas. Sale de esta lista y queda en el balance que se descarga o se carga.</p>
+            <div id="masivoRevisar" style="display:none; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 8px">
+              <span id="masivoCuenta" class="note" style="margin:0"></span>
+              <select id="selMasivo" class="sel-etiqueta" aria-label="Etiqueta para las filas seleccionadas"></select>
+              <button type="button" class="btn btn-primary" id="btnAplicarMasivo">Etiquetar seleccionadas</button>
+              <button type="button" class="btn" id="btnLimpiarSel">Quitar selección</button>
+            </div>
             <div class="table-wrap">
               <table class="table" id="tablaRevisar"></table>
             </div>
