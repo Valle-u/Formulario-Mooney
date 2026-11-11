@@ -94,7 +94,7 @@ router.get("/", auth, requireConciliador, async (req, res) => {
     let ingresosArs = [];
     let avisoBalance = null;
     try {
-      const matriz = await leerBalanceMensual();
+      const matriz = await leerBalanceMensual(desde);
       ingresosArs = ingresosArsDesdeBalance(matriz, { desde, hasta });
     } catch (e) {
       avisoBalance = e.message || "No pude leer el balance mensual";

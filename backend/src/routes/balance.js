@@ -372,8 +372,7 @@ router.post("/cargar", auth, requireConciliador, writeLimiter, async (req, res) 
     if (filas.length > 20000) {
       return res.status(400).json({ message: "Demasiadas filas para una sola carga" });
     }
-    const fechaDD = isoAFecha(fecha);
-    const resultado = await escribirBalanceMensual(filas, fechaDD);
+    const resultado = await escribirBalanceMensual(filas, fecha);
     await auditLog(req, {
       action: "balance_cargar",
       entity: "balance_mensual",
