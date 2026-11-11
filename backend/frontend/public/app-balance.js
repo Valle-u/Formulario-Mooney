@@ -397,7 +397,7 @@ async function generar(e) {
   const input = document.getElementById("bancos");
   const estado = document.getElementById("balanceEstado");
   if (rango.error || !input.files?.length) {
-    toast("Falta algo", rango.error || "Elegí al menos un CSV.", "error");
+    toast("Falta algo", rango.error || "Elegí al menos un extracto (CSV o Excel).", "error");
     return;
   }
   const fd = new FormData();
