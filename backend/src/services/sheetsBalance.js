@@ -42,19 +42,29 @@ export async function getSheets() {
   return sheetsClient;
 }
 
-export function planillaSheetId(fechaISO) {
+// Spreadsheet del mes de la fecha: primero el JSON por mes ({"2026-11":"<id>"}),
+// si el mes no está, el ID único de siempre.
+function sheetIdDelMes(fechaISO, varPorMes, varUnica) {
   const ym = String(fechaISO || "").slice(0, 7);
-  const raw = process.env.PLANILLA_CARGAS_SHEETS;
+  const raw = process.env[varPorMes];
   if (raw && raw.trim()) {
     let map;
-    try { map = JSON.parse(raw); } catch { throw new Error("PLANILLA_CARGAS_SHEETS no es un JSON válido"); }
+    try { map = JSON.parse(raw); } catch { throw new Error(`${varPorMes} no es un JSON válido`); }
     if (map[ym]) return map[ym];
     if (map[fechaISO]) return map[fechaISO];
   }
-  if (!process.env.PLANILLA_CARGAS_SHEET_ID) {
-    throw new Error("Falta PLANILLA_CARGAS_SHEET_ID");
+  if (!process.env[varUnica]) {
+    throw new Error(`Falta ${varUnica}`);
   }
-  return process.env.PLANILLA_CARGAS_SHEET_ID;
+  return process.env[varUnica];
+}
+
+export function planillaSheetId(fechaISO) {
+  return sheetIdDelMes(fechaISO, "PLANILLA_CARGAS_SHEETS", "PLANILLA_CARGAS_SHEET_ID");
+}
+
+export function balanceSheetId(fechaISO) {
+  return sheetIdDelMes(fechaISO, "BALANCE_DEF_SHEETS", "BALANCE_DEF_SHEET_ID");
 }
 
 export async function leerPlanillaDia(fechaISO) {
@@ -98,9 +108,8 @@ function celdaSegura(v) {
  * Escribe en la hoja "Balance Mensual Bancario" del spreadsheet del mes.
  * No pisa el encabezado. Dedup: ID|Tipo|Importe|Titular|FechaHora.
  */
-export async function leerBalanceMensual() {
-  const spreadsheetId = process.env.BALANCE_DEF_SHEET_ID;
-  if (!spreadsheetId) throw new Error("Falta BALANCE_DEF_SHEET_ID");
+export async function leerBalanceMensual(fechaISO) {
+  const spreadsheetId = balanceSheetId(fechaISO);
   const tab = tabDestinoBalance();
   const sheets = await getSheets();
   let res;
@@ -133,9 +142,8 @@ async function appendEnLotes(sheets, spreadsheetId, tab, inicio, filas) {
   }
 }
 
-export async function escribirBalanceMensual(filas) {
-  const spreadsheetId = process.env.BALANCE_DEF_SHEET_ID;
-  if (!spreadsheetId) throw new Error("Falta BALANCE_DEF_SHEET_ID");
+export async function escribirBalanceMensual(filas, fechaISO) {
+  const spreadsheetId = balanceSheetId(fechaISO);
   const tab = tabDestinoBalance();
 
   const dataRows = filasAMatriz(filas).map((r) => r.map(celdaSegura));
