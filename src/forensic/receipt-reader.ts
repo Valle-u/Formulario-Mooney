@@ -40,6 +40,7 @@ REGLAS DE EXTRACCION:
 2. El codigo de operacion es un identificador unico de la transaccion
 3. La fecha en formato ISO: YYYY-MM-DD HH:MM:SS. Ver el bloque FECHA.
 4. Cuenta receptora (DESTINO): CBU/CVU (22 digitos EXACTOS) o Alias. Transcribi los 22 digitos completos, sin espacios ni puntos, sin confundir letras con numeros (O=0, I/l=1, S=5, B=8). No la trunques. El CBU/CVU tiene EXACTAMENTE 22 digitos — en secuencias largas de ceros conta con cuidado y NO agregues ni quites ceros (exactamente 22).
+4b. Nombre receptor: nombre y apellido (o razon social) del DESTINATARIO, el titular de la cuenta que recibe. NO es el que envia. Si no figura, null.
 5. Entidad emisora: banco o fintech (Mercado Pago, Brubank, Galicia, DolarApp/ARQ, etc.)
 6. confianza: 0.0 a 1.0
 7. signos_edicion: true si detectas edicion digital
@@ -56,6 +57,7 @@ CODIGO DE OPERACION / COELSA ID (CRITICO — es la LLAVE de conciliacion del dep
   hay un codigo claro, devolve null — NUNCA pongas el CUIT, la cuenta ni un placeholder "<UNKNOWN>"/"N/A".
 
 FECHA (CRITICO — de este campo depende que un comprobante de HOY no se lea como de hace un año):
+- Los comprobantes argentinos escriben la fecha DIA/MES/AÑO (DD/MM/AAAA), aunque la hora diga a.m./p.m.: "12/11/2026, 11:59 a.m." es 12 de noviembre (2026-11-12), NUNCA 11 de diciembre. No la interpretes como formato yanqui MM/DD.
 - El AÑO se TRANSCRIBE de la imagen. NUNCA lo deduzcas ni lo completes con el año que vos creas que
   es hoy: tu noción del año actual viene de tu entrenamiento y ESTA DESACTUALIZADA. Si el comprobante
   dice 2026, va 2026, aunque te parezca futuro. Relee los cuatro digitos del año antes de escribirlo.
@@ -82,6 +84,7 @@ const RECEIPT_SCHEMA = {
       fecha: { type: ["string", "null"] as const },
       dia_semana: { type: ["string", "null"] as const },
       nombre_emisor: { type: ["string", "null"] as const },
+      nombre_receptor: { type: ["string", "null"] as const },
       cuenta_emisora: { type: ["string", "null"] as const },
       cuenta_receptora: { type: ["string", "null"] as const },
       entidad_emisora: { type: ["string", "null"] as const },
@@ -102,6 +105,7 @@ const RECEIPT_SCHEMA = {
       "fecha",
       "dia_semana",
       "nombre_emisor",
+      "nombre_receptor",
       "cuenta_emisora",
       "cuenta_receptora",
       "entidad_emisora",
@@ -130,6 +134,7 @@ function mapGeminiToExtraction(result: GeminiExtractionResult): ReceiptExtractio
     fecha,
     dia_semana: result.weekday,
     nombre_emisor: result.sender_name,
+    nombre_receptor: null,
     cuenta_emisora: result.sender_cbu_alias,
     cuenta_receptora: result.receiver_cbu_alias,
     entidad_emisora: result.bank_name,

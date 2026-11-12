@@ -10,6 +10,8 @@ export interface ReceiptExtraction {
    */
   dia_semana?: string | null;
   nombre_emisor: string | null;
+  /** Aditivo: nombre del titular de la cuenta destino (destinatario), o null. */
+  nombre_receptor?: string | null;
   cuenta_emisora: string | null;
   cuenta_receptora: string | null;
   entidad_emisora: string | null;

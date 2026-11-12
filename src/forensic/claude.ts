@@ -17,6 +17,7 @@ REGLAS DE EXTRACCION:
 3. El COELSA ID (si existe) es un numero largo de referencia interbancaria
 4. La fecha en formato ISO: YYYY-MM-DD HH:MM:SS (lo mas completo posible). Ver el bloque FECHA.
 5. Cuenta receptora (DESTINO): CBU/CVU (22 digitos EXACTOS) o Alias del destinatario. Transcribi los 22 digitos completos, sin espacios ni puntos, sin confundir letras con numeros (O=0, I/l=1, S=5, B=8). Es el dato mas importante: no lo trunques ni lo inventes. IMPORTANTE: el CBU/CVU tiene EXACTAMENTE 22 digitos — en las secuencias largas de ceros conta con cuidado y NO agregues ni quites ceros de mas (ni 21 ni 23: exactamente 22).
+5b. Nombre receptor: nombre y apellido (o razon social) del DESTINATARIO, el titular de la cuenta que recibe (suele figurar como "Destinatario", "Para", "Nombre" bajo Destinatario, "Le transferiste a"). NO es el que envia. Si no figura, null.
 6. Cuenta emisora: CBU/CVU/Alias del que envia (mismas reglas de transcripcion)
 7. Entidad emisora: banco o fintech del que envia (Mercado Pago, Brubank, Galicia, DolarApp/ARQ, etc.)
 8. confianza: 0.0 a 1.0
@@ -38,6 +39,7 @@ CODIGO DE OPERACION / COELSA ID (CRITICO — es la LLAVE de conciliacion del dep
   el CUIT, la cuenta, el monto ni un placeholder tipo "<UNKNOWN>"/"N/A": en ese caso va null.
 
 FECHA (CRITICO — de este campo depende que un comprobante de HOY no se lea como de hace un año):
+- Los comprobantes argentinos escriben la fecha DIA/MES/AÑO (DD/MM/AAAA), aunque la hora diga a.m./p.m.: "12/11/2026, 11:59 a.m." es 12 de noviembre (2026-11-12), NUNCA 11 de diciembre. No la interpretes como formato yanqui MM/DD.
 - El AÑO se TRANSCRIBE de la imagen. NUNCA lo deduzcas, lo completes ni lo "corrijas" con el año que
   vos creas que es hoy: tu noción del año actual viene de tu entrenamiento y ESTA DESACTUALIZADA. Si
   el comprobante dice 2026, va 2026, aunque te parezca futuro.
@@ -68,6 +70,7 @@ const RECEIPT_TOOL = {
       fecha: { type: ["string", "null"], description: "Fecha y hora ISO YYYY-MM-DD HH:MM:SS. El AÑO se transcribe de la imagen, NUNCA se deduce del año que creas que es hoy" },
       dia_semana: { type: ["string", "null"], description: "Dia de la semana TAL CUAL esta impreso en el comprobante (ej 'Martes'). null si no aparece. NO deducirlo de la fecha" },
       nombre_emisor: { type: ["string", "null"], description: "Nombre de quien realizo la transferencia" },
+      nombre_receptor: { type: ["string", "null"], description: "Nombre del destinatario (titular de la cuenta que recibe). null si no figura" },
       cuenta_emisora: { type: ["string", "null"], description: "CBU/CVU/Alias origen" },
       cuenta_receptora: { type: ["string", "null"], description: "CBU/CVU/Alias destino" },
       entidad_emisora: { type: ["string", "null"], description: "Banco o fintech de origen" },
@@ -84,7 +87,7 @@ const RECEIPT_TOOL = {
       },
     },
     required: [
-      "monto", "codigo_operacion", "fecha", "dia_semana", "nombre_emisor",
+      "monto", "codigo_operacion", "fecha", "dia_semana", "nombre_emisor", "nombre_receptor",
       "cuenta_emisora", "cuenta_receptora", "entidad_emisora",
       "tipo_operacion", "confianza", "signos_edicion",
       "es_comprobante_valido", "coelsa_id", "observaciones",
@@ -105,6 +108,7 @@ function coerceExtraction(input: Record<string, unknown>): ReceiptExtraction {
     fecha: str(input.fecha),
     dia_semana: str(input.dia_semana),
     nombre_emisor: str(input.nombre_emisor),
+    nombre_receptor: str(input.nombre_receptor),
     cuenta_emisora: str(input.cuenta_emisora),
     cuenta_receptora: str(input.cuenta_receptora),
     entidad_emisora: str(input.entidad_emisora),
