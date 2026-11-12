@@ -50,6 +50,8 @@ const EMPRESA_ALIASES = [
   ["copter", "Copter"],
   ["palta", "Palta"],
   ["lohas", "Lohas"],
+  ["pepe pay", "PepePay"],
+  ["pepepay", "PepePay"],
 ];
 
 /**
@@ -80,14 +82,37 @@ export function matchEmpresaSalida(entidadEmisora, empresasActivas = EMPRESAS_SA
   return null;
 }
 
-/** GATE fecha: `YYYY-MM-DD HH:MM:SS` (o parcial) → dd/mm/aaaa + HH:MM */
-export function parseGateFecha(fechaIso) {
+/** Fecha de hoy en Argentina como YYYY-MM-DD. */
+export function hoyArgentinaISO(ahora = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ahora);
+}
+
+/**
+ * GATE fecha: `YYYY-MM-DD HH:MM:SS` (o parcial) → dd/mm/aaaa + HH:MM.
+ * Comprobantes con "12/11/2026, 11:59 a.m." a veces vuelven con día y mes
+ * invertidos (la IA lo lee como fecha yanqui). Si la fecha queda en el futuro
+ * y al invertirla da una fecha válida que no es futura, se usa la invertida.
+ */
+export function parseGateFecha(fechaIso, hoyISO = hoyArgentinaISO()) {
   if (!fechaIso || typeof fechaIso !== "string") return null;
   const m = fechaIso.trim().match(
     /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/
   );
   if (!m) return null;
-  const [, y, mo, d, hh, mm] = m;
+  const [, y, , , hh, mm] = m;
+  let mo = m[2];
+  let d = m[3];
+  if (`${y}-${mo}-${d}` > hoyISO && Number(d) >= 1 && Number(d) <= 12) {
+    const invertida = `${y}-${d}-${mo}`;
+    const dt = new Date(`${invertida}T00:00:00Z`);
+    const valida = !Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === invertida;
+    if (valida && invertida <= hoyISO) [mo, d] = [d, mo];
+  }
   const out = { fecha: `${d}/${mo}/${y}`, hora: null };
   if (hh != null && mm != null) out.hora = `${hh}:${mm}`;
   return out;
