@@ -44,6 +44,27 @@ export async function renderPdfFirstPageToPng(
   });
 }
 
+// ── PDF renderizado → recorte de márgenes + más contraste ─────────────────────
+// Los comprobantes en PDF suelen ser una hoja A4 con el comprobante arriba y el resto en
+// blanco, con los datos (destinatario, CBU, ID) en gris claro. Sin recortar, la IA recibe la
+// hoja entera achicada y no llega a leer ese texto. Se recorta el blanco sobrante y se
+// oscurecen los grises claros (el blanco queda blanco). Si algo falla, se usa la imagen tal cual.
+export async function prepararPdfRenderizado(png: Buffer): Promise<Buffer> {
+  try {
+    const recortado = await sharp(png, { limitInputPixels: C.maxMegapixels * 1_000_000 })
+      .flatten({ background: "#ffffff" })
+      .trim({ background: "#ffffff", threshold: 12 })
+      .toBuffer();
+    return await sharp(recortado)
+      .extend({ top: 24, bottom: 24, left: 24, right: 24, background: "#ffffff" })
+      .linear(1.5, -127.5)
+      .png()
+      .toBuffer();
+  } catch {
+    return png;
+  }
+}
+
 // ── Perceptual hash (dHash 64-bit) ───────────────────────────────────────────
 export async function perceptualHash(img: Buffer): Promise<string> {
   const w = 9;

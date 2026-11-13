@@ -10,6 +10,7 @@ import { RECEIPT_GATE_CONFIG as C } from "./config.js";
 import { scanBuffer } from "./clamav.js";
 import {
   renderPdfFirstPageToPng,
+  prepararPdfRenderizado,
   perceptualHash,
   looksLikeReceipt,
   findDuplicateForSubject,
@@ -71,6 +72,7 @@ export async function runReceiptGate(
     let working = input;
     if (sniff.mime === "application/pdf") {
       working = await renderPdfFirstPageToPng(input, C.pdfRenderDpi, C.sandboxTimeoutMs);
+      working = await prepararPdfRenderizado(working);
     }
 
     const meta = await sharp(working, {

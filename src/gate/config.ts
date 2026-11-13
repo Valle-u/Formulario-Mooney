@@ -50,7 +50,9 @@ export const RECEIPT_GATE_CONFIG = {
   // ── Capa 2: sanitización ──────────────────────────────────
   reencodeQuality: 85,
   maxSideOutput: 2000,
-  pdfRenderDpi: 200,
+  // 300 dpi: los PDF de billeteras (A4 con el comprobante arriba y texto gris claro) a 200 dpi
+  // quedaban con el texto chico y lavado, y la IA solo leía el encabezado (monto y fecha).
+  pdfRenderDpi: 300,
   sandboxTimeoutMs: 20_000,
 
   // ── Capa 3: filtro semántico ──────────────────────────────
