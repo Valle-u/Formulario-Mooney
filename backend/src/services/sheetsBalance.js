@@ -158,8 +158,10 @@ export async function escribirBalanceMensual(filas, fechaISO) {
   );
   const nuevas = dataRows.filter((r) => !yaCargadas.has(claveMovimiento(r)));
 
+  // `matriz` es la hoja completa después de la carga (lo que ya había más lo
+  // nuevo), para recalcular los totales del mes sin volver a leer Sheets.
   if (!nuevas.length) {
-    return { tab, nuevas: 0, repetidas: dataRows.length };
+    return { tab, nuevas: 0, repetidas: dataRows.length, matriz: existing };
   }
 
   if (existing.length === 0) {
@@ -182,5 +184,5 @@ export async function escribirBalanceMensual(filas, fechaISO) {
     }
     await appendEnLotes(sheets, spreadsheetId, tab, inicio, nuevas);
   }
-  return { tab, nuevas: nuevas.length, repetidas: dataRows.length - nuevas.length };
+  return { tab, nuevas: nuevas.length, repetidas: dataRows.length - nuevas.length, matriz: existing.concat(nuevas) };
 }

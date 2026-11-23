@@ -122,6 +122,146 @@ function renderPersonales(data) {
   tablaAgrupada(tabla, "Panel", GRUPOS_PERSONALES, filas, data.total_personales);
 }
 
+// --- Resumen del mes (bloques de la planilla) ---
+
+const conPct = (valor, p) =>
+  `${pesos(valor)}${p === null || p === undefined ? "" : `<span class="pct">${porcentaje(p)}</span>`}`;
+
+function filaBloque(etiqueta, valorHtml, clase = "", claseValor = "") {
+  return `<div class="bloque-fila ${clase}"><span class="etq">${escapeHtml(etiqueta)}</span><span class="val ${claseValor}">${valorHtml}</span></div>`;
+}
+
+function bloque(titulo, grupo, filas) {
+  return `<div class="bloque g-${grupo}"><div class="bloque-titulo">${escapeHtml(titulo)}</div><div class="bloque-filas">${filas.join("")}</div></div>`;
+}
+
+const filasFijos = (lista) => lista.map((c) => filaBloque(c.categoria, c.monto ? pesos(c.monto) : "—", "sub"));
+
+function renderBloques(data) {
+  const b = data.bloques;
+  const aviso = document.getElementById("avisoBloques");
+  const avisos = [];
+  if (data.aviso_banco) avisos.push(`${data.aviso_banco} Mientras tanto, depósitos, retiros y CEF real quedan en 0.`);
+  const estadoBanco = document.getElementById("estadoBanco");
+  if (data.banco?.updated_at) {
+    const cuando = new Date(data.banco.updated_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    const como = data.banco.origen === "sincronizar" ? "traído a mano" : "al cargar el balance";
+    estadoBanco.textContent = `Balance bancario actualizado el ${cuando} (${como}). Se actualiza solo cada vez que se carga el balance.`;
+  } else {
+    estadoBanco.textContent = "Balance bancario de este mes: sin datos todavía.";
+  }
+  if (data.usd_sin_cotizacion) avisos.push(`Hay ${data.usd_sin_cotizacion.toLocaleString("es-AR")} USD/USDT de costos fijos sin sumar porque falta la cotización del mes.`);
+  if (data.resumen.costo_fichas_ars === null) avisos.push("Falta la factura o la cotización del mes: el costo de fichas queda en 0.");
+  aviso.hidden = !avisos.length;
+  aviso.textContent = avisos.join(" ");
+
+  const g = b.general;
+  const general = bloque("Información general", "general", [
+    filaBloque("Depósitos", pesos(g.depositos)),
+    filaBloque("Retiros", pesos(g.retiros)),
+    filaBloque("RTP", g.rtp === null ? "—" : porcentaje(g.rtp)),
+    filaBloque("GGR", pesos(g.ggr), "total", claseNum(g.ggr)),
+    filaBloque("Costos fijos", pesos(g.costos_fijos_total), "seccion"),
+    ...filasFijos(g.costos_fijos),
+    filaBloque("Costo variable", "", "seccion"),
+    filaBloque(`CEF${g.pct_cef_real === null ? "" : ` (${porcentaje(g.pct_cef_real)} real)`}`, pesos(g.cef), "sub"),
+    filaBloque("Costo de fichas", pesos(g.fichas), "sub"),
+    filaBloque("Costo de estructura", pesos(g.costo_estructura)),
+    filaBloque("Utilidades a pagar socios y nexos", pesos(g.utilidades)),
+    filaBloque("Costos totales", pesos(g.costos_totales), "total"),
+    filaBloque("Neta final", pesos(g.neta), "neta", claseNum(g.neta))
+  ]);
+
+  const c = b.casa;
+  const casa = bloque("Información casa", "casa", [
+    filaBloque("GGR casa", pesos(c.ggr), "total", claseNum(c.ggr)),
+    filaBloque("CEF", pesos(c.cef)),
+    filaBloque("Fichas", pesos(c.fichas)),
+    filaBloque("Costos fijos", pesos(c.costos_fijos_total), "seccion"),
+    ...filasFijos(c.costos_fijos),
+    filaBloque("Costos totales", pesos(c.costos_totales), "total"),
+    filaBloque("Neta", pesos(c.neta), "neta", claseNum(c.neta))
+  ]);
+
+  const s = b.socios;
+  const socios = bloque("Información socios", "socios", [
+    filaBloque("GGR socios", pesos(s.ggr), "total", claseNum(s.ggr)),
+    filaBloque("Utilidades a pagar", pesos(s.utilidades)),
+    filaBloque("Costo de estructura", pesos(s.costo_estructura)),
+    filaBloque("Ganancia de la casa", pesos(s.ganancia_casa), "total", claseNum(s.ganancia_casa)),
+    filaBloque("CEF", pesos(s.cef)),
+    filaBloque("Fichas", pesos(s.fichas)),
+    filaBloque("Costos totales", pesos(s.costos_totales), "total"),
+    filaBloque("Neta", pesos(s.neta), "neta", claseNum(s.neta))
+  ]);
+
+  const r = b.representacion;
+  const repr = bloque("Representación GGR", "repr", [
+    filaBloque("GGR total", pesos(r.total), "total", claseNum(r.total)),
+    filaBloque("GGR por socio", conPct(r.por_socio, r.pct_por_socio)),
+    filaBloque("GGR propio", conPct(r.propio, r.pct_propio))
+  ]);
+
+  const v = b.volumen;
+  const vol = bloque("Volumen de venta", "vol", [
+    filaBloque("Venta total", pesos(v.total), "total"),
+    filaBloque("Venta socio", conPct(v.socio, v.pct_socio)),
+    filaBloque("Venta casa", conPct(v.casa, v.pct_casa))
+  ]);
+
+  document.getElementById("bloques").innerHTML = general + casa + socios + `<div class="socios-bloques">${repr}${vol}</div>`;
+}
+
+async function sincronizarBanco() {
+  const btn = document.getElementById("btnSincronizarBanco");
+  btn.disabled = true;
+  const texto = btn.textContent;
+  btn.textContent = "Leyendo el balance…";
+  try {
+    await api("/api/socios/sincronizar-banco", { method: "POST", body: { mes: document.getElementById("mes").value }, timeout: 180000 });
+    toast("Listo", "Totales del balance bancario actualizados", "success");
+    await cargar(null, { mantenerConfigAbierta: true });
+  } catch (e) {
+    toast("Error", e.message || "No pude leer el balance bancario", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = texto;
+  }
+}
+
+// --- Etiquetas de costos fijos ---
+
+function renderFijos(data) {
+  const asignadas = new Map((data.costos_fijos_etiquetas || []).map((a) => [a.etiqueta.trim(), a.categoria]));
+  const disponibles = (typeof getEtiquetas_dynamic === "function" ? getEtiquetas_dynamic() : [])
+    .map((e) => String(e).trim())
+    .filter((e) => e && e !== "Cierre de Caja");
+  // Las asignadas primero; después el resto de las etiquetas del formulario.
+  const etiquetas = [...new Set([...asignadas.keys(), ...disponibles])];
+  const categorias = [...new Set([...asignadas.values(), "Empleados", "Livechat", "Servidor", "Mantenimiento CRM", "Granja", "IA"])];
+  document.getElementById("categoriasFijos").innerHTML = categorias.map((cat) => `<option value="${escapeHtml(cat)}">`).join("");
+  document.getElementById("tablaFijos").innerHTML = `<thead><tr><th>Etiqueta de egreso</th><th>Categoría de costo fijo</th></tr></thead><tbody>${
+    etiquetas.map((e) => `<tr><td>${escapeHtml(e)}</td><td><input type="text" list="categoriasFijos" maxlength="40" data-etiqueta="${escapeHtml(e)}" value="${escapeHtml(asignadas.get(e) || "")}" placeholder="No cuenta"></td></tr>`).join("")
+  }</tbody>`;
+}
+
+async function guardarFijos() {
+  const btn = document.getElementById("btnGuardarFijos");
+  const asignaciones = [...document.querySelectorAll("#tablaFijos input[data-etiqueta]")]
+    .map((i) => ({ etiqueta: i.dataset.etiqueta, categoria: i.value.trim() }))
+    .filter((a) => a.categoria);
+  btn.disabled = true;
+  try {
+    await api("/api/socios/costos-fijos", { method: "PUT", body: { asignaciones } });
+    toast("Guardado", "Etiquetas de costos fijos actualizadas", "success");
+    await cargar(null, { mantenerConfigAbierta: true });
+  } catch (e) {
+    toast("Error", e.message || "No se pudo guardar", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // --- KPIs ---
 
 function renderKpis(data) {
@@ -242,7 +382,9 @@ function render(data) {
   renderKpis(data);
   renderSocios(data);
   renderPersonales(data);
+  renderBloques(data);
   renderConfig(data);
+  renderFijos(data);
   document.getElementById("sociosResultado").hidden = false;
 
   const d = data.datos || {};
@@ -262,14 +404,15 @@ async function cargar(ev, { mantenerConfigAbierta = false } = {}) {
     estado.textContent = "Elegí un mes.";
     return;
   }
-  const detalle = document.getElementById("detalleConfig");
-  const abierto = mantenerConfigAbierta && detalle.open;
+  // Al guardar, los paneles de configuración quedan como estaban.
+  const detalles = ["detalleConfig", "detalleFijos"].map((id) => document.getElementById(id));
+  const abiertos = detalles.map((d) => mantenerConfigAbierta && d.open);
   btn.disabled = true;
   if (!ultimoReparto) estado.textContent = "Armando el reparto…";
   try {
     const data = await api(`/api/socios/reparto?mes=${encodeURIComponent(valor)}`);
     render(data);
-    detalle.open = abierto;
+    detalles.forEach((d, i) => { d.open = abiertos[i]; });
   } catch (e) {
     estado.textContent = e.message || "No pude armar el reparto";
   } finally {
@@ -289,6 +432,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("mes").value = mesActual();
   document.getElementById("sociosForm").addEventListener("submit", cargar);
   document.getElementById("formMes").addEventListener("submit", guardarMes);
+  document.getElementById("btnGuardarFijos").addEventListener("click", guardarFijos);
+  document.getElementById("btnSincronizarBanco").addEventListener("click", sincronizarBanco);
   document.getElementById("tablaConfig").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-guardar]");
     if (btn) guardarSocio(btn);

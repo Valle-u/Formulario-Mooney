@@ -68,6 +68,39 @@
     .socios-config input, .socios-config select { width: 100%; min-width: 64px; padding: 6px; font-size: 13px; }
     .socios-config input.monto { min-width: 110px; }
     details.socios-detalle > summary { cursor: pointer; font-weight: 700; }
+    .socios-banco { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+    #avisoBloques { margin-bottom: 12px; color: #b45309; }
+    /* Resumen del mes: cuadros como los de la planilla. */
+    .socios-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+    .bloque { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card2); }
+    .bloque-titulo {
+      padding: 10px 14px; font-size: 12px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+      color: var(--g); background: var(--g-fondo); border-top: 3px solid var(--g);
+    }
+    .bloque-filas { display: flex; flex-direction: column; padding: 6px 0; }
+    .bloque-fila { display: flex; justify-content: space-between; gap: 12px; padding: 6px 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .bloque-fila .etq { color: var(--muted); }
+    .bloque-fila .val { white-space: nowrap; text-align: right; }
+    .bloque-fila .pct { color: var(--muted); font-size: 12px; margin-left: 8px; }
+    .bloque-fila.sub { padding-left: 28px; font-size: 12px; }
+    .bloque-fila.seccion { margin-top: 6px; font-size: 11px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+    .bloque-fila.total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 8px; font-weight: 700; }
+    .bloque-fila.total .etq { color: var(--text); }
+    .bloque-fila.neta { margin: 6px 10px 4px; border-radius: 8px; padding: 10px; font-size: 15px; font-weight: 800; background: rgba(127, 127, 127, .10); }
+    .bloque-fila.neta .etq { color: var(--text); }
+    .g-casa   { --g: #60a5fa; --g-fondo: rgba(96, 165, 250, .14); }
+    .g-socios { --g: #a78bfa; --g-fondo: rgba(167, 139, 250, .14); }
+    .g-repr   { --g: #34d399; --g-fondo: rgba(52, 211, 153, .16); }
+    .g-vol    { --g: #fbbf24; --g-fondo: rgba(251, 191, 36, .14); }
+    .g-general { --g: #94a3b8; --g-fondo: rgba(148, 163, 184, .16); }
+    [data-theme="light"] .g-casa    { --g: #2563eb; }
+    [data-theme="light"] .g-socios  { --g: #7c3aed; }
+    [data-theme="light"] .g-repr    { --g: #047857; }
+    [data-theme="light"] .g-vol     { --g: #b45309; }
+    [data-theme="light"] .g-general { --g: #475569; }
+    .socios-fijos { min-width: 0; }
+    .socios-fijos td { padding: 6px 10px; }
+    .socios-fijos input { width: 100%; min-width: 180px; padding: 6px; font-size: 13px; }
     .socios-vacio { color: var(--muted); margin: 8px 0; }
   </style>
 </head>
@@ -169,6 +202,18 @@
           </section>
 
           <section class="card">
+            <div class="card-header">Resumen del mes</div>
+            <div class="card-body">
+              <div class="socios-banco">
+                <span id="estadoBanco" class="note"></span>
+                <button class="btn btn-ghost btn-small" type="button" id="btnSincronizarBanco">Traer del balance bancario</button>
+              </div>
+              <div id="avisoBloques" class="note" hidden></div>
+              <div id="bloques" class="socios-resumen"></div>
+            </div>
+          </section>
+
+          <section class="card">
             <div class="card-header">Configuración del mes</div>
             <div class="card-body">
               <details class="socios-detalle" id="detalleConfig">
@@ -186,6 +231,18 @@
                 <div class="table-wrap" style="margin-top:16px">
                   <table class="table socios-config" id="tablaConfig"></table>
                 </div>
+              </details>
+              <details class="socios-detalle" id="detalleFijos" style="margin-top:16px">
+                <summary>Etiquetas que cuentan como costo fijo</summary>
+                <p class="note" style="margin-top:12px">
+                  Los costos fijos del resumen salen de los egresos del mes con estas etiquetas, agrupados por categoría.
+                  Dejá la categoría vacía para que una etiqueta no cuente. Los egresos en USD o USDT se pasan a pesos con la cotización del mes.
+                </p>
+                <datalist id="categoriasFijos"></datalist>
+                <div class="table-wrap">
+                  <table class="table socios-fijos" id="tablaFijos"></table>
+                </div>
+                <button class="btn btn-primary" type="button" id="btnGuardarFijos" style="margin-top:12px">Guardar etiquetas</button>
               </details>
             </div>
           </section>
