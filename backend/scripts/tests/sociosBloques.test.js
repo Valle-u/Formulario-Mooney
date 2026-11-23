@@ -76,9 +76,9 @@ test("calcularBloques arma los cuadros como la planilla", () => {
   assert.equal(b.casa.neta, 2600000 - 50000 - 160000 - 1000000);
 
   assert.equal(b.socios.ganancia_casa, 400000 - 81000);
-  assert.equal(b.socios.cef, 16875);        // 750.000 × 2,25%
+  assert.equal(b.socios.cef, 18750);        // 750.000 × 2,5% (CEF real)
   assert.equal(b.socios.fichas, 18000);
-  assert.equal(b.socios.neta, 319000 - 16875 - 18000);
+  assert.equal(b.socios.neta, 319000 - 18750 - 18000);
 
   assert.equal(b.representacion.total, 2600000 + 319000);
   assert.equal(b.representacion.propio, 2600000);

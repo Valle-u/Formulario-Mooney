@@ -160,7 +160,8 @@ export function calcularBloques({ reparto, banco, fijos }) {
   // Socios: lo que le deja a la casa el GGR de los paneles de socios.
   const ggrSocios = num(ts.ggr);
   const gananciaCasa = ggrSocios - (utilidades + estructura);
-  const cefSocios = num(ts.entrada) * num(res.pct_cef_socio);
+  // En el resumen el CEF es siempre el real (IVA sobre depósitos del banco).
+  const cefSocios = pctCefReal === null ? 0 : num(ts.entrada) * pctCefReal;
   const fichasSocios = num(ts.fichas_casa) + num(ts.fichas_socio) + num(ts.fichas_nexo);
   const socios = {
     ggr: r2(ggrSocios),
