@@ -19,12 +19,47 @@
     .socios-kpi small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
     .num-pos { color: #10b981; }
     .num-neg { color: #ef4444; }
-    .socios-tabla { min-width: 1500px; }
-    .socios-tabla th, .socios-tabla td { text-align: right; white-space: nowrap; padding: 8px; }
-    .socios-tabla th:first-child, .socios-tabla td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); z-index: 1; }
-    .socios-tabla thead tr.grupo th { text-align: center; font-size: 11px; letter-spacing: .3px; }
-    .socios-tabla tr.total td { font-weight: 800; border-top: 2px solid var(--border); }
-    .socios-tabla .col-ggc { background: rgba(16, 185, 129, .06); }
+    /* Tablas agrupadas: cada grupo de columnas tiene su color. */
+    .socios-tabla { min-width: 0; width: max-content; border-collapse: separate; border-spacing: 0; }
+    .socios-tabla th, .socios-tabla td { text-align: right; white-space: nowrap; padding: 9px 12px; font-variant-numeric: tabular-nums; }
+    .socios-tabla .col-nombre {
+      text-align: left; position: sticky; left: 0; z-index: 2; min-width: 150px;
+      background: var(--card); border-right: 1px solid var(--border); font-weight: 700;
+    }
+    .socios-tabla thead .col-nombre { vertical-align: bottom; }
+    .socios-tabla tr.grupo th {
+      text-align: center; font-size: 11px; letter-spacing: .5px; text-transform: uppercase;
+      padding: 8px 12px; border-top: 3px solid var(--g); background: var(--g-fondo); color: var(--g);
+    }
+    .socios-tabla tr.sub th {
+      font-size: 12px; font-weight: 700; color: var(--muted); background: var(--g-suave);
+      border-bottom: 1px solid var(--border);
+    }
+    .socios-tabla .ini { border-left: 1px solid var(--border); }
+    .socios-tabla tbody tr:nth-child(even) td:not(.col-nombre) { background-color: rgba(127, 127, 127, .05); }
+    .socios-tabla tbody tr:hover td { background-color: rgba(127, 127, 127, .10); }
+    .socios-tabla td.g-ggc { background-color: rgba(16, 185, 129, .07); }
+    .socios-tabla tbody tr:nth-child(even) td.g-ggc { background-color: rgba(16, 185, 129, .11); }
+    .socios-tabla td.fuerte { font-weight: 700; }
+    .socios-tabla .vacio { color: var(--muted); opacity: .5; }
+    .socios-tabla tr.total td { font-weight: 800; border-top: 2px solid var(--border); background-color: rgba(127, 127, 127, .12); }
+    .socios-tabla tr.total .col-nombre { background: var(--card); }
+    .g-info   { --g: #60a5fa; --g-fondo: rgba(96, 165, 250, .14); --g-suave: rgba(96, 165, 250, .05); }
+    .g-ggr    { --g: #a78bfa; --g-fondo: rgba(167, 139, 250, .14); --g-suave: rgba(167, 139, 250, .05); }
+    .g-cef    { --g: #fbbf24; --g-fondo: rgba(251, 191, 36, .14); --g-suave: rgba(251, 191, 36, .05); }
+    .g-fichas { --g: #fb923c; --g-fondo: rgba(251, 146, 60, .14); --g-suave: rgba(251, 146, 60, .05); }
+    .g-otros  { --g: #f472b6; --g-fondo: rgba(244, 114, 182, .14); --g-suave: rgba(244, 114, 182, .05); }
+    .g-ggc    { --g: #34d399; --g-fondo: rgba(52, 211, 153, .16); --g-suave: rgba(52, 211, 153, .07); }
+    .g-ops    { --g: #22d3ee; --g-fondo: rgba(34, 211, 238, .14); --g-suave: rgba(34, 211, 238, .05); }
+    .g-ticket { --g: #94a3b8; --g-fondo: rgba(148, 163, 184, .16); --g-suave: rgba(148, 163, 184, .05); }
+    [data-theme="light"] .g-info   { --g: #2563eb; }
+    [data-theme="light"] .g-ggr    { --g: #7c3aed; }
+    [data-theme="light"] .g-cef    { --g: #b45309; }
+    [data-theme="light"] .g-fichas { --g: #c2410c; }
+    [data-theme="light"] .g-otros  { --g: #be185d; }
+    [data-theme="light"] .g-ggc    { --g: #047857; }
+    [data-theme="light"] .g-ops    { --g: #0e7490; }
+    [data-theme="light"] .g-ticket { --g: #475569; }
     .socios-aviso { color: #b45309; font-size: 11px; display: block; }
     .socios-config-mes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
     @media (max-width: 720px) { .socios-config-mes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
