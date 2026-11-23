@@ -40,3 +40,6 @@ backend/backups/
 
 # Archivos temporales de Claude Code
 tmpclaude-*
+
+# Scraper (repo aparte, con credenciales): no se versiona acá
+scraper/
