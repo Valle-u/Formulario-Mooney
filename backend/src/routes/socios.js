@@ -78,7 +78,7 @@ router.get("/reparto", async (req, res) => {
   if (!mes) return res.status(400).json({ message: "mes inválido (formato AAAA-MM)" });
 
   try {
-    const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes] = await Promise.all([
+    const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes, anterior] = await Promise.all([
       query(`SELECT id, nombre, tipo, orden, is_active FROM paneles ORDER BY orden, nombre`),
       query(
         `SELECT panel_id,
@@ -100,13 +100,24 @@ router.get("/reparto", async (req, res) => {
       socioMesDe(mes.inicio),
       egresosPorEtiqueta(mes.inicio),
       query(`SELECT etiqueta, categoria FROM costos_fijos_etiquetas ORDER BY categoria, etiqueta`),
-      bancoDelMes(mes.inicio)
+      bancoDelMes(mes.inicio),
+      // Netwin de los paneles de control del mes pasado (para el costo real de fichas).
+      query(
+        `SELECT p.nombre, SUM(d.netwin)::float8 AS netwin
+           FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
+          WHERE p.tipo = 'control'
+            AND d.fecha >= $1::date - INTERVAL '1 month' AND d.fecha < $1::date
+          GROUP BY p.nombre`,
+        [mes.inicio]
+      )
     ]);
 
     const porPanel = {};
     for (const row of totales.rows) porPanel[row.panel_id] = row;
 
-    const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes });
+    const control = Object.fromEntries(anterior.rows.map((r) => [r.nombre, r.netwin]));
+    const netwinAnterior = control.ADMIN === undefined ? null : { admin: control.ADMIN, agentemc: control.AGENTEMC ?? 0 };
+    const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes, netwinAnterior });
     const fijos = costosFijosPorCategoria(egresos, asignaciones.rows, reparto.resumen.cotizacion);
     const bloques = calcularBloques({ reparto, banco: bancoRes.banco, fijos });
 

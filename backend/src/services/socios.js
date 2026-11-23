@@ -96,7 +96,11 @@ function sumar(filas, campos) {
  * @param configs   { [panel_id]: fila de panel_config_mes (+ heredada, nexo_nombre) }
  * @param socioMes  fila de socios_mes (o null)
  */
-export function calcularReparto({ paneles, totales, configs, socioMes }) {
+/**
+ * @param netwinAnterior { admin, agentemc } del mes anterior: el costo real de
+ *   fichas es la factura del mes (en pesos) sobre el netwin propio del mes pasado.
+ */
+export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnterior = null }) {
   const socios = [];
   const personales = [];
   const control = {};
@@ -133,8 +137,6 @@ export function calcularReparto({ paneles, totales, configs, socioMes }) {
   const totalSocios = sumar(socios, camposSocio);
   totalSocios.ggc_socio = r2(socios.reduce((s, f) => s + Math.max(0, f.ggc_socio), 0));
   totalSocios.ggc_nexo = r2(socios.reduce((s, f) => s + Math.max(0, f.ggc_nexo), 0));
-  totalSocios.deuda_socios = r2(socios.reduce((s, f) => s + Math.max(0, -f.ggc_socio), 0));
-  totalSocios.deuda_nexos = r2(socios.reduce((s, f) => s + Math.max(0, -f.ggc_nexo), 0));
 
   const totalPersonales = sumar(personales, ["netwin", "entrada", "salida", "ops_entrada", "ops_salida", "bonos", "ggr", "inversion_publicidad"]);
 
@@ -144,6 +146,8 @@ export function calcularReparto({ paneles, totales, configs, socioMes }) {
   const factura = socioMes?.factura_usd === null || socioMes?.factura_usd === undefined ? null : num(socioMes.factura_usd);
   const cotizacion = socioMes?.cotizacion === null || socioMes?.cotizacion === undefined ? null : num(socioMes.cotizacion);
   const costoFichasArs = factura !== null && cotizacion !== null ? r2(factura * cotizacion) : null;
+  const adminAnterior = netwinAnterior?.admin ?? null;
+  const netwinPropioAnterior = adminAnterior === null ? null : r2(num(adminAnterior) - num(netwinAnterior?.agentemc));
 
   return {
     socios,
@@ -157,7 +161,8 @@ export function calcularReparto({ paneles, totales, configs, socioMes }) {
       factura_usd: factura,
       cotizacion,
       costo_fichas_ars: costoFichasArs,
-      pct_fichas_real: costoFichasArs !== null && netwinPropio > 0 ? costoFichasArs / netwinPropio : null,
+      netwin_propio_anterior: netwinPropioAnterior,
+      pct_fichas_real: costoFichasArs !== null && netwinPropioAnterior > 0 ? costoFichasArs / netwinPropioAnterior : null,
       pct_fichas_pactado: num(socioMes?.pct_fichas_pactado),
       pct_cef_socio: num(socioMes?.pct_cef_socio)
     }

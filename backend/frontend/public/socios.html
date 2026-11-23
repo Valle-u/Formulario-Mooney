@@ -11,7 +11,7 @@
     .socios-periodo .field { min-width: 180px; }
     .socios-bloques { display: flex; flex-direction: column; gap: 16px; }
     .socios-bloques[hidden] { display: none; }
-    .socios-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .socios-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
     @media (max-width: 720px) { .socios-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .socios-kpi { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--card2); }
     .socios-kpi span { display: block; font-size: 11px; letter-spacing: .25px; text-transform: uppercase; color: var(--muted); }

@@ -274,12 +274,13 @@ function renderKpis(data) {
     : porcentaje(r.pct_fichas_real);
   const notaFichas = r.costo_fichas_ars === null
     ? "Falta la factura o la cotización del mes"
-    : `${pesos(r.costo_fichas_ars)} de factura · pactado ${porcentaje(r.pct_fichas_pactado, 0)}`;
+    : r.netwin_propio_anterior === null
+      ? `${pesos(r.costo_fichas_ars)} de factura · falta el netwin del mes pasado`
+      : `${pesos(r.costo_fichas_ars)} de factura sobre netwin del mes pasado ${pesos(r.netwin_propio_anterior)} · pactado ${porcentaje(r.pct_fichas_pactado, 0)}`;
   document.getElementById("sociosKpis").innerHTML = [
     kpi("GGR socios", pesos(t.ggr), claseNum(t.ggr)),
     kpi("GGC casa", pesos(t.ggc_casa), claseNum(t.ggc_casa), "Lo que nos queda de los paneles de socios"),
     kpi("Utilidades a pagar", pesos(t.ggc_socio + t.ggc_nexo), "", "GGC positivo de socios y nexos"),
-    kpi("Nos deben", pesos(t.deuda_socios + t.deuda_nexos), t.deuda_socios + t.deuda_nexos > 0 ? "num-neg" : "", "GGC negativo de socios y nexos"),
     kpi("Netwin propio", pesos(r.netwin_propio), claseNum(r.netwin_propio),
       r.netwin_admin === null ? "Sin datos del admin" : `Admin ${pesos(r.netwin_admin)} − AgenteMC ${pesos(r.netwin_agentemc)}`),
     kpi("Costo real de fichas", fichasReal, "", notaFichas)

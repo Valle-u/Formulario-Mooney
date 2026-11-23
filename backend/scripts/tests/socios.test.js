@@ -71,7 +71,8 @@ test("calcularReparto: totales, deuda de socios, paneles personales y netwin pro
   const gJ = r.socios[0].ggc_socio;
   assert.ok(gJ > 0);
   assert.equal(r.total_socios.ggc_socio, gJ);
-  assert.equal(r.total_socios.deuda_socios, -r.socios[1].ggc_socio);
+  assert.ok(r.socios[1].ggc_socio < 0);
+  assert.equal(r.total_socios.ggc_socio, gJ); // el negativo cuenta 0
 
   assert.equal(r.personales[0].ggr, 177194 - 51300 - 1000);
   assert.equal(r.personales[0].ticket_deposito, Math.round(177194 / 42 * 100) / 100);
@@ -79,7 +80,18 @@ test("calcularReparto: totales, deuda de socios, paneles personales y netwin pro
 
   assert.equal(r.resumen.netwin_propio, 600000);
   assert.equal(r.resumen.costo_fichas_ars, 9293130);
-  assert.ok(Math.abs(r.resumen.pct_fichas_real - 9293130 / 600000) < 1e-9);
+  assert.equal(r.resumen.pct_fichas_real, null); // sin netwin del mes pasado
+});
+
+test("costo real de fichas: factura en pesos sobre el netwin propio del mes pasado", () => {
+  const r = calcularReparto({
+    paneles: [], totales: {}, configs: {}, socioMes: MES,
+    netwinAnterior: { admin: 60000000, agentemc: 10000000 }
+  });
+  assert.equal(r.resumen.netwin_propio_anterior, 50000000);
+  assert.ok(Math.abs(r.resumen.pct_fichas_real - 9293130 / 50000000) < 1e-12);
+  const negativo = calcularReparto({ paneles: [], totales: {}, configs: {}, socioMes: MES, netwinAnterior: { admin: -5, agentemc: 0 } });
+  assert.equal(negativo.resumen.pct_fichas_real, null);
 });
 
 test("un socio sin configuración se muestra sin repartir", () => {
