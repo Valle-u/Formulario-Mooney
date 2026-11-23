@@ -25,13 +25,6 @@ function claseNum(n) {
   return "";
 }
 
-function celda(n, { color = false, extra = "" } = {}) {
-  const v = Number(n);
-  const vacio = !v;
-  const clases = [color && !vacio ? claseNum(v) : "", extra].filter(Boolean).join(" ");
-  return `<td${clases ? ` class="${clases}"` : ""}>${vacio ? "—" : pesos(v)}</td>`;
-}
-
 function fechaCorta(iso) {
   const [y, m, d] = String(iso || "").split("-");
   return d ? `${d}/${m}/${y}` : "—";
@@ -39,14 +32,59 @@ function fechaCorta(iso) {
 
 // --- Panel de socios ---
 
-const COLUMNAS_SOCIOS = [
-  ["netwin", "Netwin"], ["entrada", "Entrada"], ["salida", "Salida"], ["ggr", "GGR", true],
-  ["ggr_casa", "GGR casa", true], ["ggr_socio", "GGR socio", true], ["ggr_nexo", "GGR nexo", true],
-  ["cef_casa", "CEF casa"], ["cef_socio", "CEF socio"], ["cef_nexo", "CEF nexo"],
-  ["fichas_casa", "Fichas casa"], ["fichas_socio", "Fichas socio"], ["fichas_nexo", "Fichas nexo"],
-  ["empleados_socio", "Empleados socio"], ["empleados_nexo", "Empleados nexo"], ["costo_estructura", "Costo estructura"],
-  ["ggc_casa", "GGC casa", true, "col-ggc"], ["ggc_socio", "GGC socio", true, "col-ggc"], ["ggc_nexo", "GGC nexo", true, "col-ggc"]
+// Columnas agrupadas: cada grupo tiene su color (ver .g-* en socios.html) y
+// las subcolumnas repiten el mismo orden Casa / Socio / Nexo.
+const GRUPOS_SOCIOS = [
+  { id: "info", titulo: "Información general", cols: [
+    { k: "netwin", t: "Netwin", color: "neg" }, { k: "entrada", t: "Entrada" },
+    { k: "salida", t: "Salida" }, { k: "ggr", t: "GGR", color: true, fuerte: true }] },
+  { id: "ggr", titulo: "Reparto del GGR", cols: [
+    { k: "ggr_casa", t: "Casa", color: "neg" }, { k: "ggr_socio", t: "Socio", color: "neg" }, { k: "ggr_nexo", t: "Nexo", color: "neg" }] },
+  { id: "cef", titulo: "CEF", cols: [
+    { k: "cef_casa", t: "Casa" }, { k: "cef_socio", t: "Socio" }, { k: "cef_nexo", t: "Nexo" }] },
+  { id: "fichas", titulo: "Fichas", cols: [
+    { k: "fichas_casa", t: "Casa" }, { k: "fichas_socio", t: "Socio" }, { k: "fichas_nexo", t: "Nexo" }] },
+  { id: "otros", titulo: "Empleados y estructura", cols: [
+    { k: "empleados_socio", t: "Empleados socio" }, { k: "empleados_nexo", t: "Empleados nexo" }, { k: "costo_estructura", t: "Estructura" }] },
+  { id: "ggc", titulo: "GGC · lo que queda", cols: [
+    { k: "ggc_casa", t: "Casa", color: true, fuerte: true }, { k: "ggc_socio", t: "Socio", color: true, fuerte: true },
+    { k: "ggc_nexo", t: "Nexo", color: true, fuerte: true }] }
 ];
+
+const GRUPOS_PERSONALES = [
+  { id: "info", titulo: "Información general", cols: [
+    { k: "netwin", t: "Netwin", color: "neg" }, { k: "entrada", t: "Entrada" },
+    { k: "salida", t: "Salida" }, { k: "ggr", t: "GGR", color: true, fuerte: true }] },
+  { id: "ops", titulo: "Cantidad de operaciones", cols: [
+    { k: "ops_entrada", t: "Entrada", entero: true }, { k: "ops_salida", t: "Salida", entero: true }] },
+  { id: "ticket", titulo: "Ticket promedio", cols: [
+    { k: "ticket_deposito", t: "Depósito", sinTotal: true }, { k: "ticket_retiro", t: "Retiro", sinTotal: true }] }
+];
+
+function celdaGrupo(valor, col, grupo, inicio, esTotal) {
+  const clases = [`g-${grupo.id}`];
+  if (inicio) clases.push("ini");
+  if (col.fuerte) clases.push("fuerte");
+  if (esTotal && col.sinTotal) return `<td class="${clases.join(" ")}"></td>`;
+  const v = Number(valor);
+  if (!v) return `<td class="${clases.join(" ")}"><span class="vacio">—</span></td>`;
+  // color "neg": solo los negativos en rojo (los positivos verdes quedan para GGR y GGC).
+  if (col.color === true || (col.color === "neg" && v < 0)) clases.push(claseNum(v));
+  const texto = col.entero ? v.toLocaleString("es-AR") : pesos(v);
+  return `<td class="${clases.join(" ")}">${texto}</td>`;
+}
+
+function tablaAgrupada(tabla, titulo, grupos, filas, total) {
+  const cabGrupos = `<tr class="grupo"><th rowspan="2" class="col-nombre">${titulo}</th>${grupos.map((g) =>
+    `<th colspan="${g.cols.length}" class="g-${g.id} ini">${g.titulo}</th>`).join("")}</tr>`;
+  const cabCols = `<tr class="sub">${grupos.map((g) => g.cols.map((c, i) =>
+    `<th class="g-${g.id}${i === 0 ? " ini" : ""}">${c.t}</th>`).join("")).join("")}</tr>`;
+  const fila = (nombreHtml, datos, esTotal) =>
+    `<tr${esTotal ? ' class="total"' : ""}><td class="col-nombre">${nombreHtml}</td>${grupos.map((g) =>
+      g.cols.map((c, i) => celdaGrupo(datos[c.k], c, g, i === 0, esTotal)).join("")).join("")}</tr>`;
+  tabla.innerHTML = `<thead>${cabGrupos}${cabCols}</thead><tbody>${
+    filas.map((f) => fila(f.nombreHtml, f.datos, false)).join("")}${fila("Total", total, true)}</tbody>`;
+}
 
 function renderSocios(data) {
   const tabla = document.getElementById("tablaSocios");
@@ -54,21 +92,22 @@ function renderSocios(data) {
     tabla.innerHTML = `<tbody><tr><td class="socios-vacio">No hay socios con datos este mes.</td></tr></tbody>`;
     return;
   }
-  const grupos = `<tr class="grupo">
-    <th></th><th colspan="4">Información general</th><th colspan="3">Reparto del GGR</th>
-    <th colspan="9">Costos</th><th colspan="3">GGC</th>
-  </tr>`;
-  const encabezado = `<tr><th>Socio</th>${COLUMNAS_SOCIOS.map(([, titulo]) => `<th>${titulo}</th>`).join("")}</tr>`;
+  // Sin socios con nexo, las columnas de nexo sobran.
+  const hayNexo = data.socios.some((s) => s.nexo);
+  const grupos = GRUPOS_SOCIOS.map((g) => ({
+    ...g,
+    cols: hayNexo ? g.cols : g.cols.filter((c) => !/_nexo$/.test(c.k))
+  }));
   const filas = data.socios.map((s) => {
     const avisos = [];
     if (s.sin_config) avisos.push("sin reparto cargado");
     if (s.nexo) avisos.push(`nexo: ${s.nexo}`);
-    const nombre = `${escapeHtml(s.nombre)}${avisos.length ? `<span class="socios-aviso">${escapeHtml(avisos.join(" · "))}</span>` : ""}`;
-    return `<tr><td>${nombre}</td>${COLUMNAS_SOCIOS.map(([k, , color, extra]) => celda(s[k], { color, extra })).join("")}</tr>`;
-  }).join("");
-  const t = data.total_socios;
-  const total = `<tr class="total"><td>Total</td>${COLUMNAS_SOCIOS.map(([k, , color, extra]) => celda(t[k], { color, extra })).join("")}</tr>`;
-  tabla.innerHTML = `<thead>${grupos}${encabezado}</thead><tbody>${filas}${total}</tbody>`;
+    return {
+      nombreHtml: `${escapeHtml(s.nombre)}${avisos.length ? `<span class="socios-aviso">${escapeHtml(avisos.join(" · "))}</span>` : ""}`,
+      datos: s
+    };
+  });
+  tablaAgrupada(tabla, "Socio", grupos, filas, data.total_socios);
 }
 
 // --- Paneles personales ---
@@ -79,23 +118,8 @@ function renderPersonales(data) {
     tabla.innerHTML = `<tbody><tr><td class="socios-vacio">No hay paneles personales con datos este mes.</td></tr></tbody>`;
     return;
   }
-  const filas = data.personales.map((p) => `<tr>
-    <td>${escapeHtml(p.nombre)}</td>
-    ${celda(p.netwin, { color: true })}${celda(p.entrada)}${celda(p.salida)}
-    <td>${p.ops_entrada || "—"}</td><td>${p.ops_salida || "—"}</td>
-    ${celda(p.ticket_deposito)}${celda(p.ticket_retiro)}${celda(p.bonos)}
-    ${celda(p.ggr, { color: true })}${celda(p.inversion_publicidad)}
-  </tr>`).join("");
-  const t = data.total_personales;
-  const total = `<tr class="total"><td>Total</td>
-    ${celda(t.netwin, { color: true })}${celda(t.entrada)}${celda(t.salida)}
-    <td>${t.ops_entrada || "—"}</td><td>${t.ops_salida || "—"}</td><td></td><td></td>
-    ${celda(t.bonos)}${celda(t.ggr, { color: true })}${celda(t.inversion_publicidad)}
-  </tr>`;
-  tabla.innerHTML = `<thead><tr>
-      <th>Panel</th><th>Netwin</th><th>Entrada</th><th>Salida</th><th>Op. entrada</th><th>Op. salida</th>
-      <th>Ticket depósito</th><th>Ticket retiro</th><th>Bonos y remarketing</th><th>GGR</th><th>Inversión publicidad</th>
-    </tr></thead><tbody>${filas}${total}</tbody>`;
+  const filas = data.personales.map((p) => ({ nombreHtml: escapeHtml(p.nombre), datos: p }));
+  tablaAgrupada(tabla, "Panel", GRUPOS_PERSONALES, filas, data.total_personales);
 }
 
 // --- KPIs ---
