@@ -2,7 +2,7 @@ import crypto from "crypto";
 
 export const API_KEY_PREFIX = "mmk_";
 export const API_KEY_BYTES = 32;
-export const ALLOWED_SCOPES = ["export:egresos"];
+export const ALLOWED_SCOPES = ["export:egresos", "ingest:paneles"];
 export const DEFAULT_SCOPES = ["export:egresos"];
 
 export function generateApiKey() {

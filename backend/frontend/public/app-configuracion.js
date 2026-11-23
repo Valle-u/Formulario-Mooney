@@ -389,6 +389,8 @@ function initApiKeyUi() {
 function openApiKeyModal() {
   document.getElementById("apiKeyName").value = "";
   document.getElementById("apiKeyExpires").value = "never";
+  document.getElementById("apiKeyScopeEgresos").checked = true;
+  document.getElementById("apiKeyScopePaneles").checked = false;
   document.getElementById("apiKeyModal").style.display = "flex";
   document.getElementById("apiKeyName").focus();
 }
@@ -426,13 +428,21 @@ async function createApiKey() {
     return;
   }
 
+  const scopes = [];
+  if (document.getElementById("apiKeyScopeEgresos").checked) scopes.push("export:egresos");
+  if (document.getElementById("apiKeyScopePaneles").checked) scopes.push("ingest:paneles");
+  if (scopes.length === 0) {
+    toast("Error", "Elegí al menos un permiso", "warning");
+    return;
+  }
+
   try {
     const result = await api("/api/api-keys", {
       method: "POST",
       body: {
         name,
         expires_in_days: expires === "never" ? "never" : Number(expires),
-        scopes: ["export:egresos"]
+        scopes
       }
     });
     closeApiKeyModal();

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MooneyMaker • Socios</title>
+  <script src="boot-sidebar.js?v=AUTO"></script>
+  <link rel="stylesheet" href="styles.css?v=AUTO"/>
+  <style>
+    .socios-periodo { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+    .socios-periodo .field { min-width: 180px; }
+    .socios-bloques { display: flex; flex-direction: column; gap: 16px; }
+    .socios-bloques[hidden] { display: none; }
+    .socios-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 720px) { .socios-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .socios-kpi { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--card2); }
+    .socios-kpi span { display: block; font-size: 11px; letter-spacing: .25px; text-transform: uppercase; color: var(--muted); }
+    .socios-kpi strong { display: block; margin-top: 6px; font-size: 18px; color: var(--text); }
+    .socios-kpi small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .num-pos { color: #10b981; }
+    .num-neg { color: #ef4444; }
+    .socios-tabla { min-width: 1500px; }
+    .socios-tabla th, .socios-tabla td { text-align: right; white-space: nowrap; padding: 8px; }
+    .socios-tabla th:first-child, .socios-tabla td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); z-index: 1; }
+    .socios-tabla thead tr.grupo th { text-align: center; font-size: 11px; letter-spacing: .3px; }
+    .socios-tabla tr.total td { font-weight: 800; border-top: 2px solid var(--border); }
+    .socios-tabla .col-ggc { background: rgba(16, 185, 129, .06); }
+    .socios-aviso { color: #b45309; font-size: 11px; display: block; }
+    .socios-config-mes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+    @media (max-width: 720px) { .socios-config-mes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .socios-config { min-width: 1400px; }
+    .socios-config td, .socios-config th { padding: 6px; white-space: nowrap; }
+    .socios-config input, .socios-config select { width: 100%; min-width: 64px; padding: 6px; font-size: 13px; }
+    .socios-config input.monto { min-width: 110px; }
+    details.socios-detalle > summary { cursor: pointer; font-weight: 700; }
+    .socios-vacio { color: var(--muted); margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="app-nosidebar">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <span class="brand">MooneyMaker</span>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Abrir menú" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="topbar-center nav-desktop">
+          <a href="egreso.html" class="nav-item">Retiros</a>
+          <a href="consulta-egresos.html" class="nav-item">Historial</a>
+          <a href="flujo-usd.html" data-no-encargado="1" class="nav-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="nav-item" data-requires-encargado="1">Balance</a>
+          <a href="flujo-caja.html" class="nav-item" data-requires-encargado="1">Flujo de caja</a>
+          <a href="socios.html" class="nav-item active" data-requires-encargado="1">Socios</a>
+          <a href="tarjetas-arq.html" class="nav-item" data-requires-encargado="1">Tarjetas ARQ</a>
+          <a href="cierres-caja.html" data-no-encargado="1" class="nav-item">Cierres</a>
+          <a href="saldos.html" class="nav-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="nav-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="nav-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="nav-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="topbar-right nav-desktop">
+          <button id="themeToggle" class="btn-theme" aria-label="Cambiar tema" title="Cambiar tema">TEMA</button>
+          <span id="whoami" class="user-badge">—</span>
+          <button id="logoutBtn" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <span class="brand">MooneyMaker</span>
+          <button class="drawer-close" id="closeDrawerBtn" aria-label="Cerrar menú">X</button>
+        </div>
+        <nav class="mobile-nav">
+          <a href="egreso.html" class="mobile-item">Retiros</a>
+          <a href="consulta-egresos.html" class="mobile-item">Historial</a>
+          <a href="flujo-usd.html" data-no-encargado="1" class="mobile-item">Flujo USD/USDT</a>
+          <a href="balance.html" class="mobile-item" data-requires-encargado="1">Balance</a>
+          <a href="flujo-caja.html" class="mobile-item" data-requires-encargado="1">Flujo de caja</a>
+          <a href="socios.html" class="mobile-item active" data-requires-encargado="1">Socios</a>
+          <a href="tarjetas-arq.html" class="mobile-item" data-requires-encargado="1">Tarjetas ARQ</a>
+          <a href="cierres-caja.html" data-no-encargado="1" class="mobile-item">Cierres</a>
+          <a href="saldos.html" class="mobile-item" data-admin-strict="1">Saldos</a>
+          <a href="usuarios.html" class="mobile-item" data-admin-only="1">Usuarios</a>
+          <a href="logs.html" class="mobile-item" data-requires-encargado="1">Logs</a>
+          <a href="configuracion.html" class="mobile-item" data-admin-strict="1">Config</a>
+        </nav>
+        <div class="mobile-actions">
+          <button id="themeToggleMobile" class="btn-theme" aria-label="Cambiar tema">TEMA</button>
+          <div id="whoamiMobile" class="user-badge">—</div>
+          <button id="logoutBtnMobile" class="btn-logout">Salir</button>
+        </div>
+      </div>
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+    </header>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <main class="content-wrap">
+      <div class="page">
+        <section class="card">
+          <div class="card-header">Socios</div>
+          <div class="card-body">
+            <p class="note">
+              Reparto del mes con cada socio: GGR, costos (CEF, fichas, empleados y costo de estructura) y lo que le queda a cada uno (GGC).
+              Los datos de los paneles los carga el scraper todos los días. Si el GGC de un socio da negativo, en el total cuenta como 0 y lo negativo es lo que nos debe.
+            </p>
+            <form id="sociosForm" class="socios-periodo">
+              <div class="field">
+                <label for="mes">MES</label>
+                <input id="mes" type="month" required>
+              </div>
+              <button class="btn btn-primary" id="btnVer" type="submit">Ver reparto</button>
+            </form>
+            <div id="sociosEstado" class="note" style="margin-top:12px"></div>
+          </div>
+        </section>
+
+        <div id="sociosResultado" class="socios-bloques" hidden>
+          <div id="sociosKpis" class="socios-kpis"></div>
+
+          <section class="card">
+            <div class="card-header">Panel de socios</div>
+            <div class="card-body">
+              <div class="table-wrap"><table class="table socios-tabla" id="tablaSocios"></table></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">Paneles personales</div>
+            <div class="card-body">
+              <div class="table-wrap"><table class="table socios-tabla" id="tablaPersonales"></table></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">Configuración del mes</div>
+            <div class="card-body">
+              <details class="socios-detalle" id="detalleConfig">
+                <summary>Datos del mes y reparto de cada socio</summary>
+                <p class="note" style="margin-top:12px">
+                  Los cambios valen para el mes elegido y los siguientes, hasta que se vuelvan a cambiar. Los meses anteriores no se tocan.
+                </p>
+                <form id="formMes" class="socios-config-mes">
+                  <div class="field"><label for="facturaUsd">FACTURA FICHAS (USD)</label><input id="facturaUsd" type="number" step="0.01" min="0"></div>
+                  <div class="field"><label for="cotizacion">COTIZACIÓN</label><input id="cotizacion" type="number" step="0.01" min="0"></div>
+                  <div class="field"><label for="pctFichas">FICHAS PACTADO (%)</label><input id="pctFichas" type="number" step="0.01" min="0" max="100" required></div>
+                  <div class="field"><label for="pctCef">CEF SOCIO (%)</label><input id="pctCef" type="number" step="0.0001" min="0" max="100" required></div>
+                  <button class="btn btn-primary" type="submit" id="btnGuardarMes">Guardar datos del mes</button>
+                </form>
+                <div class="table-wrap" style="margin-top:16px">
+                  <table class="table socios-config" id="tablaConfig"></table>
+                </div>
+              </details>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="app-shared.js?v=AUTO"></script>
+  <script src="app-socios.js?v=AUTO"></script>
+</body>
+</html>
