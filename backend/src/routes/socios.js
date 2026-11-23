@@ -1,8 +1,10 @@
 import express from "express";
-import { query } from "../config/db.js";
+import { pool, query } from "../config/db.js";
 import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { auditLog } from "../utils/audit.js";
 import { calcularReparto, mesValido, validarConfigPanel, validarSocioMes } from "../services/socios.js";
+import { calcularBloques, costosFijosPorCategoria, guardarResumenBanco, validarCostosFijos } from "../services/sociosBloques.js";
+import { leerBalanceMensual } from "../services/sheetsBalance.js";
 
 const router = express.Router();
 router.use(auth, requireAdminOrDireccion);
@@ -40,12 +42,43 @@ async function socioMesDe(inicio) {
   return { ...row, heredado: false };
 }
 
+// Egresos del mes con etiqueta, agrupados por etiqueta y moneda (para los
+// costos fijos). Las entradas y los anulados no cuentan.
+async function egresosPorEtiqueta(inicio) {
+  const result = await query(
+    `SELECT TRIM(etiqueta) AS etiqueta, COALESCE(moneda, 'ARS') AS moneda, SUM(monto)::float8 AS total
+       FROM egresos
+      WHERE status IS DISTINCT FROM 'anulado'
+        AND COALESCE(tipo_transaccion, 'SALIDA') <> 'ENTRADA'
+        AND fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month'
+      GROUP BY TRIM(etiqueta), COALESCE(moneda, 'ARS')`,
+    [inicio]
+  );
+  return result.rows;
+}
+
+// Totales del balance bancario guardados en la base (se actualizan al cargar
+// el balance). La pantalla no lee Sheets.
+async function bancoDelMes(inicio) {
+  const result = await query(
+    `SELECT depositos::float8 AS depositos, retiros::float8 AS retiros, iva::float8 AS iva,
+            movimientos, origen, updated_at
+       FROM banco_resumen_mes WHERE mes = $1::date`,
+    [inicio]
+  );
+  const banco = result.rows[0] || null;
+  return {
+    banco,
+    aviso: banco ? null : "Todavía no hay datos del balance bancario de este mes en el formulario. Usá \"Traer del balance bancario\"."
+  };
+}
+
 router.get("/reparto", async (req, res) => {
   const mes = mesValido(req.query.mes);
   if (!mes) return res.status(400).json({ message: "mes inválido (formato AAAA-MM)" });
 
   try {
-    const [paneles, totales, dias, configs, socioMes] = await Promise.all([
+    const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes] = await Promise.all([
       query(`SELECT id, nombre, tipo, orden, is_active FROM paneles ORDER BY orden, nombre`),
       query(
         `SELECT panel_id,
@@ -64,13 +97,18 @@ router.get("/reparto", async (req, res) => {
         [mes.inicio]
       ),
       configsDelMes(mes.inicio),
-      socioMesDe(mes.inicio)
+      socioMesDe(mes.inicio),
+      egresosPorEtiqueta(mes.inicio),
+      query(`SELECT etiqueta, categoria FROM costos_fijos_etiquetas ORDER BY categoria, etiqueta`),
+      bancoDelMes(mes.inicio)
     ]);
 
     const porPanel = {};
     for (const row of totales.rows) porPanel[row.panel_id] = row;
 
     const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes });
+    const fijos = costosFijosPorCategoria(egresos, asignaciones.rows, reparto.resumen.cotizacion);
+    const bloques = calcularBloques({ reparto, banco: bancoRes.banco, fijos });
 
     const configLista = paneles.rows
       .filter((p) => p.tipo === "socio")
@@ -104,6 +142,11 @@ router.get("/reparto", async (req, res) => {
         heredado: socioMes.heredado
       },
       config: configLista,
+      costos_fijos_etiquetas: asignaciones.rows,
+      bloques,
+      banco: bancoRes.banco,
+      aviso_banco: bancoRes.aviso,
+      usd_sin_cotizacion: fijos.usd_sin_cotizacion,
       ...reparto
     });
   } catch (error) {
@@ -172,6 +215,49 @@ router.put("/config", async (req, res) => {
   } catch (error) {
     console.error("❌ Error guardando configuración del socio:", error);
     return res.status(500).json({ message: "Error guardando la configuración del socio" });
+  }
+});
+
+// Trae los totales del mes leyendo la hoja del balance bancario una vez
+// (para meses cargados antes de esta función o si se editó la hoja a mano).
+router.post("/sincronizar-banco", async (req, res) => {
+  const mes = mesValido(req.body?.mes);
+  if (!mes) return res.status(400).json({ message: "mes inválido (AAAA-MM)" });
+  try {
+    const matriz = await leerBalanceMensual(mes.inicio);
+    const r = await guardarResumenBanco(query, mes.inicio, matriz, { origen: "sincronizar", userId: req.user.id });
+    await auditLog(req, { action: "SOCIOS_SINCRONIZAR_BANCO", entity: "banco_resumen_mes", success: true, status_code: 200, details: r });
+    return res.json({ ok: true, ...r });
+  } catch (e) {
+    console.error("socios sincronizar banco:", e?.message || e);
+    // 424 y no 5xx: Seenode reemplaza el cuerpo de las respuestas 502/503/504.
+    return res.status(424).json({ message: e?.message || "No pude leer el balance bancario" });
+  }
+});
+
+// Reemplaza la lista de etiquetas que cuentan como costo fijo.
+router.put("/costos-fijos", async (req, res) => {
+  const datos = validarCostosFijos(req.body);
+  if (datos.error) return res.status(400).json({ message: datos.error });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM costos_fijos_etiquetas");
+    for (const a of datos.asignaciones) {
+      await client.query(
+        `INSERT INTO costos_fijos_etiquetas (etiqueta, categoria, updated_by, updated_at) VALUES ($1, $2, $3, NOW())`,
+        [a.etiqueta, a.categoria, req.user.id]
+      );
+    }
+    await client.query("COMMIT");
+    await auditLog(req, { action: "SOCIOS_COSTOS_FIJOS_UPDATE", entity: "costos_fijos_etiquetas", success: true, status_code: 200, details: { asignaciones: datos.asignaciones } });
+    return res.json({ ok: true });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("❌ Error guardando costos fijos:", error);
+    return res.status(500).json({ message: "Error guardando las etiquetas de costos fijos" });
+  } finally {
+    client.release();
   }
 });
 
