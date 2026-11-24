@@ -169,6 +169,49 @@ export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnt
   };
 }
 
+// Lo que AgenteMC nos paga por las fichas (23%) menos lo que nos cuestan (13%),
+// igual que "GANANCIA POR FICHAS" de la planilla.
+export const PCT_FICHAS_VENTA_AGENTEMC = 0.23;
+export const PCT_FICHAS_COSTO_AGENTEMC = 0.13;
+
+/**
+ * Control de netwin por día: la suma de los paneles (socios y personales)
+ * tiene que dar igual que ADMIN − AGENTEMC.
+ * @param filas [{ fecha: "AAAA-MM-DD", tipo, nombre, netwin }]
+ */
+export function controlNetwin(filas) {
+  const porDia = new Map();
+  for (const f of filas || []) {
+    const d = porDia.get(f.fecha) || { fecha: f.fecha, admin: null, agentemc: null, paneles: 0 };
+    if (f.tipo === "control") {
+      if (f.nombre === "ADMIN") d.admin = num(f.netwin);
+      else if (f.nombre === "AGENTEMC") d.agentemc = num(f.netwin);
+    } else {
+      d.paneles += num(f.netwin);
+    }
+    porDia.set(f.fecha, d);
+  }
+  const dias = [...porDia.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)).map((d) => {
+    const control = d.admin === null ? null : d.admin - (d.agentemc || 0);
+    return {
+      fecha: d.fecha,
+      admin: d.admin === null ? null : r2(d.admin),
+      agentemc: d.agentemc === null ? null : r2(d.agentemc),
+      control: control === null ? null : r2(control),
+      paneles: r2(d.paneles),
+      diferencia: control === null ? null : r2(d.paneles - control)
+    };
+  });
+  const suma = (k) => r2(dias.reduce((s, d) => s + (d[k] || 0), 0));
+  const total = { admin: suma("admin"), agentemc: suma("agentemc"), control: suma("control"), paneles: suma("paneles"), diferencia: suma("diferencia") };
+  return {
+    dias,
+    total,
+    dias_con_diferencia: dias.filter((d) => d.diferencia !== null && Math.abs(d.diferencia) >= 1).length,
+    ganancia_fichas: r2(total.agentemc * PCT_FICHAS_VENTA_AGENTEMC - total.agentemc * PCT_FICHAS_COSTO_AGENTEMC)
+  };
+}
+
 // --- Validación de lo que se edita desde la pantalla ---
 
 function pct(valor) {

@@ -42,7 +42,7 @@
     .socios-tabla tbody tr:nth-child(even) td.g-ggc { background-color: rgba(16, 185, 129, .11); }
     .socios-tabla td.fuerte { font-weight: 700; }
     .socios-tabla .vacio { color: var(--muted); opacity: .5; }
-    .socios-tabla tr.total td { font-weight: 800; border-top: 2px solid var(--border); background-color: rgba(127, 127, 127, .12); }
+    .socios-tabla tr.total td, .socios-tabla tfoot tr.total td { font-weight: 800; border-top: 2px solid var(--border); background-color: rgba(127, 127, 127, .12); }
     .socios-tabla tr.total .col-nombre { background: var(--card); }
     .g-info   { --g: #60a5fa; --g-fondo: rgba(96, 165, 250, .14); --g-suave: rgba(96, 165, 250, .05); }
     .g-ggr    { --g: #a78bfa; --g-fondo: rgba(167, 139, 250, .14); --g-suave: rgba(167, 139, 250, .05); }
@@ -169,7 +169,7 @@
           <div class="card-body">
             <p class="note">
               Reparto del mes con cada socio: GGR, costos (CEF, fichas, empleados y costo de estructura) y lo que le queda a cada uno (GGC).
-              Los datos de los paneles los carga el scraper todos los días. Si el GGC de un socio da negativo, en el total cuenta como 0 y lo negativo es lo que nos debe.
+              Los datos de los paneles los carga el scraper todos los días. Si el GGC de un socio da negativo, en el total cuenta como 0.
             </p>
             <form id="sociosForm" class="socios-periodo">
               <div class="field">
@@ -179,6 +179,10 @@
               <button class="btn btn-primary" id="btnVer" type="submit">Ver reparto</button>
             </form>
             <div id="sociosEstado" class="note" style="margin-top:12px"></div>
+            <div class="socios-banco" style="margin-top:12px">
+              <span id="estadoBanco" class="note"></span>
+              <button class="btn btn-ghost btn-small" type="button" id="btnSincronizarBanco" disabled>Traer del balance bancario</button>
+            </div>
           </div>
         </section>
 
@@ -200,12 +204,20 @@
           </section>
 
           <section class="card">
+            <div class="card-header">Control de netwin</div>
+            <div class="card-body">
+              <p class="note">
+                La suma del netwin de los paneles del día (socios y personales) tiene que dar igual que el netwin del admin menos el de AgenteMC.
+                Si un día no coincide, falta algún panel o hay un dato mal cargado.
+              </p>
+              <div id="controlKpis" class="socios-kpis" style="margin:12px 0"></div>
+              <div class="table-wrap"><table class="table socios-tabla" id="tablaControl"></table></div>
+            </div>
+          </section>
+
+          <section class="card">
             <div class="card-header">Resumen del mes</div>
             <div class="card-body">
-              <div class="socios-banco">
-                <span id="estadoBanco" class="note"></span>
-                <button class="btn btn-ghost btn-small" type="button" id="btnSincronizarBanco">Traer del balance bancario</button>
-              </div>
               <div id="avisoBloques" class="note" hidden></div>
               <div id="bloques" class="socios-resumen"></div>
             </div>
