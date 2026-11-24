@@ -43,6 +43,14 @@
     .socios-tabla td.fuerte { font-weight: 700; }
     .socios-tabla .vacio { color: var(--muted); opacity: .5; }
     .socios-tabla .pct-celda { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+    .socios-pedidos { width: 100%; margin-top: 8px; font-size: 13px; border-collapse: collapse; }
+    .socios-pedidos td, .socios-pedidos th { padding: 6px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+    .socios-pedidos td.note { white-space: normal; }
+    .socios-pedidos .estado-pendiente { color: #b45309; }
+    .socios-pedidos .estado-corriendo { color: #60a5fa; }
+    .socios-pedidos .estado-listo { color: #10b981; }
+    .socios-pedidos .estado-error { color: #ef4444; }
+    .socios-pedidos .estado-cancelado { color: var(--muted); }
     .socios-subtitulo { margin: 8px 0 4px; font-size: 14px; }
     .socios-tabla thead th.col-nombre { background: var(--card); z-index: 3; }
     .socios-tabla .nota-col { display: block; font-size: 10px; font-weight: 500; text-transform: none; opacity: .8; }
@@ -166,6 +174,40 @@
 
     <div id="toastContainer" class="toast-container"></div>
 
+    <div id="pedidoModal" class="modal-backdrop" style="display:none">
+      <div class="modal-content" style="max-width:480px;width:90%">
+        <div class="modal-header">
+          <h3>Traer datos del panel</h3>
+          <button class="btn-close" type="button" id="pedidoModalClose">X</button>
+        </div>
+        <form id="pedidoForm">
+          <div class="modal-body">
+            <p class="note" style="margin-bottom:12px">
+              El scraper de la PC trae del panel de Mooneymaker los días que elijas y los guarda solo en el formulario (no toca ninguna planilla).
+              Si un día ya estaba cargado, se reemplaza. La PC tiene que estar prendida: toma el pedido en unos minutos.
+            </p>
+            <div class="socios-config-mes" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+              <div class="field"><label for="pedidoDesde">DESDE</label><input id="pedidoDesde" type="date" required></div>
+              <div class="field"><label for="pedidoHasta">HASTA</label><input id="pedidoHasta" type="date" required></div>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label for="pedidoQue">QUÉ TRAER</label>
+              <select id="pedidoQue">
+                <option value="todo">Netwin y pagos (entrada / salida) de todos los paneles</option>
+                <option value="netwin">Solo netwin (admin, AgenteMC, DistriPablo y paneles)</option>
+                <option value="pagos">Solo pagos (entrada / salida de socios y paneles personales)</option>
+              </select>
+            </div>
+            <p class="note" style="margin-top:8px">Máximo 62 días por pedido. Los pagos tardan más que el netwin.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" type="button" id="pedidoCancelar">Cancelar</button>
+            <button class="btn btn-primary" type="submit" id="pedidoEnviar">Pedir</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <main class="content-wrap">
       <div class="page">
         <section class="card">
@@ -187,6 +229,11 @@
               <span id="estadoBanco" class="note"></span>
               <button class="btn btn-ghost btn-small" type="button" id="btnSincronizarBanco" disabled>Traer del balance bancario</button>
             </div>
+            <div class="socios-banco" style="margin-top:8px">
+              <span id="estadoPedidos" class="note">Datos de los paneles: el scraper los trae solo todos los días. Para otro rango de fechas, pedilo acá.</span>
+              <button class="btn btn-ghost btn-small" type="button" id="btnPedido">Traer datos del panel…</button>
+            </div>
+            <div id="listaPedidos"></div>
           </div>
         </section>
 
