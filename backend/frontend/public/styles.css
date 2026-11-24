@@ -2566,7 +2566,6 @@ body {
   .app-nosidebar .topbar-center.nav-desktop .nav-item[href*="consulta-egresos.html"]::before { content: 'HS'; }
   .app-nosidebar .topbar-center.nav-desktop .nav-item[href*="flujo-usd.html"]::before { content: 'FX'; }
   .app-nosidebar .topbar-center.nav-desktop .nav-item[href*="cierres-caja.html"]::before { content: 'CJ'; }
-  .app-nosidebar .topbar-center.nav-desktop .nav-item[href*="saldos.html"]::before { content: 'SD'; }
   .app-nosidebar .topbar-center.nav-desktop .nav-item[href*="usuarios.html"]::before { content: 'US'; }
   .app-nosidebar .topbar-center.nav-desktop .nav-item[href*="logs.html"]::before { content: 'LG'; }
 

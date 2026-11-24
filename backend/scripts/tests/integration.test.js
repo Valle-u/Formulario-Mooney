@@ -182,10 +182,4 @@ describe("egresos", () => {
     assert.ok(text.includes("empresa_salida") || text.includes("codigo_operacion"));
   });
 
-  test("saldos admin", async () => {
-    assert.ok(adminToken);
-    const r = await json("/api/egresos/saldos?mes=10&anio=2026", { token: adminToken });
-    assert.equal(r.status, 200);
-    assert.ok(Array.isArray(r.data.saldos));
-  });
 });

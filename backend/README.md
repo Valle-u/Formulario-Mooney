@@ -26,7 +26,7 @@ backend/
 │   ├── routes/
 │   │   ├── auth.js            # POST /api/auth/login
 │   │   ├── users.js           # CRUD usuarios
-│   │   ├── egresos.js         # CRUD egresos + CSV + saldos + cierres
+│   │   ├── egresos.js         # CRUD egresos + CSV + cierres
 │   │   ├── notifications.js   # Stream SSE de notificaciones
 │   │   ├── options.js         # Opciones de selects (select_options)
 │   │   └── logs.js            # Audit logs (readonly)
@@ -119,10 +119,7 @@ GET    /api/egresos/:id/history        # Historial de cambios
 GET    /api/egresos/:id/comprobante    # Descargar comprobante
 GET    /api/egresos/csv                # Exportar CSV (admin / direccion)
 GET    /api/egresos/cuentas            # Opciones de empresas y etiquetas
-GET    /api/egresos/distinct-empresas  # Empresas con egresos cargados
 GET    /api/egresos/check-id-transferencia # Validar duplicado antes de guardar
-GET    /api/egresos/saldos             # Saldos por cuenta (admin only)
-GET    /api/egresos/saldos/csv         # Exportar saldos (admin only)
 GET    /api/egresos/cierres/kpi        # KPIs de cierre de caja
 GET    /api/egresos/cierres/resumen-dia # Totales ARS/USDT de cierres por usuario/fecha
 GET    /api/egresos/cierres/csv        # Exportar cierres de caja
