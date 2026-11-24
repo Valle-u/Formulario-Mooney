@@ -6,8 +6,9 @@
 // - GGR = entrada − salida, repartido con los % de GGR del socio.
 // - El socio paga lo pactado: CEF = entrada × 2,25% y fichas = netwin × 18%
 //   × su % de costos (9% con 50/50; 0 si el netwin es negativo).
-// - La casa paga lo real: CEF = entrada × CEF real (IVA / depósitos del
-//   banco) y fichas = netwin × fichas real / 2.
+// - La casa paga el resto del CEF real (IVA / depósitos del banco): entrada ×
+//   (CEF real − lo que pagan el socio y el nexo), nunca negativo. Fichas =
+//   netwin × fichas real / 2.
 // - El nexo paga su % de costos sobre el CEF pactado y los empleados del
 //   socio, y las fichas = netwin × 18% × su % de GGR.
 // - Empleados y costo de estructura los paga el socio.
@@ -54,7 +55,7 @@ export function repartoSocio(totales, cfg, socioMes, reales = {}) {
     ggr_casa: r2(ggr * num(cfg.pct_ggr_casa)),
     ggr_nexo: r2(ggr * num(cfg.pct_ggr_nexo)),
     cef_socio: r2(entrada * pctCefSocio),
-    cef_casa: r2(entrada * num(reales.cef)),
+    cef_casa: r2(entrada * Math.max(0, num(reales.cef) - pctCefSocio - pctCefSocio * costos.nexo)),
     cef_nexo: r2(entrada * pctCefSocio * costos.nexo),
     fichas_socio: r2(fichasPactadas * costos.socio),
     fichas_casa: r2(netwinPositivo * num(reales.fichas) / 2),
