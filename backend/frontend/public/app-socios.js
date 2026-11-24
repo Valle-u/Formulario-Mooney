@@ -48,7 +48,7 @@ const GRUPOS_SOCIOS = [
     { k: "ggr_socio", t: "Socio", color: "neg", pct: sobre("ggr_socio", "ggr") },
     { k: "ggr_nexo", t: "Nexo", color: "neg", pct: sobre("ggr_nexo", "ggr") }] },
   { id: "cef", titulo: "CEF · % de la entrada", cols: [
-    { k: "cef_casa", t: "Casa", nota: "real", pct: sobre("cef_casa", "entrada") },
+    { k: "cef_casa", t: "Casa", nota: "resto del real", pct: sobre("cef_casa", "entrada") },
     { k: "cef_socio", t: "Socio", nota: "pactado", pct: sobre("cef_socio", "entrada") },
     { k: "cef_nexo", t: "Nexo", nota: "su % de costos", pct: sobre("cef_nexo", "entrada") }] },
   { id: "fichas", titulo: "Fichas · % del netwin", cols: [
