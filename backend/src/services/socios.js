@@ -180,46 +180,88 @@ export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnt
   };
 }
 
-// Lo que AgenteMC nos paga por las fichas (23%) menos lo que nos cuestan (13%),
-// igual que "GANANCIA POR FICHAS" de la planilla.
-export const PCT_FICHAS_VENTA_AGENTEMC = 0.23;
-export const PCT_FICHAS_COSTO_AGENTEMC = 0.13;
+// Escala de costo de fichas de los autónomos (AgenteMC y DistriPablo): el %
+// del tramo se aplica a todo el netwin del mes del panel. Desde 90M queda 16%.
+export const ESCALA_FICHAS_AUTONOMOS = [
+  { hasta: 10_000_000, pct: 0.25 },
+  { hasta: 20_000_000, pct: 0.24 },
+  { hasta: 30_000_000, pct: 0.23 },
+  { hasta: 40_000_000, pct: 0.22 },
+  { hasta: 50_000_000, pct: 0.21 },
+  { hasta: 60_000_000, pct: 0.20 },
+  { hasta: 70_000_000, pct: 0.19 },
+  { hasta: 80_000_000, pct: 0.18 },
+  { hasta: 90_000_000, pct: 0.17 },
+  { hasta: null, pct: 0.16 }
+];
+
+export function tramoEscala(netwin, escala = ESCALA_FICHAS_AUTONOMOS) {
+  const v = num(netwin);
+  return (escala.find((t) => t.hasta === null || v <= t.hasta) || escala[escala.length - 1]).pct;
+}
+
+/**
+ * Ganancia por fichas de un autónomo en el mes: lo que nos paga según la
+ * escala menos lo que nos cuestan esas fichas (fichas real del mes). Con
+ * netwin negativo no hay fichas.
+ */
+export function fichasAutonomo(netwin, pctFichasReal) {
+  const n = num(netwin);
+  const pctEscala = tramoEscala(n);
+  const cobro = n > 0 ? n * pctEscala : 0;
+  const costo = n > 0 && pctFichasReal !== null && pctFichasReal !== undefined ? n * num(pctFichasReal) : 0;
+  return { netwin: r2(n), pct_escala: pctEscala, cobro: r2(cobro), costo: r2(costo), ganancia: r2(cobro - costo) };
+}
 
 /**
  * Control de netwin por día: la suma de los paneles (socios y personales)
- * tiene que dar igual que ADMIN − AGENTEMC.
+ * tiene que dar igual que ADMIN − AGENTEMC. AgenteMC incluye a DistriPablo:
+ * lo propio de AgenteMC es AGENTEMC − DISTRIPABLO.
  * @param filas [{ fecha: "AAAA-MM-DD", tipo, nombre, netwin }]
+ * @param pctFichasReal fichas real del mes (para la ganancia de los autónomos)
  */
-export function controlNetwin(filas) {
+export function controlNetwin(filas, { pctFichasReal = null } = {}) {
   const porDia = new Map();
   for (const f of filas || []) {
-    const d = porDia.get(f.fecha) || { fecha: f.fecha, admin: null, agentemc: null, paneles: 0 };
+    const d = porDia.get(f.fecha) || { fecha: f.fecha, admin: null, agentemc: null, distripablo: null, paneles: 0 };
     if (f.tipo === "control") {
       if (f.nombre === "ADMIN") d.admin = num(f.netwin);
       else if (f.nombre === "AGENTEMC") d.agentemc = num(f.netwin);
+      else if (f.nombre === "DISTRIPABLO") d.distripablo = num(f.netwin);
     } else {
       d.paneles += num(f.netwin);
     }
     porDia.set(f.fecha, d);
   }
+  const opc = (v) => (v === null ? null : r2(v));
   const dias = [...porDia.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)).map((d) => {
     const control = d.admin === null ? null : d.admin - (d.agentemc || 0);
     return {
       fecha: d.fecha,
-      admin: d.admin === null ? null : r2(d.admin),
-      agentemc: d.agentemc === null ? null : r2(d.agentemc),
-      control: control === null ? null : r2(control),
+      admin: opc(d.admin),
+      agentemc: opc(d.agentemc),
+      distripablo: opc(d.distripablo),
+      agentemc_propio: d.agentemc === null ? null : r2(d.agentemc - (d.distripablo || 0)),
+      control: opc(control),
       paneles: r2(d.paneles),
       diferencia: control === null ? null : r2(d.paneles - control)
     };
   });
   const suma = (k) => r2(dias.reduce((s, d) => s + (d[k] || 0), 0));
-  const total = { admin: suma("admin"), agentemc: suma("agentemc"), control: suma("control"), paneles: suma("paneles"), diferencia: suma("diferencia") };
+  const total = {
+    admin: suma("admin"), agentemc: suma("agentemc"), distripablo: suma("distripablo"),
+    agentemc_propio: suma("agentemc_propio"), control: suma("control"), paneles: suma("paneles"), diferencia: suma("diferencia")
+  };
+  const agentemc = fichasAutonomo(total.agentemc_propio, pctFichasReal);
+  const distripablo = fichasAutonomo(total.distripablo, pctFichasReal);
   return {
     dias,
     total,
     dias_con_diferencia: dias.filter((d) => d.diferencia !== null && Math.abs(d.diferencia) >= 1).length,
-    ganancia_fichas: r2(total.agentemc * PCT_FICHAS_VENTA_AGENTEMC - total.agentemc * PCT_FICHAS_COSTO_AGENTEMC)
+    hay_distripablo: dias.some((d) => d.distripablo !== null),
+    autonomos: { agentemc, distripablo },
+    pct_fichas_real: pctFichasReal,
+    ganancia_fichas: r2(agentemc.ganancia + distripablo.ganancia)
   };
 }
 

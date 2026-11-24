@@ -43,6 +43,7 @@
     .socios-tabla td.fuerte { font-weight: 700; }
     .socios-tabla .vacio { color: var(--muted); opacity: .5; }
     .socios-tabla .pct-celda { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+    .socios-subtitulo { margin: 8px 0 4px; font-size: 14px; }
     .socios-tabla thead th.col-nombre { background: var(--card); z-index: 3; }
     .socios-tabla .nota-col { display: block; font-size: 10px; font-weight: 500; text-transform: none; opacity: .8; }
     .socios-tabla tr.total td, .socios-tabla tfoot tr.total td { font-weight: 800; border-top: 2px solid var(--border); background-color: rgba(127, 127, 127, .12); }
@@ -214,6 +215,13 @@
                 Si un día no coincide, falta algún panel o hay un dato mal cargado.
               </p>
               <div id="controlKpis" class="socios-kpis" style="margin:12px 0"></div>
+              <h4 class="socios-subtitulo">Fichas de los autónomos</h4>
+              <p class="note">
+                AgenteMC y DistriPablo pagan las fichas según la escala: el % del tramo se aplica a todo el netwin del mes de cada panel
+                (de 0 a 10M 25%, baja 1% cada 10M, desde 90M 16%). Lo propio de AgenteMC es su netwin menos el de DistriPablo.
+              </p>
+              <div class="table-wrap" style="margin-bottom:16px"><table class="table socios-tabla" id="tablaAutonomos"></table></div>
+              <h4 class="socios-subtitulo">Por día</h4>
               <div class="table-wrap"><table class="table socios-tabla" id="tablaControl"></table></div>
             </div>
           </section>
