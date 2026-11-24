@@ -2,7 +2,7 @@ import express from "express";
 import { pool, query } from "../config/db.js";
 import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { auditLog } from "../utils/audit.js";
-import { calcularReparto, mesValido, validarConfigPanel, validarSocioMes } from "../services/socios.js";
+import { calcularReparto, controlNetwin, mesValido, validarConfigPanel, validarSocioMes } from "../services/socios.js";
 import { calcularBloques, costosFijosPorCategoria, guardarResumenBanco, validarCostosFijos } from "../services/sociosBloques.js";
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
 
@@ -78,7 +78,7 @@ router.get("/reparto", async (req, res) => {
   if (!mes) return res.status(400).json({ message: "mes inválido (formato AAAA-MM)" });
 
   try {
-    const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes, anterior] = await Promise.all([
+    const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes, anterior, diario] = await Promise.all([
       query(`SELECT id, nombre, tipo, orden, is_active FROM paneles ORDER BY orden, nombre`),
       query(
         `SELECT panel_id,
@@ -108,6 +108,12 @@ router.get("/reparto", async (req, res) => {
           WHERE p.tipo = 'control'
             AND d.fecha >= $1::date - INTERVAL '1 month' AND d.fecha < $1::date
           GROUP BY p.nombre`,
+        [mes.inicio]
+      ),
+      query(
+        `SELECT d.fecha::text AS fecha, p.tipo, p.nombre, d.netwin::float8 AS netwin
+           FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
+          WHERE d.fecha >= $1::date AND d.fecha < $1::date + INTERVAL '1 month'`,
         [mes.inicio]
       )
     ]);
@@ -158,6 +164,7 @@ router.get("/reparto", async (req, res) => {
       banco: bancoRes.banco,
       aviso_banco: bancoRes.aviso,
       usd_sin_cotizacion: fijos.usd_sin_cotizacion,
+      control_netwin: controlNetwin(diario.rows),
       ...reparto
     });
   } catch (error) {

@@ -378,13 +378,41 @@ async function guardarMes(ev) {
   }
 }
 
+// --- Control de netwin ---
+
+function renderControl(data) {
+  const c = data.control_netwin;
+  const kpi = (titulo, valor, clase = "", nota = "") =>
+    `<div class="socios-kpi"><span>${titulo}</span><strong class="${clase}">${valor}</strong>${nota ? `<small>${escapeHtml(nota)}</small>` : ""}</div>`;
+  const t = c.total;
+  const difClase = Math.abs(t.diferencia) >= 1 ? "num-neg" : "num-pos";
+  document.getElementById("controlKpis").innerHTML = [
+    kpi("Suma de netwin de paneles diarios", pesos(t.paneles), claseNum(t.paneles)),
+    kpi("Netwin admin − AgenteMC", pesos(t.control), claseNum(t.control), `Admin ${pesos(t.admin)}`),
+    kpi("Diferencia", pesos(t.diferencia), difClase,
+      c.dias_con_diferencia ? `${c.dias_con_diferencia} día(s) no coinciden` : "Todos los días coinciden"),
+    kpi("Netwin panel AgenteMC", pesos(t.agentemc), claseNum(t.agentemc)),
+    kpi("Ganancia por fichas", pesos(c.ganancia_fichas), claseNum(c.ganancia_fichas), "AgenteMC × (23% − 13%)")
+  ].join("");
+
+  const celda = (v, clase = "") => `<td class="${clase}">${v === null ? "—" : pesos(v)}</td>`;
+  const dif = (v) => celda(v, v === null ? "" : Math.abs(v) >= 1 ? "num-neg" : "");
+  const filas = c.dias.map((d) => `<tr><td class="col-nombre">${fechaCorta(d.fecha)}</td>${celda(d.admin)}${celda(d.agentemc)}${celda(d.control)}${celda(d.paneles)}${dif(d.diferencia)}</tr>`);
+  document.getElementById("tablaControl").innerHTML =
+    `<thead><tr class="sub"><th class="col-nombre">Fecha</th><th>Netwin admin</th><th>AgenteMC</th><th>Admin − AgenteMC</th><th>Suma paneles</th><th>Diferencia</th></tr></thead>` +
+    `<tbody>${filas.join("") || '<tr><td colspan="6" class="note">Sin datos este mes.</td></tr>'}</tbody>` +
+    `<tfoot><tr class="total"><td class="col-nombre">Total</td>${celda(t.admin)}${celda(t.agentemc)}${celda(t.control)}${celda(t.paneles)}${dif(t.diferencia)}</tr></tfoot>`;
+}
+
 function render(data) {
   ultimoReparto = data;
   renderKpis(data);
   renderSocios(data);
   renderPersonales(data);
+  renderControl(data);
   renderBloques(data);
   renderConfig(data);
+  document.getElementById("btnSincronizarBanco").disabled = false;
   renderFijos(data);
   document.getElementById("sociosResultado").hidden = false;
 
