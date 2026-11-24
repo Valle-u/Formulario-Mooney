@@ -484,6 +484,104 @@ async function cargar(ev, { mantenerConfigAbierta = false } = {}) {
   }
 }
 
+// --- Pedidos al scraper (traer un rango de fechas) ---
+
+const QUE_PEDIDO = { todo: "Netwin y pagos", netwin: "Solo netwin", pagos: "Solo pagos" };
+const ESTADO_PEDIDO = { pendiente: "Esperando a la PC", corriendo: "Trayendo datos…", listo: "Listo", error: "Con errores", cancelado: "Cancelado" };
+let timerPedidos = null;
+
+function fechaHora(iso) {
+  return iso ? new Date(iso).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
+}
+
+function detallePedido(p) {
+  const r = p.resultado || {};
+  const partes = [];
+  if (r.dias_ok?.length) partes.push(`${r.dias_ok.length} día(s) traídos`);
+  if (r.dias_error?.length) partes.push(`con error: ${r.dias_error.join(", ")}`);
+  if (r.mensaje) partes.push(r.mensaje);
+  if (r.errores?.length && !r.dias_error?.length) partes.push(r.errores.slice(0, 3).join(" · "));
+  return partes.join(" · ");
+}
+
+async function cargarPedidos({ recargarReparto = false } = {}) {
+  let pedidos;
+  try {
+    ({ pedidos } = await api("/api/socios/pedidos"));
+  } catch {
+    return;
+  }
+  pedidos = pedidos || [];
+  const abiertos = pedidos.filter((p) => p.estado === "pendiente" || p.estado === "corriendo");
+  const recientes = pedidos.filter((p) => abiertos.includes(p) || (p.terminado_at && Date.now() - new Date(p.terminado_at) < 24 * 3600 * 1000));
+  const cont = document.getElementById("listaPedidos");
+  cont.innerHTML = recientes.length
+    ? `<table class="socios-pedidos"><thead><tr><th>Rango</th><th>Qué</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody>${
+        recientes.map((p) => `<tr>
+          <td>${fechaCorta(p.desde)} → ${fechaCorta(p.hasta)}</td>
+          <td>${QUE_PEDIDO[p.que] || escapeHtml(p.que)}</td>
+          <td class="estado-${escapeHtml(p.estado)}">${ESTADO_PEDIDO[p.estado] || escapeHtml(p.estado)}</td>
+          <td class="note">${escapeHtml(detallePedido(p) || `pedido por ${p.creado_por || "—"} el ${fechaHora(p.created_at)}`)}</td>
+          <td>${p.estado === "pendiente" ? `<button class="btn btn-ghost btn-small" type="button" data-cancelar="${Number(p.id)}">Cancelar</button>` : ""}</td>
+        </tr>`).join("")}</tbody></table>`
+    : "";
+  // Mientras haya pedidos abiertos se refresca solo; al terminar se recarga el reparto.
+  clearTimeout(timerPedidos);
+  if (abiertos.length) timerPedidos = setTimeout(() => cargarPedidos({ recargarReparto: true }), 20000);
+  else if (recargarReparto) cargar(null, { mantenerConfigAbierta: true });
+}
+
+function abrirPedido() {
+  const hoy = new Date().toLocaleDateString("en-CA");
+  const mes = document.getElementById("mes").value;
+  const base = /^\d{4}-\d{2}$/.test(mes) ? mes : hoy.slice(0, 7);
+  const [y, m] = base.split("-").map(Number);
+  const finMes = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  document.getElementById("pedidoDesde").value = `${base}-01`;
+  // Por defecto hasta ayer: el día de hoy todavía no está completo.
+  const ayer = new Date(Date.now() - 86400000).toLocaleDateString("en-CA");
+  document.getElementById("pedidoHasta").value = finMes < ayer ? finMes : ayer;
+  document.getElementById("pedidoDesde").max = hoy;
+  document.getElementById("pedidoHasta").max = hoy;
+  document.getElementById("pedidoModal").style.display = "flex";
+}
+
+function cerrarPedido() {
+  document.getElementById("pedidoModal").style.display = "none";
+}
+
+async function enviarPedido(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById("pedidoEnviar");
+  btn.disabled = true;
+  try {
+    await api("/api/socios/pedidos", {
+      method: "POST",
+      body: {
+        desde: document.getElementById("pedidoDesde").value,
+        hasta: document.getElementById("pedidoHasta").value,
+        que: document.getElementById("pedidoQue").value
+      }
+    });
+    toast("Pedido enviado", "El scraper lo va a tomar en unos minutos", "success");
+    cerrarPedido();
+    cargarPedidos();
+  } catch (e) {
+    toast("Error", e.message || "No se pudo crear el pedido", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function cancelarPedido(id) {
+  try {
+    await api(`/api/socios/pedidos/${id}/cancelar`, { method: "POST" });
+    cargarPedidos();
+  } catch (e) {
+    toast("Error", e.message || "No se pudo cancelar", "error");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (!requireAuth()) return;
   if (!ROLES_SOCIOS.has(getUser().role)) {
@@ -498,6 +596,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("formMes").addEventListener("submit", guardarMes);
   document.getElementById("btnGuardarFijos").addEventListener("click", guardarFijos);
   document.getElementById("btnSincronizarBanco").addEventListener("click", sincronizarBanco);
+  document.getElementById("btnPedido").addEventListener("click", abrirPedido);
+  document.getElementById("pedidoModalClose").addEventListener("click", cerrarPedido);
+  document.getElementById("pedidoCancelar").addEventListener("click", cerrarPedido);
+  document.getElementById("pedidoForm").addEventListener("submit", enviarPedido);
+  document.getElementById("listaPedidos").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-cancelar]");
+    if (b) cancelarPedido(b.dataset.cancelar);
+  });
+  cargarPedidos();
   document.getElementById("tablaConfig").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-guardar]");
     if (btn) guardarSocio(btn);

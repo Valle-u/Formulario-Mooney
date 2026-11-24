@@ -6,6 +6,7 @@ import { calcularReparto, controlNetwin, mesValido, validarConfigPanel, validarS
 import { calcularBloques, costosFijosPorCategoria, guardarResumenBanco, validarCostosFijos } from "../services/sociosBloques.js";
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
 import { cotizacionEnVivo } from "../services/cotizacion.js";
+import { validarPedido } from "../services/scraperPedidos.js";
 
 const router = express.Router();
 router.use(auth, requireAdminOrDireccion);
@@ -283,6 +284,65 @@ router.put("/costos-fijos", async (req, res) => {
     return res.status(500).json({ message: "Error guardando las etiquetas de costos fijos" });
   } finally {
     client.release();
+  }
+});
+
+// --- Pedidos al scraper para traer un rango de fechas (solo al formulario) ---
+
+function hoyArgentina() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date());
+}
+
+router.get("/pedidos", async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT p.id, p.desde::text AS desde, p.hasta::text AS hasta, p.que, p.estado, p.resultado,
+              p.created_at, p.tomado_at, p.terminado_at, u.username AS creado_por
+         FROM scraper_pedidos p LEFT JOIN users u ON u.id = p.creado_por
+        ORDER BY p.created_at DESC
+        LIMIT 15`
+    );
+    return res.json({ pedidos: result.rows });
+  } catch (error) {
+    console.error("❌ Error listando pedidos del scraper:", error);
+    return res.status(500).json({ message: "Error listando los pedidos" });
+  }
+});
+
+router.post("/pedidos", async (req, res) => {
+  const datos = validarPedido(req.body, hoyArgentina());
+  if (datos.error) return res.status(400).json({ message: datos.error });
+  try {
+    const abiertos = await query(`SELECT COUNT(*)::int AS n FROM scraper_pedidos WHERE estado IN ('pendiente', 'corriendo')`);
+    if (abiertos.rows[0].n >= 5) return res.status(409).json({ message: "Ya hay 5 pedidos esperando. Esperá a que terminen." });
+    const result = await query(
+      `INSERT INTO scraper_pedidos (desde, hasta, que, creado_por) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [datos.desde, datos.hasta, datos.que, req.user.id]
+    );
+    await auditLog(req, {
+      action: "SCRAPER_PEDIDO_CREAR", entity: "scraper_pedidos", entity_id: result.rows[0].id,
+      success: true, status_code: 201, details: { desde: datos.desde, hasta: datos.hasta, que: datos.que }
+    });
+    return res.status(201).json({ id: result.rows[0].id });
+  } catch (error) {
+    console.error("❌ Error creando pedido del scraper:", error);
+    return res.status(500).json({ message: "Error creando el pedido" });
+  }
+});
+
+router.post("/pedidos/:id/cancelar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "id inválido" });
+  try {
+    const result = await query(
+      `UPDATE scraper_pedidos SET estado = 'cancelado', terminado_at = NOW() WHERE id = $1 AND estado = 'pendiente' RETURNING id`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(409).json({ message: "Solo se puede cancelar un pedido pendiente" });
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("❌ Error cancelando pedido del scraper:", error);
+    return res.status(500).json({ message: "Error cancelando el pedido" });
   }
 });
 

@@ -20,6 +20,7 @@ import flujoCajaRoutes from "./routes/flujoCaja.js";
 import arqRoutes from "./routes/arq.js";
 import panelesRoutes from "./routes/paneles.js";
 import sociosRoutes from "./routes/socios.js";
+import scraperRoutes from "./routes/scraper.js";
 import { runMigrations } from "./migrations/runMigrations.js";
 import { validateRequiredEnv } from "./utils/validateEnv.js";
 import { startHealthMonitor } from "./utils/health-monitor.js";
@@ -205,6 +206,7 @@ app.use("/api/flujo-caja", flujoCajaRoutes);
 app.use("/api/arq", arqRoutes);
 app.use("/api/paneles", panelesRoutes); // Datos diarios de paneles (ingesta del scraper)
 app.use("/api/socios", sociosRoutes); // Reparto mensual con socios (admin y dirección)
+app.use("/api/scraper", scraperRoutes); // Pedidos de rangos de fechas que toma el scraper de la PC
 
 // Health check endpoint mejorado
 import { query } from "./config/db.js";
