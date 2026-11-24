@@ -1,17 +1,18 @@
 // Reparto mensual con socios: GGR, costos (CEF, fichas, empleados, costo de
 // estructura) y GGC de cada socio, de la casa y del nexo.
 //
-// Reglas (confirmadas con el usuario, 23/11/2026):
+// Reglas (confirmadas con el usuario, igual que la planilla "Trazabilidad
+// General Mensual"):
 // - GGR = entrada − salida, repartido con los % de GGR del socio.
-// - Fichas: netwin × 18% pactado (0 si el netwin es negativo). Cada parte paga
-//   su % de costos: con 50/50 queda 9% el socio y 9% la casa.
-// - CEF: entrada × 2,25% es la parte del socio con costos al 50%; el total
-//   pactado es el doble y cada parte paga su % de costos. El CEF real del
-//   banco no se usa acá (va en "Información general").
-// - Empleados y costo de estructura los paga el socio; el nexo paga su % de
-//   costos sobre los empleados del socio.
+// - El socio paga lo pactado: CEF = entrada × 2,25% y fichas = netwin × 18%
+//   × su % de costos (9% con 50/50; 0 si el netwin es negativo).
+// - La casa paga lo real: CEF = entrada × CEF real (IVA / depósitos del
+//   banco) y fichas = netwin × fichas real / 2.
+// - El nexo paga su % de costos sobre el CEF pactado y los empleados del
+//   socio, y las fichas = netwin × 18% × su % de GGR.
+// - Empleados y costo de estructura los paga el socio.
 // - GGC = GGR − costos. Si el GGC del socio es negativo, en el total cuenta
-//   como 0 y lo negativo es lo que el socio nos debe.
+//   como 0.
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (v) => (v === null || v === undefined || v === "" ? 0 : Number(v) || 0);
@@ -25,7 +26,11 @@ export function mesValido(texto) {
   return { anio, mes, inicio: `${m[1]}-${m[2]}-01` };
 }
 
-export function repartoSocio(totales, cfg, socioMes) {
+/**
+ * @param reales { cef, fichas }: % reales del mes (CEF real del banco y
+ *   fichas real); si falta alguno, ese costo de la casa queda en 0.
+ */
+export function repartoSocio(totales, cfg, socioMes, reales = {}) {
   const netwin = num(totales?.netwin);
   const entrada = num(totales?.entrada);
   const salida = num(totales?.salida);
@@ -33,8 +38,8 @@ export function repartoSocio(totales, cfg, socioMes) {
 
   const pctCefSocio = num(socioMes?.pct_cef_socio);
   const pctFichas = num(socioMes?.pct_fichas_pactado);
-  const cefTotal = entrada * pctCefSocio * 2;
-  const fichasTotal = netwin > 0 ? netwin * pctFichas : 0;
+  const netwinPositivo = netwin > 0 ? netwin : 0;
+  const fichasPactadas = netwinPositivo * pctFichas;
 
   const costos = { socio: num(cfg.pct_costos_socio), casa: num(cfg.pct_costos_casa), nexo: num(cfg.pct_costos_nexo) };
   const empleados = num(cfg.empleados);
@@ -48,12 +53,12 @@ export function repartoSocio(totales, cfg, socioMes) {
     ggr_socio: r2(ggr * num(cfg.pct_ggr_socio)),
     ggr_casa: r2(ggr * num(cfg.pct_ggr_casa)),
     ggr_nexo: r2(ggr * num(cfg.pct_ggr_nexo)),
-    cef_socio: r2(cefTotal * costos.socio),
-    cef_casa: r2(cefTotal * costos.casa),
-    cef_nexo: r2(cefTotal * costos.nexo),
-    fichas_socio: r2(fichasTotal * costos.socio),
-    fichas_casa: r2(fichasTotal * costos.casa),
-    fichas_nexo: r2(fichasTotal * costos.nexo),
+    cef_socio: r2(entrada * pctCefSocio),
+    cef_casa: r2(entrada * num(reales.cef)),
+    cef_nexo: r2(entrada * pctCefSocio * costos.nexo),
+    fichas_socio: r2(fichasPactadas * costos.socio),
+    fichas_casa: r2(netwinPositivo * num(reales.fichas) / 2),
+    fichas_nexo: r2(fichasPactadas * num(cfg.pct_ggr_nexo)),
     empleados_socio: r2(empleados),
     empleados_nexo: r2(empleados * costos.nexo),
     costo_estructura: r2(estructura)
@@ -100,7 +105,16 @@ function sumar(filas, campos) {
  * @param netwinAnterior { admin, agentemc } del mes anterior: el costo real de
  *   fichas es la factura del mes (en pesos) sobre el netwin propio del mes pasado.
  */
-export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnterior = null }) {
+export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnterior = null, pctCefReal = null }) {
+  // Fichas real: factura del mes en pesos sobre el netwin del admin (total)
+  // del mes pasado, igual que "FICHAS REAL" de la planilla.
+  const factura = socioMes?.factura_usd === null || socioMes?.factura_usd === undefined ? null : num(socioMes.factura_usd);
+  const cotizacion = socioMes?.cotizacion === null || socioMes?.cotizacion === undefined ? null : num(socioMes.cotizacion);
+  const costoFichasArs = factura !== null && cotizacion !== null ? r2(factura * cotizacion) : null;
+  const adminAnterior = netwinAnterior?.admin ?? null;
+  const pctFichasReal = costoFichasArs !== null && adminAnterior > 0 ? costoFichasArs / adminAnterior : null;
+  const reales = { cef: pctCefReal, fichas: pctFichasReal };
+
   const socios = [];
   const personales = [];
   const control = {};
@@ -118,7 +132,7 @@ export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnt
     } else if (p.tipo === "socio") {
       const cfg = configs[p.id];
       if (!cfg) {
-        socios.push({ panel_id: p.id, nombre: p.nombre, sin_config: true, ...repartoSocio(t, {}, socioMes) });
+        socios.push({ panel_id: p.id, nombre: p.nombre, sin_config: true, ...repartoSocio(t, {}, socioMes, reales) });
         continue;
       }
       socios.push({
@@ -126,7 +140,7 @@ export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnt
         nombre: p.nombre,
         nexo: cfg.nexo_nombre || null,
         config_heredada: Boolean(cfg.heredada),
-        ...repartoSocio(t, cfg, socioMes)
+        ...repartoSocio(t, cfg, socioMes, reales)
       });
     }
   }
@@ -143,11 +157,6 @@ export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnt
   const netwinAdmin = control.ADMIN ?? null;
   const netwinAgenteMc = control.AGENTEMC ?? null;
   const netwinPropio = netwinAdmin === null ? null : r2(netwinAdmin - (netwinAgenteMc || 0));
-  const factura = socioMes?.factura_usd === null || socioMes?.factura_usd === undefined ? null : num(socioMes.factura_usd);
-  const cotizacion = socioMes?.cotizacion === null || socioMes?.cotizacion === undefined ? null : num(socioMes.cotizacion);
-  const costoFichasArs = factura !== null && cotizacion !== null ? r2(factura * cotizacion) : null;
-  const adminAnterior = netwinAnterior?.admin ?? null;
-  const netwinPropioAnterior = adminAnterior === null ? null : r2(num(adminAnterior) - num(netwinAnterior?.agentemc));
 
   return {
     socios,
@@ -161,8 +170,9 @@ export function calcularReparto({ paneles, totales, configs, socioMes, netwinAnt
       factura_usd: factura,
       cotizacion,
       costo_fichas_ars: costoFichasArs,
-      netwin_propio_anterior: netwinPropioAnterior,
-      pct_fichas_real: costoFichasArs !== null && netwinPropioAnterior > 0 ? costoFichasArs / netwinPropioAnterior : null,
+      netwin_admin_anterior: adminAnterior === null ? null : r2(adminAnterior),
+      pct_fichas_real: pctFichasReal,
+      pct_cef_real: pctCefReal,
       pct_fichas_pactado: num(socioMes?.pct_fichas_pactado),
       pct_cef_socio: num(socioMes?.pct_cef_socio)
     }

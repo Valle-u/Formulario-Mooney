@@ -5,6 +5,7 @@ import { auditLog } from "../utils/audit.js";
 import { calcularReparto, controlNetwin, mesValido, validarConfigPanel, validarSocioMes } from "../services/socios.js";
 import { calcularBloques, costosFijosPorCategoria, guardarResumenBanco, validarCostosFijos } from "../services/sociosBloques.js";
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
+import { cotizacionEnVivo } from "../services/cotizacion.js";
 
 const router = express.Router();
 router.use(auth, requireAdminOrDireccion);
@@ -123,7 +124,12 @@ router.get("/reparto", async (req, res) => {
 
     const control = Object.fromEntries(anterior.rows.map((r) => [r.nombre, r.netwin]));
     const netwinAnterior = control.ADMIN === undefined ? null : { admin: control.ADMIN, agentemc: control.AGENTEMC ?? 0 };
-    const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes, netwinAnterior });
+    const banco = bancoRes.banco;
+    const pctCefReal = banco && Number(banco.depositos) > 0 ? Number(banco.iva) / Number(banco.depositos) : null;
+    // Sin cotización cargada para el mes se usa la de CriptoYa en vivo.
+    const enVivo = socioMes.cotizacion === null ? await cotizacionEnVivo() : null;
+    const socioMesCalculo = enVivo ? { ...socioMes, cotizacion: enVivo.valor } : socioMes;
+    const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes: socioMesCalculo, netwinAnterior, pctCefReal });
     const fijos = costosFijosPorCategoria(egresos, asignaciones.rows, reparto.resumen.cotizacion);
     const bloques = calcularBloques({ reparto, banco: bancoRes.banco, fijos });
 
@@ -156,7 +162,8 @@ router.get("/reparto", async (req, res) => {
         cotizacion: socioMes.cotizacion === null ? null : Number(socioMes.cotizacion),
         pct_fichas_pactado: Number(socioMes.pct_fichas_pactado),
         pct_cef_socio: Number(socioMes.pct_cef_socio),
-        heredado: socioMes.heredado
+        heredado: socioMes.heredado,
+        cotizacion_en_vivo: enVivo
       },
       config: configLista,
       costos_fijos_etiquetas: asignaciones.rows,

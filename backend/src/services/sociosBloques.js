@@ -120,7 +120,8 @@ export function calcularBloques({ reparto, banco, fijos }) {
   const ggr = depositos - retiros;
   const cefReal = num(banco?.iva);
   const pctCefReal = pct(cefReal, depositos);
-  const costoFichas = num(res.netwin_propio) > 0 ? num(res.costo_fichas_ars) : 0;
+  // Costo de fichas del mes: netwin propio × fichas real (0 si es negativo).
+  const costoFichas = res.pct_fichas_real === null ? 0 : Math.max(0, num(res.netwin_propio) * res.pct_fichas_real);
   const utilidades = num(ts.ggc_socio) + num(ts.ggc_nexo);
   const estructura = num(ts.costo_estructura);
 
@@ -160,9 +161,9 @@ export function calcularBloques({ reparto, banco, fijos }) {
   // Socios: lo que le deja a la casa el GGR de los paneles de socios.
   const ggrSocios = num(ts.ggr);
   const gananciaCasa = ggrSocios - (utilidades + estructura);
-  // En el resumen el CEF es siempre el real (IVA sobre depósitos del banco).
-  const cefSocios = pctCefReal === null ? 0 : num(ts.entrada) * pctCefReal;
-  const fichasSocios = num(ts.fichas_casa) + num(ts.fichas_socio) + num(ts.fichas_nexo);
+  // Lo pactado con los socios: entrada × 2,25% y netwin × 18%.
+  const cefSocios = num(ts.entrada) * num(res.pct_cef_socio);
+  const fichasSocios = num(ts.netwin) * num(res.pct_fichas_pactado);
   const socios = {
     ggr: r2(ggrSocios),
     utilidades: r2(utilidades),
