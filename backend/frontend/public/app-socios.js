@@ -416,17 +416,27 @@ function renderControl(data) {
     kpi("Netwin admin − AgenteMC", pesos(t.control), claseNum(t.control), `Admin ${pesos(t.admin)}`),
     kpi("Diferencia", pesos(t.diferencia), difClase,
       c.dias_con_diferencia ? `${c.dias_con_diferencia} día(s) no coinciden` : "Todos los días coinciden"),
-    kpi("Netwin panel AgenteMC", pesos(t.agentemc), claseNum(t.agentemc)),
-    kpi("Ganancia por fichas", pesos(c.ganancia_fichas), claseNum(c.ganancia_fichas), "AgenteMC × (23% − 13%)")
+    kpi("Ganancia por fichas", pesos(c.ganancia_fichas), claseNum(c.ganancia_fichas), "AgenteMC y DistriPablo según la escala")
   ].join("");
 
   const celda = (v, clase = "") => `<td class="${clase}">${v === null ? "—" : pesos(v)}</td>`;
   const dif = (v) => celda(v, v === null ? "" : Math.abs(v) >= 1 ? "num-neg" : "");
-  const filas = c.dias.map((d) => `<tr><td class="col-nombre">${fechaCorta(d.fecha)}</td>${celda(d.admin)}${celda(d.agentemc)}${celda(d.control)}${celda(d.paneles)}${dif(d.diferencia)}</tr>`);
+
+  // Fichas de los autónomos: escala sobre el netwin del mes.
+  const a = c.autonomos;
+  const costoNota = c.pct_fichas_real === null ? "falta fichas real" : `fichas real ${porcentaje(c.pct_fichas_real)}`;
+  const filaAut = (nombre, x) => `<tr><td class="col-nombre">${nombre}</td>${celda(x.netwin, claseNum(x.netwin) === "num-neg" ? "num-neg" : "")}<td>${porcentaje(x.pct_escala, 0)}</td>${celda(x.cobro)}${celda(x.costo)}${celda(x.ganancia, claseNum(x.ganancia))}</tr>`;
+  const sinDp = !c.hay_distripablo ? '<tr><td class="col-nombre">DistriPablo</td><td colspan="5" class="note">Sin datos de DistriPablo este mes.</td></tr>' : filaAut("DistriPablo", a.distripablo);
+  document.getElementById("tablaAutonomos").innerHTML =
+    `<thead><tr class="sub"><th class="col-nombre">Panel</th><th>Netwin del mes</th><th>Tramo</th><th>Nos paga</th><th>Nos cuesta<small class="nota-col">${costoNota}</small></th><th>Ganancia</th></tr></thead>` +
+    `<tbody>${filaAut("AgenteMC (sin DistriPablo)", a.agentemc)}${sinDp}</tbody>` +
+    `<tfoot><tr class="total"><td class="col-nombre">Total</td>${celda(a.agentemc.netwin + a.distripablo.netwin)}<td></td>${celda(a.agentemc.cobro + a.distripablo.cobro)}${celda(a.agentemc.costo + a.distripablo.costo)}${celda(c.ganancia_fichas, claseNum(c.ganancia_fichas))}</tr></tfoot>`;
+
+  const filas = c.dias.map((d) => `<tr><td class="col-nombre">${fechaCorta(d.fecha)}</td>${celda(d.admin)}${celda(d.agentemc)}${celda(d.distripablo)}${celda(d.agentemc_propio)}${celda(d.control)}${celda(d.paneles)}${dif(d.diferencia)}</tr>`);
   document.getElementById("tablaControl").innerHTML =
-    `<thead><tr class="sub"><th class="col-nombre">Fecha</th><th>Netwin admin</th><th>AgenteMC</th><th>Admin − AgenteMC</th><th>Suma paneles</th><th>Diferencia</th></tr></thead>` +
-    `<tbody>${filas.join("") || '<tr><td colspan="6" class="note">Sin datos este mes.</td></tr>'}</tbody>` +
-    `<tfoot><tr class="total"><td class="col-nombre">Total</td>${celda(t.admin)}${celda(t.agentemc)}${celda(t.control)}${celda(t.paneles)}${dif(t.diferencia)}</tr></tfoot>`;
+    `<thead><tr class="sub"><th class="col-nombre">Fecha</th><th>Netwin admin</th><th>AgenteMC</th><th>DistriPablo</th><th>AgenteMC − DistriPablo</th><th>Admin − AgenteMC</th><th>Suma paneles</th><th>Diferencia</th></tr></thead>` +
+    `<tbody>${filas.join("") || '<tr><td colspan="8" class="note">Sin datos este mes.</td></tr>'}</tbody>` +
+    `<tfoot><tr class="total"><td class="col-nombre">Total</td>${celda(t.admin)}${celda(t.agentemc)}${celda(c.hay_distripablo ? t.distripablo : null)}${celda(t.agentemc_propio)}${celda(t.control)}${celda(t.paneles)}${dif(t.diferencia)}</tr></tfoot>`;
 }
 
 function render(data) {

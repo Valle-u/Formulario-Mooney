@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calcularReparto, controlNetwin, mesValido, repartoSocio, validarConfigPanel, validarSocioMes } from "../../src/services/socios.js";
+import { calcularReparto, controlNetwin, fichasAutonomo, tramoEscala, mesValido, repartoSocio, validarConfigPanel, validarSocioMes } from "../../src/services/socios.js";
 
 const MES = { pct_fichas_pactado: 0.18, pct_cef_socio: 0.0225, factura_usd: 5215, cotizacion: 1782 };
 const CFG_50 = { pct_ggr_socio: 0.7, pct_ggr_casa: 0.3, pct_ggr_nexo: 0, pct_costos_socio: 0.5, pct_costos_casa: 0.5, pct_costos_nexo: 0, empleados: 950000 };
@@ -141,19 +141,39 @@ test("validaciones de lo que se edita", () => {
   assert.match(validarSocioMes({ mes: "2026-11", cotizacion: 0, pct_fichas_pactado: 0.18, pct_cef_socio: 0.0225 }).error, /cotizacion/);
 });
 
-test("controlNetwin: suma de paneles contra admin − AgenteMC y ganancia por fichas", () => {
+test("controlNetwin: suma de paneles contra admin − AgenteMC y AgenteMC sin DistriPablo", () => {
   const c = controlNetwin([
     { fecha: "2026-11-01", tipo: "control", nombre: "ADMIN", netwin: 2079832.79 },
     { fecha: "2026-11-01", tipo: "control", nombre: "AGENTEMC", netwin: 870108.7 },
+    { fecha: "2026-11-01", tipo: "control", nombre: "DISTRIPABLO", netwin: 108.7 },
     { fecha: "2026-11-01", tipo: "socio", nombre: "TANO", netwin: 1000000 },
     { fecha: "2026-11-01", tipo: "personal", nombre: "AGENTEMADRE", netwin: 209724.09 },
     { fecha: "2026-11-02", tipo: "socio", nombre: "TANO", netwin: 500 }
-  ]);
+  ], { pctFichasReal: 0.163 });
   assert.equal(c.dias.length, 2);
   assert.equal(c.dias[0].control, 1209724.09);
   assert.equal(c.dias[0].diferencia, 0);
+  assert.equal(c.dias[0].agentemc_propio, 870000);
   assert.equal(c.dias[1].control, null);
   assert.equal(c.dias_con_diferencia, 0);
   assert.equal(c.total.paneles, 1210224.09);
-  assert.equal(c.ganancia_fichas, 87010.87);
+  assert.equal(c.hay_distripablo, true);
+  assert.equal(c.autonomos.agentemc.pct_escala, 0.25);
+  assert.equal(c.autonomos.agentemc.ganancia, Math.round(870000 * (0.25 - 0.163) * 100) / 100);
+  assert.equal(c.ganancia_fichas, Math.round((870000 * (0.25 - 0.163) + 108.7 * (0.25 - 0.163)) * 100) / 100);
+});
+
+test("escala de fichas de los autónomos: tramos de 10M y piso de 16%", () => {
+  assert.equal(tramoEscala(0), 0.25);
+  assert.equal(tramoEscala(10_000_000), 0.25);
+  assert.equal(tramoEscala(10_000_001), 0.24);
+  assert.equal(tramoEscala(55_000_000), 0.2);
+  assert.equal(tramoEscala(90_000_000), 0.17);
+  assert.equal(tramoEscala(250_000_000), 0.16);
+  const neg = fichasAutonomo(-500, 0.163);
+  assert.equal(neg.cobro, 0);
+  assert.equal(neg.ganancia, 0);
+  const sinReal = fichasAutonomo(1000, null);
+  assert.equal(sinReal.costo, 0);
+  assert.equal(sinReal.cobro, 250);
 });

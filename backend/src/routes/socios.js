@@ -171,7 +171,7 @@ router.get("/reparto", async (req, res) => {
       banco: bancoRes.banco,
       aviso_banco: bancoRes.aviso,
       usd_sin_cotizacion: fijos.usd_sin_cotizacion,
-      control_netwin: controlNetwin(diario.rows),
+      control_netwin: controlNetwin(diario.rows, { pctFichasReal: reparto.resumen.pct_fichas_real }),
       ...reparto
     });
   } catch (error) {
