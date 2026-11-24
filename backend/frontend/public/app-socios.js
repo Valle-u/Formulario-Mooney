@@ -33,35 +33,51 @@ function fechaCorta(iso) {
 // --- Panel de socios ---
 
 // Columnas agrupadas: cada grupo tiene su color (ver .g-* en socios.html) y
-// las subcolumnas repiten el mismo orden Casa / Socio / Nexo.
+// las subcolumnas repiten el mismo orden Casa / Socio / Nexo. "pct" calcula el
+// porcentaje que se muestra chico debajo de cada monto y "nota" explica en el
+// encabezado sobre qué es ese porcentaje.
+const sobre = (k, base) => (d) => (Number(d[base]) > 0 ? Number(d[k]) / Number(d[base]) : null);
+const sobreNetwin = (k) => (d) => (Number(d.netwin) > 0 ? Number(d[k]) / Number(d.netwin) : null);
 const GRUPOS_SOCIOS = [
   { id: "info", titulo: "Información general", cols: [
     { k: "netwin", t: "Netwin", color: "neg" }, { k: "entrada", t: "Entrada" },
-    { k: "salida", t: "Salida" }, { k: "ggr", t: "GGR", color: true, fuerte: true }] },
-  { id: "ggr", titulo: "Reparto del GGR", cols: [
-    { k: "ggr_casa", t: "Casa", color: "neg" }, { k: "ggr_socio", t: "Socio", color: "neg" }, { k: "ggr_nexo", t: "Nexo", color: "neg" }] },
-  { id: "cef", titulo: "CEF", cols: [
-    { k: "cef_casa", t: "Casa" }, { k: "cef_socio", t: "Socio" }, { k: "cef_nexo", t: "Nexo" }] },
-  { id: "fichas", titulo: "Fichas", cols: [
-    { k: "fichas_casa", t: "Casa" }, { k: "fichas_socio", t: "Socio" }, { k: "fichas_nexo", t: "Nexo" }] },
+    { k: "salida", t: "Salida", nota: "RTP", pct: sobre("salida", "entrada") },
+    { k: "ggr", t: "GGR", color: true, fuerte: true, nota: "% de la entrada", pct: sobre("ggr", "entrada") }] },
+  { id: "ggr", titulo: "Reparto del GGR · % del GGR", cols: [
+    { k: "ggr_casa", t: "Casa", color: "neg", pct: sobre("ggr_casa", "ggr") },
+    { k: "ggr_socio", t: "Socio", color: "neg", pct: sobre("ggr_socio", "ggr") },
+    { k: "ggr_nexo", t: "Nexo", color: "neg", pct: sobre("ggr_nexo", "ggr") }] },
+  { id: "cef", titulo: "CEF · % de la entrada", cols: [
+    { k: "cef_casa", t: "Casa", nota: "real", pct: sobre("cef_casa", "entrada") },
+    { k: "cef_socio", t: "Socio", nota: "pactado", pct: sobre("cef_socio", "entrada") },
+    { k: "cef_nexo", t: "Nexo", nota: "su % de costos", pct: sobre("cef_nexo", "entrada") }] },
+  { id: "fichas", titulo: "Fichas · % del netwin", cols: [
+    { k: "fichas_casa", t: "Casa", nota: "real ÷ 2", pct: sobreNetwin("fichas_casa") },
+    { k: "fichas_socio", t: "Socio", nota: "pactado", pct: sobreNetwin("fichas_socio") },
+    { k: "fichas_nexo", t: "Nexo", nota: "su % de GGR", pct: sobreNetwin("fichas_nexo") }] },
   { id: "otros", titulo: "Empleados y estructura", cols: [
-    { k: "empleados_socio", t: "Empleados socio" }, { k: "empleados_nexo", t: "Empleados nexo" }, { k: "costo_estructura", t: "Estructura" }] },
-  { id: "ggc", titulo: "GGC · lo que queda", cols: [
-    { k: "ggc_casa", t: "Casa", color: true, fuerte: true }, { k: "ggc_socio", t: "Socio", color: true, fuerte: true },
-    { k: "ggc_nexo", t: "Nexo", color: true, fuerte: true }] }
+    { k: "empleados_socio", t: "Empleados socio" },
+    { k: "empleados_nexo", t: "Empleados nexo", nota: "% de empleados", pct: sobre("empleados_nexo", "empleados_socio") },
+    { k: "costo_estructura", t: "Estructura" }] },
+  { id: "ggc", titulo: "GGC · lo que queda · % del GGR", cols: [
+    { k: "ggc_casa", t: "Casa", color: true, fuerte: true, pct: sobre("ggc_casa", "ggr") },
+    { k: "ggc_socio", t: "Socio", color: true, fuerte: true, pct: sobre("ggc_socio", "ggr") },
+    { k: "ggc_nexo", t: "Nexo", color: true, fuerte: true, pct: sobre("ggc_nexo", "ggr") }] }
 ];
 
 const GRUPOS_PERSONALES = [
   { id: "info", titulo: "Información general", cols: [
     { k: "netwin", t: "Netwin", color: "neg" }, { k: "entrada", t: "Entrada" },
-    { k: "salida", t: "Salida" }, { k: "ggr", t: "GGR", color: true, fuerte: true }] },
+    { k: "salida", t: "Salida", nota: "RTP", pct: sobre("salida", "entrada") },
+    { k: "ggr", t: "GGR", color: true, fuerte: true, nota: "% de la entrada", pct: sobre("ggr", "entrada") }] },
   { id: "ops", titulo: "Cantidad de operaciones", cols: [
     { k: "ops_entrada", t: "Entrada", entero: true }, { k: "ops_salida", t: "Salida", entero: true }] },
   { id: "ticket", titulo: "Ticket promedio", cols: [
     { k: "ticket_deposito", t: "Depósito", sinTotal: true }, { k: "ticket_retiro", t: "Retiro", sinTotal: true }] }
 ];
 
-function celdaGrupo(valor, col, grupo, inicio, esTotal) {
+function celdaGrupo(datos, col, grupo, inicio, esTotal) {
+  const valor = datos[col.k];
   const clases = [`g-${grupo.id}`];
   if (inicio) clases.push("ini");
   if (col.fuerte) clases.push("fuerte");
@@ -71,17 +87,19 @@ function celdaGrupo(valor, col, grupo, inicio, esTotal) {
   // color "neg": solo los negativos en rojo (los positivos verdes quedan para GGR y GGC).
   if (col.color === true || (col.color === "neg" && v < 0)) clases.push(claseNum(v));
   const texto = col.entero ? v.toLocaleString("es-AR") : pesos(v);
-  return `<td class="${clases.join(" ")}">${texto}</td>`;
+  const p = col.pct ? col.pct(datos) : null;
+  const pctHtml = p === null || !Number.isFinite(p) ? "" : `<span class="pct-celda">${porcentaje(p)}</span>`;
+  return `<td class="${clases.join(" ")}">${texto}${pctHtml}</td>`;
 }
 
 function tablaAgrupada(tabla, titulo, grupos, filas, total) {
   const cabGrupos = `<tr class="grupo"><th rowspan="2" class="col-nombre">${titulo}</th>${grupos.map((g) =>
     `<th colspan="${g.cols.length}" class="g-${g.id} ini">${g.titulo}</th>`).join("")}</tr>`;
   const cabCols = `<tr class="sub">${grupos.map((g) => g.cols.map((c, i) =>
-    `<th class="g-${g.id}${i === 0 ? " ini" : ""}">${c.t}</th>`).join("")).join("")}</tr>`;
+    `<th class="g-${g.id}${i === 0 ? " ini" : ""}">${c.t}${c.nota ? `<small class="nota-col">${c.nota}</small>` : ""}</th>`).join("")).join("")}</tr>`;
   const fila = (nombreHtml, datos, esTotal) =>
     `<tr${esTotal ? ' class="total"' : ""}><td class="col-nombre">${nombreHtml}</td>${grupos.map((g) =>
-      g.cols.map((c, i) => celdaGrupo(datos[c.k], c, g, i === 0, esTotal)).join("")).join("")}</tr>`;
+      g.cols.map((c, i) => celdaGrupo(datos, c, g, i === 0, esTotal)).join("")).join("")}</tr>`;
   tabla.innerHTML = `<thead>${cabGrupos}${cabCols}</thead><tbody>${
     filas.map((f) => fila(f.nombreHtml, f.datos, false)).join("")}${fila("Total", total, true)}</tbody>`;
 }
