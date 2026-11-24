@@ -53,11 +53,11 @@ test("costos fijos por categoría, pasando USD a pesos con la cotización", () =
 test("calcularBloques arma los cuadros como la planilla", () => {
   const reparto = {
     total_socios: {
-      ggr: 400000, entrada: 750000, costo_estructura: 1000,
+      ggr: 400000, entrada: 750000, netwin: 100000, costo_estructura: 1000,
       ggc_socio: 80000, ggc_nexo: 0, fichas_casa: 9000, fichas_socio: 9000, fichas_nexo: 0
     },
     total_personales: { entrada: 2000000, netwin: 1000000 },
-    resumen: { netwin_propio: 5000000, costo_fichas_ars: 800000, pct_fichas_real: 0.16, pct_cef_socio: 0.0225 }
+    resumen: { netwin_propio: 5000000, costo_fichas_ars: 1200000, pct_fichas_real: 0.16, pct_cef_socio: 0.0225, pct_fichas_pactado: 0.18 }
   };
   const banco = { depositos: 10000000, retiros: 7000000, iva: 250000 };
   const fijos = { lista: [{ categoria: "Empleados", monto: 1000000 }], total: 1000000 };
@@ -76,9 +76,9 @@ test("calcularBloques arma los cuadros como la planilla", () => {
   assert.equal(b.casa.neta, 2600000 - 50000 - 160000 - 1000000);
 
   assert.equal(b.socios.ganancia_casa, 400000 - 81000);
-  assert.equal(b.socios.cef, 18750);        // 750.000 × 2,5% (CEF real)
-  assert.equal(b.socios.fichas, 18000);
-  assert.equal(b.socios.neta, 319000 - 18750 - 18000);
+  assert.equal(b.socios.cef, 16875);        // 750.000 × 2,25% pactado
+  assert.equal(b.socios.fichas, 18000);      // 100.000 × 18%
+  assert.equal(b.socios.neta, 319000 - 16875 - 18000);
 
   assert.equal(b.representacion.total, 2600000 + 319000);
   assert.equal(b.representacion.propio, 2600000);

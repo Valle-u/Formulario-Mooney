@@ -274,9 +274,9 @@ function renderKpis(data) {
     : porcentaje(r.pct_fichas_real);
   const notaFichas = r.costo_fichas_ars === null
     ? "Falta la factura o la cotización del mes"
-    : r.netwin_propio_anterior === null
-      ? `${pesos(r.costo_fichas_ars)} de factura · falta el netwin del mes pasado`
-      : `${pesos(r.costo_fichas_ars)} de factura sobre netwin del mes pasado ${pesos(r.netwin_propio_anterior)} · pactado ${porcentaje(r.pct_fichas_pactado, 0)}`;
+    : r.netwin_admin_anterior === null
+      ? `${pesos(r.costo_fichas_ars)} de factura · falta el netwin del admin del mes pasado`
+      : `${pesos(r.costo_fichas_ars)} de factura sobre netwin admin del mes pasado ${pesos(r.netwin_admin_anterior)} · pactado ${porcentaje(r.pct_fichas_pactado, 0)}`;
   document.getElementById("sociosKpis").innerHTML = [
     kpi("GGR socios", pesos(t.ggr), claseNum(t.ggr)),
     kpi("GGC casa", pesos(t.ggc_casa), claseNum(t.ggc_casa), "Lo que nos queda de los paneles de socios"),
@@ -294,7 +294,14 @@ const pctInput = (v) => Math.round(Number(v || 0) * 100 * 10000) / 10000;
 function renderConfig(data) {
   const m = data.socio_mes;
   document.getElementById("facturaUsd").value = m.factura_usd ?? "";
-  document.getElementById("cotizacion").value = m.cotizacion ?? "";
+  const inputCot = document.getElementById("cotizacion");
+  inputCot.value = m.cotizacion ?? "";
+  inputCot.placeholder = m.cotizacion_en_vivo ? `En vivo: ${m.cotizacion_en_vivo.valor}` : "En vivo";
+  document.getElementById("notaCotizacion").textContent = m.cotizacion !== null
+    ? "Cotización fija cargada a mano. Borrala para usar la cotización en vivo."
+    : m.cotizacion_en_vivo
+      ? `Se usa la cotización en vivo de Binance (CriptoYa): ${m.cotizacion_en_vivo.valor}.`
+      : "No se pudo leer la cotización en vivo: cargala a mano.";
   document.getElementById("pctFichas").value = pctInput(m.pct_fichas_pactado);
   document.getElementById("pctCef").value = pctInput(m.pct_cef_socio);
 
@@ -420,7 +427,7 @@ function render(data) {
   const estado = d.dias
     ? `${d.dias} días con datos de los paneles, el último del ${fechaCorta(d.ultima)}.`
     : "Todavía no llegaron datos de los paneles para este mes.";
-  const avisoMes = data.socio_mes.heredado ? " Los datos del mes (factura y cotización) todavía no se cargaron." : "";
+  const avisoMes = data.socio_mes.heredado && data.socio_mes.factura_usd === null ? " La factura de fichas del mes todavía no se cargó." : "";
   document.getElementById("sociosEstado").textContent = estado + avisoMes;
 }
 
