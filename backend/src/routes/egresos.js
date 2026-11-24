@@ -40,36 +40,6 @@ import { sendNotification } from "./notifications.js";
 
  const router = express.Router();
 
-const SALDOS_CACHE_TTL_MS = Number(process.env.SALDOS_CACHE_TTL_MS || 15000);
-const SALDOS_CACHE_MAX_ENTRIES = Number(process.env.SALDOS_CACHE_MAX_ENTRIES || 100);
-const saldosCache = new Map();
-
-function buildSaldosCacheKey({ empresa, moneda, cuenta, mes, anio }) {
-  return [empresa || "*", moneda || "*", cuenta || "*", String(mes), String(anio)].join("|");
-}
-
-function getSaldosCache(cacheKey) {
-  const item = saldosCache.get(cacheKey);
-  if (!item) return null;
-  if ((Date.now() - item.ts) > SALDOS_CACHE_TTL_MS) {
-    saldosCache.delete(cacheKey);
-    return null;
-  }
-  return item.payload;
-}
-
-function setSaldosCache(cacheKey, payload) {
-  if (saldosCache.size >= SALDOS_CACHE_MAX_ENTRIES) {
-    const firstKey = saldosCache.keys().next().value;
-    if (firstKey) saldosCache.delete(firstKey);
-  }
-  saldosCache.set(cacheKey, { ts: Date.now(), payload });
-}
-
-function clearSaldosCache() {
-  if (saldosCache.size) saldosCache.clear();
-}
-
 function normalizeTurnoLabel(turnoValue) {
   const raw = String(turnoValue || "").trim();
   const lower = raw.toLowerCase();
@@ -136,18 +106,6 @@ async function findDuplicateCierreSlot({ fecha, turno, empresaSalida, cuentaSali
     params
   );
 }
-
-// GET distinct empresas (for saldos filter)
-router.get("/distinct-empresas", auth, async (req, res) => {
-  try {
-    const result = await query("SELECT DISTINCT empresa_salida FROM egresos WHERE status NOT IN ('anulado') ORDER BY empresa_salida", []);
-    const empresas = result.rows.map(r => r.empresa_salida);
-    return res.json({ empresas });
-  } catch (error) {
-    console.error("Error obteniendo empresas distintas:", error);
-    return res.status(500).json({ message: "Error obteniendo empresas" });
-  }
-});
 
 // GET cuentas por empresa (para dividir por cuentas de una empresa)
 router.get("/cuentas", auth, async (req, res) => {
@@ -750,7 +708,6 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
       // No fallar la creación del egreso si falla la notificación
     }
 
-    clearSaldosCache();
     return res.status(201).json({ id: egresoId, codigo_operacion: codigoOperacion, message: "ok" });
   } catch (e) {
     console.error("🔥 POST /api/egresos ERROR:", e);
@@ -789,213 +746,6 @@ router.post("/", auth, writeLimiter, upload.single("comprobante"), validateUploa
   }
 });
 
-// ═══════════════════════════════════════════════════
-// HELPER: Calcular saldos de un mes dado
-// ═══════════════════════════════════════════════════
-async function computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown = true }) {
-  // Robustly derive month/year for filtering
-  const mm = Number.isFinite(Number(mes)) ? Number(mes) : (new Date()).getMonth() + 1;
-  const aa = Number.isFinite(Number(anio)) ? Number(anio) : new Date().getFullYear();
-  const mesStr = String(mm).padStart(2, "0");
-  const anioStr = String(aa);
-  const primerDiaMesISO = `${anioStr}-${mesStr}-01`;
-
-  const next = new Date(aa, mm, 1);
-  const nextMesStr = String(next.getMonth() + 1).padStart(2, "0");
-  const nextAnioStr = String(next.getFullYear());
-  const primerDiaMesSiguienteISO = `${nextAnioStr}-${nextMesStr}-01`;
-
-  // Construir filtros comunes
-  const baseParams = [];
-  let commonFilter = "";
-
-  if (empresa) {
-    baseParams.push(empresa);
-    commonFilter += ` AND empresa_salida = $${baseParams.length}`;
-  }
-  if (moneda) {
-    baseParams.push(moneda.toUpperCase());
-    commonFilter += ` AND moneda = $${baseParams.length}`;
-  }
-  if (cuenta) {
-    baseParams.push(cuenta);
-    commonFilter += ` AND cuenta_salida = $${baseParams.length}`;
-  }
-
-  const nextIdx = baseParams.length + 1;
-
-  // egresos.fecha es DATE desde la migración 001: comparar directo para que
-  // idx_egresos_fecha sea usable. El CAST a text + TO_DATE anterior hacía un
-  // scan completo en cada cálculo de saldos.
-  const cierreSql = `
-    SELECT DISTINCT ON (empresa_salida, cuenta_salida, moneda)
-      empresa_salida,
-      cuenta_salida,
-      moneda,
-      monto
-    FROM egresos
-    WHERE status <> 'anulado'
-      AND etiqueta = 'Cierre de Caja'
-      AND fecha < $${nextIdx}::date
-      ${commonFilter}
-    ORDER BY empresa_salida, cuenta_salida, moneda, fecha DESC
-  `;
-  const cierreResult = await query(cierreSql, [...baseParams, primerDiaMesISO]);
-
-  const cierreMap = {};
-  cierreResult.rows.forEach(r => {
-    cierreMap[`${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`] = Number(r.monto);
-  });
-
-  // 2) Movimientos del mes (con o sin desglose por etiqueta)
-  const movSql = includeBreakdown
-    ? `
-      SELECT
-        empresa_salida,
-        cuenta_salida,
-        moneda,
-        etiqueta,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
-        MAX(created_at) AS ultima_transaccion,
-        COUNT(*) AS cnt
-      FROM egresos
-      WHERE status <> 'anulado'
-        AND etiqueta != 'Cierre de Caja'
-        AND fecha >= $${nextIdx}::date
-        AND fecha < $${nextIdx + 1}::date
-        ${commonFilter}
-      GROUP BY empresa_salida, cuenta_salida, moneda, etiqueta
-      ORDER BY empresa_salida, cuenta_salida, moneda, salidas DESC
-    `
-    : `
-      SELECT
-        empresa_salida,
-        cuenta_salida,
-        moneda,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'ENTRADA' THEN monto END), 0) AS entradas,
-        COALESCE(SUM(CASE WHEN tipo_transaccion = 'SALIDA' THEN monto END), 0) AS salidas,
-        MAX(created_at) AS ultima_transaccion,
-        COUNT(*) AS cnt
-      FROM egresos
-      WHERE status <> 'anulado'
-        AND etiqueta != 'Cierre de Caja'
-        AND fecha >= $${nextIdx}::date
-        AND fecha < $${nextIdx + 1}::date
-        ${commonFilter}
-      GROUP BY empresa_salida, cuenta_salida, moneda
-      ORDER BY empresa_salida, cuenta_salida, moneda
-    `;
-
-  const movResult = await query(movSql, [...baseParams, primerDiaMesISO, primerDiaMesSiguienteISO]);
-
-  // 3) Combinar: construir cuentasMap con desglose
-  const cuentasMap = {};
-
-  // Cuentas con cierre previo (pueden no tener movimientos este mes)
-  for (const [key, inicioCaja] of Object.entries(cierreMap)) {
-    const [emp, cta, mon] = key.split("|");
-    cuentasMap[key] = {
-      empresa_salida: emp,
-      cuenta_salida: cta,
-      moneda: mon,
-      inicio_caja: inicioCaja,
-      tiene_cierre_previo: true,
-      total_entradas: 0,
-      total_salidas: 0,
-      saldo: inicioCaja,
-      ultima_transaccion: null,
-      total_transacciones: 0,
-      desglose_etiquetas: []
-    };
-  }
-
-  // Agregar movimientos (agrupados por etiqueta → agregar a cuenta)
-  movResult.rows.forEach(r => {
-    const key = `${r.empresa_salida}|${r.cuenta_salida}|${r.moneda}`;
-    const entradas = Number(r.entradas);
-    const salidas = Number(r.salidas);
-    const cnt = Number(r.cnt);
-
-    if (!cuentasMap[key]) {
-      const inicioCaja = cierreMap[key] || 0;
-      cuentasMap[key] = {
-        empresa_salida: r.empresa_salida,
-        cuenta_salida: r.cuenta_salida,
-        moneda: r.moneda,
-        inicio_caja: inicioCaja,
-        tiene_cierre_previo: !!cierreMap[key],
-        total_entradas: 0,
-        total_salidas: 0,
-        saldo: inicioCaja,
-        ultima_transaccion: null,
-        total_transacciones: 0,
-        desglose_etiquetas: []
-      };
-    }
-
-    const c = cuentasMap[key];
-    c.total_entradas += entradas;
-    c.total_salidas += salidas;
-    c.total_transacciones += cnt;
-    if (r.ultima_transaccion && (!c.ultima_transaccion || r.ultima_transaccion > c.ultima_transaccion)) {
-      c.ultima_transaccion = r.ultima_transaccion;
-    }
-
-    // Desglose por etiqueta (solo si fue solicitado)
-    if (includeBreakdown) {
-      c.desglose_etiquetas.push({
-        etiqueta: r.etiqueta,
-        entradas,
-        salidas,
-        total: entradas + salidas,
-        count: cnt
-      });
-    }
-  });
-
-  // Calcular saldo final y ordenar desglose
-  for (const c of Object.values(cuentasMap)) {
-    c.saldo = c.inicio_caja + c.total_entradas - c.total_salidas;
-    if (includeBreakdown) {
-      c.desglose_etiquetas.sort((a, b) => b.total - a.total);
-    }
-  }
-
-  const saldos = Object.values(cuentasMap).sort((a, b) => {
-    if (a.moneda !== b.moneda) return a.moneda.localeCompare(b.moneda);
-    if (a.empresa_salida !== b.empresa_salida) return a.empresa_salida.localeCompare(b.empresa_salida);
-    return a.cuenta_salida.localeCompare(b.cuenta_salida);
-  });
-
-  return { saldos, periodo: { mes: mm, anio: aa } };
-}
-
-function parsePeriodoQuery(req) {
-  const now = new Date();
-  const mesRaw = req.query.mes;
-  const anioRaw = req.query.anio;
-
-  let mes = Number.parseInt(mesRaw, 10);
-  let anio = Number.parseInt(anioRaw, 10);
-
-  if (!Number.isInteger(mes)) mes = now.getMonth() + 1;
-  if (!Number.isInteger(anio)) anio = now.getFullYear();
-
-  if (mes < 1 || mes > 12) {
-    const err = new Error("Mes inválido. Debe estar entre 1 y 12");
-    err.status = 400;
-    throw err;
-  }
-  if (anio < 2020 || anio > 2100) {
-    const err = new Error("Año inválido");
-    err.status = 400;
-    throw err;
-  }
-
-  return { mes, anio };
-}
-
 function parseFechaQueryFlexible(rawValue, fallbackISO, fieldName) {
   if (!rawValue) return fallbackISO;
 
@@ -1023,124 +773,6 @@ function buildISODateRange(fechaDesdeISO, fechaHastaISO) {
   }
   return out;
 }
-
-// GET /api/egresos/saldos - Obtener saldos de cuentas con lógica de cierre mensual
-// Solo Admin puede ver saldos
-// Parámetros: empresa, moneda, cuenta, mes (1-12), anio (YYYY)
-router.get("/saldos", auth, requireAdmin, async (req, res) => {
-  try {
-    const routeStart = Date.now();
-    const { empresa, moneda, cuenta } = req.query;
-    const { mes, anio } = parsePeriodoQuery(req);
-
-    const cacheKey = buildSaldosCacheKey({ empresa, moneda, cuenta, mes, anio });
-    const cached = getSaldosCache(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    // Calcular saldos del mes actual y anterior en paralelo
-    let prevMes = mes - 1;
-    let prevAnio = anio;
-    if (prevMes < 1) { prevMes = 12; prevAnio--; }
-
-    const [current, prev] = await Promise.all([
-      computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown: true }),
-      computeSaldos({ empresa, moneda, cuenta, mes: prevMes, anio: prevAnio, includeBreakdown: false })
-    ]);
-
-    // Mapear saldos anteriores por clave
-    const prevMap = {};
-    prev.saldos.forEach(s => {
-      prevMap[`${s.empresa_salida}|${s.cuenta_salida}|${s.moneda}`] = s.saldo;
-    });
-
-    // Agregar comparación a cada cuenta
-    current.saldos.forEach(s => {
-      const key = `${s.empresa_salida}|${s.cuenta_salida}|${s.moneda}`;
-      const prevSaldo = prevMap[key];
-      if (prevSaldo !== undefined) {
-        s.saldo_anterior = prevSaldo;
-        s.diferencia = s.saldo - prevSaldo;
-        s.diferencia_pct = prevSaldo !== 0
-          ? Math.round(((s.saldo - prevSaldo) / Math.abs(prevSaldo)) * 1000) / 10
-          : null;
-      } else {
-        s.saldo_anterior = null;
-        s.diferencia = null;
-        s.diferencia_pct = null;
-      }
-    });
-
-    // Totales por moneda (sin duplicar payload)
-    const totales = current.saldos.reduce((acc, r) => {
-      const key = String(r.moneda || "").toUpperCase();
-      if (!acc[key]) acc[key] = 0;
-      acc[key] += Number(r.saldo || 0);
-      return acc;
-    }, { ARS: 0, USD: 0, USDT: 0 });
-
-    const payload = {
-      saldos: current.saldos,
-      totales,
-      periodo: current.periodo
-    };
-
-    setSaldosCache(cacheKey, payload);
-
-    const durationMs = Date.now() - routeStart;
-    if (durationMs > 700) {
-      console.log(`Query saldos lenta (${durationMs}ms)`, { empresa, moneda, cuenta, mes, anio, cuentas: current.saldos.length });
-    }
-
-    return res.json(payload);
-  } catch (error) {
-    console.error("Error obteniendo saldos:", error);
-    if (error?.status === 400) {
-      return res.status(400).json({ message: error.message });
-    }
-    // Devolver detalle del error (solo admin puede ver saldos)
-    return res.status(500).json({
-      message: "Error obteniendo saldos",
-      detail: error?.message || "Error desconocido",
-      code: error?.code || null
-    });
-  }
-});
-
-// GET /api/egresos/saldos/csv - Exportar saldos a CSV
-router.get("/saldos/csv", auth, requireAdmin, exportLimiter, async (req, res) => {
-  try {
-    const { empresa, moneda, cuenta } = req.query;
-    const { mes, anio } = parsePeriodoQuery(req);
-
-    const { saldos } = await computeSaldos({ empresa, moneda, cuenta, mes, anio, includeBreakdown: false });
-
-    const columns = ["Empresa", "Cuenta", "Moneda", "Inicio Caja", "Entradas", "Salidas", "Balance", "Cant. Operaciones"];
-    const rows = saldos.map(s => [
-      s.empresa_salida,
-      s.cuenta_salida,
-      s.moneda,
-      s.inicio_caja.toFixed(2),
-      s.total_entradas.toFixed(2),
-      s.total_salidas.toFixed(2),
-      s.saldo.toFixed(2),
-      s.total_transacciones
-    ]);
-
-    const mesStr = String(mes).padStart(2, "0");
-    const csv = withBOM(toCSV({ columns, rows }));
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="saldos_${mesStr}_${anio}.csv"`);
-    return res.send(csv);
-  } catch (error) {
-    console.error("Error exportando saldos CSV:", error);
-    if (error?.status === 400) {
-      return res.status(400).json({ message: error.message });
-    }
-    return res.status(500).json({ message: "Error exportando saldos" });
-  }
-});
 
 // GET /api/egresos/cierres/kpi - Cobertura de cierres por dia/turno (3 slots por dia)
 router.get("/cierres/kpi", auth, async (req, res) => {
@@ -2529,7 +2161,6 @@ router.put("/:id", auth, writeLimiter, async (req, res) => {
       }
     });
 
-    clearSaldosCache();
     return res.json({ message: "Egreso actualizado correctamente" });
 
   } catch (error) {
@@ -2610,7 +2241,6 @@ router.post("/:id/anular", auth, writeLimiter, async (req, res) => {
       }
     });
 
-    clearSaldosCache();
     return res.json({ message: "Egreso anulado correctamente" });
 
   } catch (error) {

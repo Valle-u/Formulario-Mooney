@@ -175,8 +175,6 @@ function reloadSelectOptions() { _optionsLoaded = false; return loadSelectOption
 // Detectar página actual para determinar moneda y tipo
 const IS_USD_PAGE = window.location.pathname.includes('flujo-usd');
 
-// Detectar página de saldos (nueva funcionalidad en tiempo real)
-const IS_SALDOS_PAGE = window.location.pathname.includes('saldos.html');
 
 // Handler para cambiar labels según tipo de transacción
 function handleTipoTransaccionChange() {
