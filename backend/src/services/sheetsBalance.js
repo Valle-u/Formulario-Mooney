@@ -125,6 +125,13 @@ export async function leerBalanceMensual(fechaISO, { spreadsheetId = balanceShee
   return res.data.values || [];
 }
 
+// Valores de un rango (sin formato: números como números).
+export async function leerRango(spreadsheetId, rango) {
+  const sheets = await getSheets();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: rango, valueRenderOption: "UNFORMATTED_VALUE" });
+  return res.data.values || [];
+}
+
 // Título del spreadsheet: sirve para comprobar que la cuenta de servicio lo puede leer.
 export async function tituloPlanilla(spreadsheetId) {
   const sheets = await getSheets();

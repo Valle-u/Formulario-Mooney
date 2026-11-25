@@ -484,6 +484,100 @@ async function cargar(ev, { mantenerConfigAbierta = false } = {}) {
   }
 }
 
+// --- Auditoría del mes ---
+
+let ultimaAuditoria = null;
+
+function celdaDif(n) {
+  if (n === null || n === undefined) return `<td class="num note">—</td>`;
+  return `<td class="num ${Math.abs(n) < 1 ? "" : claseNum(n)}">${Math.abs(n) < 1 ? "ok" : pesos(n)}</td>`;
+}
+
+function tituloSeccion(titulo, diferencias, total) {
+  const estado = diferencias
+    ? `<span class="auditoria-mal">${diferencias} diferencia(s)</span>`
+    : `<span class="auditoria-ok">todo coincide</span>`;
+  return `<h4 class="socios-subtitulo">${escapeHtml(titulo)} · ${estado}${total ? ` <span class="note">de ${escapeHtml(String(total))}</span>` : ""}</h4>`;
+}
+
+function seccionPlanilla(p, todo) {
+  if (!p) return "";
+  const filas = p.filas.filter((f) => todo || !f.ok);
+  const esCantidad = (f) => f.campo === "ops_entrada" || f.campo === "ops_salida";
+  const valor = (f, n) => (esCantidad(f) ? (n ?? "—") : pesos(n));
+  const tabla = filas.length
+    ? `<div class="table-wrap"><table class="table socios-pedidos"><thead><tr><th>Grupo</th><th>Panel</th><th>Dato</th><th class="num">Formulario</th><th class="num">Planilla</th><th class="num">Diferencia</th></tr></thead><tbody>${
+        filas.map((f) => `<tr class="${f.ok ? "" : "dif"}"><td>${escapeHtml(f.grupo)}</td><td>${escapeHtml(f.panel)}</td><td>${escapeHtml(f.nombre_campo)}</td>
+          <td class="num">${valor(f, f.formu)}</td><td class="num">${valor(f, f.planilla)}</td>${
+          esCantidad(f) ? `<td class="num">${f.ok ? "ok" : f.diferencia}</td>` : celdaDif(f.diferencia)}</tr>`).join("")
+      }</tbody></table></div>`
+    : "";
+  return `<div class="auditoria-seccion">${tituloSeccion("Planilla vs formulario", p.diferencias, p.filas.length)}
+    ${p.faltantes.map((t) => `<div class="socios-aviso">${escapeHtml(t)}</div>`).join("")}${tabla}</div>`;
+}
+
+function seccionBanco(b, todo) {
+  if (!b) return "";
+  const filas = b.filas.filter((f) => todo || !f.ok);
+  const cuando = b.actualizado ? `guardado el ${fechaHora(b.actualizado)}` : "todavía no se trajo";
+  const ayuda = b.diferencias ? ` Si la hoja cambió, tocá "Traer del balance bancario" arriba para actualizar el formulario.` : "";
+  const tabla = filas.length
+    ? `<div class="table-wrap"><table class="table socios-pedidos"><thead><tr><th>Dato</th><th class="num">Formulario</th><th class="num">Hoja</th><th class="num">Diferencia</th></tr></thead><tbody>${
+        filas.map((f) => `<tr class="${f.ok ? "" : "dif"}"><td>${escapeHtml(f.nombre_campo)}</td><td class="num">${pesos(f.formu)}</td><td class="num">${pesos(f.planilla)}</td>${celdaDif(f.diferencia)}</tr>`).join("")
+      }</tbody></table></div>`
+    : "";
+  return `<div class="auditoria-seccion">${tituloSeccion("Banco: formulario vs hoja de hoy", b.diferencias, b.filas.length)}
+    <p class="note">Movimientos en la hoja: ${Number(b.movimientos_hoja)} · en el formulario: ${b.movimientos_formu ?? "—"} (${escapeHtml(cuando)}).${escapeHtml(ayuda)}</p>${tabla}</div>`;
+}
+
+function seccionPagos(p, todo) {
+  const filas = p.filas.filter((f) => todo || !f.ok);
+  const conBanco = p.total.banco !== null;
+  const colBanco = (html) => (conBanco ? html : "");
+  return `<div class="auditoria-seccion">${tituloSeccion('Pagos del panel vs egresos "Premio Pagado"', p.diferencias, p.filas.length ? `${p.filas.length} días` : "")}
+    <p class="note">Salida de los paneles (socios y personales) de cada día contra los egresos en pesos con la etiqueta "[Unidad M] Premio Pagado"${conBanco ? " y los retiros del banco" : ""}.</p>
+    <div class="table-wrap"><table class="table socios-pedidos"><thead><tr><th>Fecha</th><th class="num">Panel (salida)</th><th class="num">Egresos</th>${colBanco(`<th class="num">Banco</th>`)}<th class="num">Egresos − panel</th>${colBanco(`<th class="num">Banco − panel</th>`)}</tr></thead><tbody>${
+      filas.map((f) => `<tr class="${f.ok ? "" : "dif"}"><td>${fechaCorta(f.fecha)}</td><td class="num">${pesos(f.panel)}</td><td class="num">${pesos(f.egresos)}</td>${colBanco(`<td class="num">${pesos(f.banco)}</td>`)}${celdaDif(f.dif_egresos)}${colBanco(celdaDif(f.dif_banco))}</tr>`).join("")
+    }<tr class="total"><td>Total del mes</td><td class="num">${pesos(p.total.panel)}</td><td class="num">${pesos(p.total.egresos)}</td>${colBanco(`<td class="num">${pesos(p.total.banco)}</td>`)}${celdaDif(p.total.dif_egresos)}${colBanco(celdaDif(p.total.dif_banco))}</tr></tbody></table></div></div>`;
+}
+
+function renderAuditoria() {
+  const cont = document.getElementById("auditoria");
+  const a = ultimaAuditoria;
+  if (!a) {
+    cont.innerHTML = "";
+    return;
+  }
+  const todo = document.getElementById("auditoriaTodo").checked;
+  cont.innerHTML = a.avisos.map((t) => `<div class="socios-aviso" style="margin-top:8px">${escapeHtml(t)}</div>`).join("")
+    + seccionPlanilla(a.planilla, todo) + seccionBanco(a.banco, todo) + seccionPagos(a.pagos, todo);
+}
+
+async function auditar() {
+  const mes = document.getElementById("mes").value;
+  const btn = document.getElementById("btnAuditar");
+  const estado = document.getElementById("estadoAuditoria");
+  btn.disabled = true;
+  estado.textContent = "Leyendo la planilla del mes…";
+  try {
+    ultimaAuditoria = await api(`/api/socios/auditoria?mes=${encodeURIComponent(mes)}`, { timeout: 120000 });
+    const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    estado.textContent = `Auditoría de ${nombreMes(`${mes}-01`)} · ${hora}`;
+    renderAuditoria();
+  } catch (e) {
+    estado.textContent = "";
+    toast("Error", e.message || "No se pudo auditar", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function limpiarAuditoria() {
+  ultimaAuditoria = null;
+  document.getElementById("estadoAuditoria").textContent = "";
+  renderAuditoria();
+}
+
 // --- Planilla del balance de cada mes ---
 
 function nombreMes(iso) {
@@ -662,6 +756,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("planillaId").focus();
   });
   cargarPlanillas();
+  document.getElementById("btnAuditar").addEventListener("click", auditar);
+  document.getElementById("auditoriaTodo").addEventListener("change", renderAuditoria);
+  document.getElementById("sociosForm").addEventListener("submit", limpiarAuditoria);
   document.getElementById("tablaConfig").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-guardar]");
     if (btn) guardarSocio(btn);
