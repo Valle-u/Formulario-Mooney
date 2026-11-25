@@ -22,6 +22,7 @@ import {
 } from "../services/balanceDiario.js";
 import { leerPlanillaDia, escribirBalanceMensual, tabDestinoBalance } from "../services/sheetsBalance.js";
 import { guardarResumenBanco } from "../services/sociosBloques.js";
+import { balanceIdDelMes } from "../services/planillasMes.js";
 
 const router = express.Router();
 
@@ -372,7 +373,8 @@ router.post("/cargar", auth, requireConciliador, writeLimiter, async (req, res) 
     if (filas.length > 20000) {
       return res.status(400).json({ message: "Demasiadas filas para una sola carga" });
     }
-    const { matriz, ...resultado } = await escribirBalanceMensual(filas, fecha);
+    const spreadsheetId = await balanceIdDelMes(query, fecha);
+    const { matriz, ...resultado } = await escribirBalanceMensual(filas, fecha, { spreadsheetId });
     // Totales del mes para la pantalla Socios. Si falla, la carga ya quedó
     // hecha: se avisa en el log y se puede traer a mano desde Socios.
     try {

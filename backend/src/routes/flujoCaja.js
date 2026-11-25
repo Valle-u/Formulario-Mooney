@@ -3,6 +3,7 @@ import { auth } from "../middleware/auth.js";
 import { query } from "../config/db.js";
 import { agruparMovimientos, armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../services/flujoCaja.js";
 import { leerBalanceMensual } from "../services/sheetsBalance.js";
+import { balanceIdDelMes } from "../services/planillasMes.js";
 
 const router = express.Router();
 const ROLES = new Set(["admin", "direccion"]);
@@ -94,7 +95,7 @@ router.get("/", auth, requireConciliador, async (req, res) => {
     let ingresosArs = [];
     let avisoBalance = null;
     try {
-      const matriz = await leerBalanceMensual(desde);
+      const matriz = await leerBalanceMensual(desde, { spreadsheetId: await balanceIdDelMes(query, desde) });
       ingresosArs = ingresosArsDesdeBalance(matriz, { desde, hasta });
     } catch (e) {
       avisoBalance = e.message || "No pude leer el balance mensual";

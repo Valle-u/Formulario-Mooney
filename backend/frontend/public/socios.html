@@ -51,6 +51,7 @@
     .socios-pedidos .estado-listo { color: #10b981; }
     .socios-pedidos .estado-error { color: #ef4444; }
     .socios-pedidos .estado-cancelado { color: var(--muted); }
+    .socios-pedidos a { color: #60a5fa; text-decoration: underline; }
     .socios-subtitulo { margin: 8px 0 4px; font-size: 14px; }
     .socios-tabla thead th.col-nombre { background: var(--card); z-index: 3; }
     .socios-tabla .nota-col { display: block; font-size: 10px; font-weight: 500; text-transform: none; opacity: .8; }
@@ -311,6 +312,21 @@
                   <table class="table socios-fijos" id="tablaFijos"></table>
                 </div>
                 <button class="btn btn-primary" type="button" id="btnGuardarFijos" style="margin-top:12px">Guardar etiquetas</button>
+              </details>
+              <details class="socios-detalle" id="detallePlanillas" style="margin-top:16px">
+                <summary>Planilla del balance de cada mes</summary>
+                <p class="note" style="margin-top:12px">
+                  De la planilla del mes se leen el balance bancario, el flujo de caja y la auditoría, y ahí se escribe la carga del balance.
+                  Cuando arranca un mes nuevo, pegá acá el link de su planilla (tiene que estar compartida con la cuenta del scraper).
+                </p>
+                <form id="formPlanilla" class="socios-config-mes" style="grid-template-columns:minmax(0,1fr) minmax(0,3fr) auto">
+                  <div class="field"><label for="planillaMes">MES</label><input id="planillaMes" type="month" required></div>
+                  <div class="field"><label for="planillaId">LINK O ID DE LA PLANILLA</label><input id="planillaId" type="text" maxlength="300" placeholder="https://docs.google.com/spreadsheets/d/…" required></div>
+                  <button class="btn btn-primary" type="submit" id="btnGuardarPlanilla">Guardar</button>
+                </form>
+                <div class="table-wrap" style="margin-top:12px">
+                  <table class="table socios-pedidos" id="tablaPlanillas"></table>
+                </div>
               </details>
             </div>
           </section>

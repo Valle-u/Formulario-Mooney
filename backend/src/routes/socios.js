@@ -4,7 +4,8 @@ import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { auditLog } from "../utils/audit.js";
 import { calcularReparto, controlNetwin, mesValido, validarConfigPanel, validarSocioMes } from "../services/socios.js";
 import { calcularBloques, costosFijosPorCategoria, guardarResumenBanco, validarCostosFijos } from "../services/sociosBloques.js";
-import { leerBalanceMensual } from "../services/sheetsBalance.js";
+import { leerBalanceMensual, tituloPlanilla } from "../services/sheetsBalance.js";
+import { balanceIdDelMes, extraerIdPlanilla, idDelEntorno } from "../services/planillasMes.js";
 import { cotizacionEnVivo } from "../services/cotizacion.js";
 import { validarPedido } from "../services/scraperPedidos.js";
 
@@ -250,7 +251,7 @@ router.post("/sincronizar-banco", async (req, res) => {
   const mes = mesValido(req.body?.mes);
   if (!mes) return res.status(400).json({ message: "mes inválido (AAAA-MM)" });
   try {
-    const matriz = await leerBalanceMensual(mes.inicio);
+    const matriz = await leerBalanceMensual(mes.inicio, { spreadsheetId: await balanceIdDelMes(query, mes.inicio) });
     const r = await guardarResumenBanco(query, mes.inicio, matriz, { origen: "sincronizar", userId: req.user.id });
     await auditLog(req, { action: "SOCIOS_SINCRONIZAR_BANCO", entity: "banco_resumen_mes", success: true, status_code: 200, details: r });
     return res.json({ ok: true, ...r });
@@ -284,6 +285,59 @@ router.put("/costos-fijos", async (req, res) => {
     return res.status(500).json({ message: "Error guardando las etiquetas de costos fijos" });
   } finally {
     client.release();
+  }
+});
+
+// --- Planilla del balance de cada mes ---
+
+router.get("/planillas", async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT p.mes::text AS mes, p.balance_id, p.titulo, p.updated_at, u.username AS actualizado_por
+         FROM planillas_mes p LEFT JOIN users u ON u.id = p.actualizado_por
+        ORDER BY p.mes DESC`
+    );
+    // Si la variable de entorno apunta a otra planilla para ese mes, se avisa:
+    // ahora manda la cargada acá.
+    const planillas = result.rows.map((p) => {
+      const env = idDelEntorno(p.mes);
+      return { ...p, distinta_del_entorno: Boolean(env && env !== p.balance_id) };
+    });
+    return res.json({ planillas });
+  } catch (error) {
+    console.error("❌ Error listando planillas:", error);
+    return res.status(500).json({ message: "Error listando las planillas" });
+  }
+});
+
+router.put("/planillas", async (req, res) => {
+  const mes = mesValido(req.body?.mes);
+  if (!mes) return res.status(400).json({ message: "mes inválido (AAAA-MM)" });
+  const id = extraerIdPlanilla(req.body?.balance_id);
+  if (!id) return res.status(400).json({ message: "Pegá el link o el ID de la planilla de Google" });
+  let titulo;
+  try {
+    titulo = await tituloPlanilla(id);
+  } catch (e) {
+    console.error("socios planilla:", e?.message || e);
+    return res.status(400).json({ message: "No puedo abrir esa planilla. Revisá el link y que esté compartida con la cuenta del scraper." });
+  }
+  try {
+    await query(
+      `INSERT INTO planillas_mes (mes, balance_id, titulo, actualizado_por, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (mes) DO UPDATE SET balance_id = EXCLUDED.balance_id, titulo = EXCLUDED.titulo,
+         actualizado_por = EXCLUDED.actualizado_por, updated_at = NOW()`,
+      [mes.inicio, id, titulo, req.user.id]
+    );
+    await auditLog(req, {
+      action: "SOCIOS_PLANILLA_MES", entity: "planillas_mes", success: true, status_code: 200,
+      details: { mes: mes.inicio, balance_id: id, titulo }
+    });
+    return res.json({ ok: true, mes: mes.inicio, balance_id: id, titulo });
+  } catch (error) {
+    console.error("❌ Error guardando planilla:", error);
+    return res.status(500).json({ message: "Error guardando la planilla" });
   }
 });
 
