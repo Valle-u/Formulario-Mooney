@@ -2759,7 +2759,25 @@ body {
     border-radius: 10px;
   }
 
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-notification {
+    width: 42px;
+    min-height: 34px;
+    padding: 0;
+    gap: 0;
+    border-radius: 10px;
+  }
+
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-notification .notif-label {
+    display: none;
+  }
+
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-notification .notification-badge {
+    top: -6px;
+    right: -6px;
+  }
+
   html.sidebar-collapsed .app-nosidebar .topbar-center.nav-desktop .nav-item,
+  html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-notification,
   html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-theme,
   html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .btn-logout,
   html.sidebar-collapsed .app-nosidebar .topbar-right.nav-desktop .user-badge,
