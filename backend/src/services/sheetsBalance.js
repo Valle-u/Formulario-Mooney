@@ -108,8 +108,7 @@ function celdaSegura(v) {
  * Escribe en la hoja "Balance Mensual Bancario" del spreadsheet del mes.
  * No pisa el encabezado. Dedup: ID|Tipo|Importe|Titular|FechaHora.
  */
-export async function leerBalanceMensual(fechaISO) {
-  const spreadsheetId = balanceSheetId(fechaISO);
+export async function leerBalanceMensual(fechaISO, { spreadsheetId = balanceSheetId(fechaISO) } = {}) {
   const tab = tabDestinoBalance();
   const sheets = await getSheets();
   let res;
@@ -124,6 +123,13 @@ export async function leerBalanceMensual(fechaISO) {
     throw new Error(`No pude leer la hoja "${tab}" del balance mensual`);
   }
   return res.data.values || [];
+}
+
+// Título del spreadsheet: sirve para comprobar que la cuenta de servicio lo puede leer.
+export async function tituloPlanilla(spreadsheetId) {
+  const sheets = await getSheets();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "properties.title" });
+  return meta.data.properties?.title || "";
 }
 
 const LOTE_ESCRITURA = 2500;
@@ -142,8 +148,7 @@ async function appendEnLotes(sheets, spreadsheetId, tab, inicio, filas) {
   }
 }
 
-export async function escribirBalanceMensual(filas, fechaISO) {
-  const spreadsheetId = balanceSheetId(fechaISO);
+export async function escribirBalanceMensual(filas, fechaISO, { spreadsheetId = balanceSheetId(fechaISO) } = {}) {
   const tab = tabDestinoBalance();
 
   const dataRows = filasAMatriz(filas).map((r) => r.map(celdaSegura));

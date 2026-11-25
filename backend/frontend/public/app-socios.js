@@ -484,6 +484,53 @@ async function cargar(ev, { mantenerConfigAbierta = false } = {}) {
   }
 }
 
+// --- Planilla del balance de cada mes ---
+
+function nombreMes(iso) {
+  const [y, m] = String(iso).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+async function cargarPlanillas() {
+  let planillas;
+  try {
+    ({ planillas } = await api("/api/socios/planillas"));
+  } catch {
+    return;
+  }
+  const tabla = document.getElementById("tablaPlanillas");
+  tabla.innerHTML = planillas.length
+    ? `<thead><tr><th>Mes</th><th>Planilla</th><th>Actualizada</th><th></th></tr></thead><tbody>${
+        planillas.map((p) => `<tr>
+          <td>${escapeHtml(nombreMes(p.mes))}</td>
+          <td><a href="https://docs.google.com/spreadsheets/d/${encodeURIComponent(p.balance_id)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.titulo || p.balance_id)}</a>${
+            p.distinta_del_entorno ? `<span class="socios-aviso">BALANCE_DEF_SHEETS del servidor nombra otra planilla para este mes; se usa esta.</span>` : ""}</td>
+          <td class="note">${p.actualizado_por ? `${escapeHtml(p.actualizado_por)} · ${fechaHora(p.updated_at)}` : "del historial del scraper"}</td>
+          <td><button class="btn btn-ghost btn-small" type="button" data-mes="${escapeHtml(p.mes.slice(0, 7))}" data-id="${escapeHtml(p.balance_id)}">Cambiar</button></td>
+        </tr>`).join("")}</tbody>`
+    : `<tbody><tr><td class="note">Todavía no hay planillas cargadas.</td></tr></tbody>`;
+}
+
+async function guardarPlanilla(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById("btnGuardarPlanilla");
+  btn.disabled = true;
+  try {
+    const r = await api("/api/socios/planillas", {
+      method: "PUT",
+      body: { mes: document.getElementById("planillaMes").value, balance_id: document.getElementById("planillaId").value },
+      timeout: 30000
+    });
+    toast("Planilla guardada", `${nombreMes(r.mes)}: ${r.titulo}`, "success");
+    document.getElementById("planillaId").value = "";
+    cargarPlanillas();
+  } catch (e) {
+    toast("Error", e.message || "No se pudo guardar la planilla", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // --- Pedidos al scraper (traer un rango de fechas) ---
 
 const QUE_PEDIDO = { todo: "Netwin y pagos", netwin: "Solo netwin", pagos: "Solo pagos" };
@@ -605,6 +652,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (b) cancelarPedido(b.dataset.cancelar);
   });
   cargarPedidos();
+  document.getElementById("planillaMes").value = document.getElementById("mes").value;
+  document.getElementById("formPlanilla").addEventListener("submit", guardarPlanilla);
+  document.getElementById("tablaPlanillas").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-mes]");
+    if (!b) return;
+    document.getElementById("planillaMes").value = b.dataset.mes;
+    document.getElementById("planillaId").value = b.dataset.id;
+    document.getElementById("planillaId").focus();
+  });
+  cargarPlanillas();
   document.getElementById("tablaConfig").addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-guardar]");
     if (btn) guardarSocio(btn);
