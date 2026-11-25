@@ -3,8 +3,9 @@ import { pool, query } from "../config/db.js";
 import { auth, requireAdminOrDireccion } from "../middleware/auth.js";
 import { auditLog } from "../utils/audit.js";
 import { calcularReparto, controlNetwin, mesValido, validarConfigPanel, validarSocioMes } from "../services/socios.js";
-import { calcularBloques, costosFijosPorCategoria, guardarResumenBanco, validarCostosFijos } from "../services/sociosBloques.js";
-import { leerBalanceMensual, tituloPlanilla } from "../services/sheetsBalance.js";
+import { ETIQUETA_RETIRO, calcularBloques, costosFijosPorCategoria, guardarResumenBanco, rangoMes, validarCostosFijos } from "../services/sociosBloques.js";
+import { leerBalanceMensual, leerRango, tituloPlanilla } from "../services/sheetsBalance.js";
+import { RANGO_TRAZABILIDAD, TAB_TRAZABILIDAD, compararBanco, compararPagos, compararPlanilla, leerTrazabilidad, retirosBancoPorDia } from "../services/auditoria.js";
 import { balanceIdDelMes, extraerIdPlanilla, idDelEntorno } from "../services/planillasMes.js";
 import { cotizacionEnVivo } from "../services/cotizacion.js";
 import { validarPedido } from "../services/scraperPedidos.js";
@@ -76,106 +77,110 @@ async function bancoDelMes(inicio) {
   };
 }
 
+// Todo lo que muestra la pantalla Socios para un mes (también lo usa la auditoría).
+async function datosReparto(mes) {
+  const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes, anterior, diario] = await Promise.all([
+    query(`SELECT id, nombre, tipo, orden, is_active FROM paneles ORDER BY orden, nombre`),
+    query(
+      `SELECT panel_id,
+              SUM(netwin)::float8 AS netwin, SUM(entrada)::float8 AS entrada, SUM(salida)::float8 AS salida,
+              SUM(ops_entrada)::int AS ops_entrada, SUM(ops_salida)::int AS ops_salida,
+              SUM(bonos)::float8 AS bonos, SUM(inversion_publicidad)::float8 AS inversion_publicidad
+         FROM panel_diario
+        WHERE fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month'
+        GROUP BY panel_id`,
+      [mes.inicio]
+    ),
+    query(
+      `SELECT COUNT(DISTINCT fecha)::int AS dias, MAX(fecha)::text AS ultima, MAX(updated_at) AS actualizado
+         FROM panel_diario
+        WHERE fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month'`,
+      [mes.inicio]
+    ),
+    configsDelMes(mes.inicio),
+    socioMesDe(mes.inicio),
+    egresosPorEtiqueta(mes.inicio),
+    query(`SELECT etiqueta, categoria FROM costos_fijos_etiquetas ORDER BY categoria, etiqueta`),
+    bancoDelMes(mes.inicio),
+    // Netwin de los paneles de control del mes pasado (para el costo real de fichas).
+    query(
+      `SELECT p.nombre, SUM(d.netwin)::float8 AS netwin
+         FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
+        WHERE p.tipo = 'control'
+          AND d.fecha >= $1::date - INTERVAL '1 month' AND d.fecha < $1::date
+        GROUP BY p.nombre`,
+      [mes.inicio]
+    ),
+    query(
+      `SELECT d.fecha::text AS fecha, p.tipo, p.nombre, d.netwin::float8 AS netwin
+         FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
+        WHERE d.fecha >= $1::date AND d.fecha < $1::date + INTERVAL '1 month'`,
+      [mes.inicio]
+    )
+  ]);
+
+  const porPanel = {};
+  for (const row of totales.rows) porPanel[row.panel_id] = row;
+
+  const control = Object.fromEntries(anterior.rows.map((r) => [r.nombre, r.netwin]));
+  const netwinAnterior = control.ADMIN === undefined ? null : { admin: control.ADMIN, agentemc: control.AGENTEMC ?? 0 };
+  const banco = bancoRes.banco;
+  const pctCefReal = banco && Number(banco.depositos) > 0 ? Number(banco.iva) / Number(banco.depositos) : null;
+  // Sin cotización cargada para el mes se usa la de CriptoYa en vivo.
+  const enVivo = socioMes.cotizacion === null ? await cotizacionEnVivo() : null;
+  const socioMesCalculo = enVivo ? { ...socioMes, cotizacion: enVivo.valor } : socioMes;
+  const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes: socioMesCalculo, netwinAnterior, pctCefReal });
+  const fijos = costosFijosPorCategoria(egresos, asignaciones.rows, reparto.resumen.cotizacion);
+  const bloques = calcularBloques({ reparto, banco: bancoRes.banco, fijos });
+
+  const configLista = paneles.rows
+    .filter((p) => p.tipo === "socio")
+    .map((p) => {
+      const c = configs[p.id];
+      return {
+        panel_id: p.id,
+        nombre: p.nombre,
+        is_active: p.is_active,
+        heredada: c ? Boolean(c.heredada) : true,
+        nexo_panel_id: c?.nexo_panel_id ?? null,
+        pct_ggr_socio: Number(c?.pct_ggr_socio ?? 0.5),
+        pct_ggr_casa: Number(c?.pct_ggr_casa ?? 0.5),
+        pct_ggr_nexo: Number(c?.pct_ggr_nexo ?? 0),
+        pct_costos_socio: Number(c?.pct_costos_socio ?? 0.5),
+        pct_costos_casa: Number(c?.pct_costos_casa ?? 0.5),
+        pct_costos_nexo: Number(c?.pct_costos_nexo ?? 0),
+        empleados: Number(c?.empleados ?? 0),
+        costo_estructura: [1, 2, 3, 4, 5].map((i) => Number(c?.[`costo_estructura_s${i}`] ?? 0))
+      };
+    });
+
+  return {
+    mes: `${mes.anio}-${String(mes.mes).padStart(2, "0")}`,
+    datos: dias.rows[0],
+    socio_mes: {
+      factura_usd: socioMes.factura_usd === null ? null : Number(socioMes.factura_usd),
+      cotizacion: socioMes.cotizacion === null ? null : Number(socioMes.cotizacion),
+      pct_fichas_pactado: Number(socioMes.pct_fichas_pactado),
+      pct_cef_socio: Number(socioMes.pct_cef_socio),
+      heredado: socioMes.heredado,
+      cotizacion_en_vivo: enVivo
+    },
+    config: configLista,
+    costos_fijos_etiquetas: asignaciones.rows,
+    bloques,
+    banco: bancoRes.banco,
+    aviso_banco: bancoRes.aviso,
+    usd_sin_cotizacion: fijos.usd_sin_cotizacion,
+    control_netwin: controlNetwin(diario.rows, { pctFichasReal: reparto.resumen.pct_fichas_real }),
+    ...reparto
+  };
+}
+
 router.get("/reparto", async (req, res) => {
   const mes = mesValido(req.query.mes);
   if (!mes) return res.status(400).json({ message: "mes inválido (formato AAAA-MM)" });
-
   try {
-    const [paneles, totales, dias, configs, socioMes, egresos, asignaciones, bancoRes, anterior, diario] = await Promise.all([
-      query(`SELECT id, nombre, tipo, orden, is_active FROM paneles ORDER BY orden, nombre`),
-      query(
-        `SELECT panel_id,
-                SUM(netwin)::float8 AS netwin, SUM(entrada)::float8 AS entrada, SUM(salida)::float8 AS salida,
-                SUM(ops_entrada)::int AS ops_entrada, SUM(ops_salida)::int AS ops_salida,
-                SUM(bonos)::float8 AS bonos, SUM(inversion_publicidad)::float8 AS inversion_publicidad
-           FROM panel_diario
-          WHERE fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month'
-          GROUP BY panel_id`,
-        [mes.inicio]
-      ),
-      query(
-        `SELECT COUNT(DISTINCT fecha)::int AS dias, MAX(fecha)::text AS ultima, MAX(updated_at) AS actualizado
-           FROM panel_diario
-          WHERE fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month'`,
-        [mes.inicio]
-      ),
-      configsDelMes(mes.inicio),
-      socioMesDe(mes.inicio),
-      egresosPorEtiqueta(mes.inicio),
-      query(`SELECT etiqueta, categoria FROM costos_fijos_etiquetas ORDER BY categoria, etiqueta`),
-      bancoDelMes(mes.inicio),
-      // Netwin de los paneles de control del mes pasado (para el costo real de fichas).
-      query(
-        `SELECT p.nombre, SUM(d.netwin)::float8 AS netwin
-           FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
-          WHERE p.tipo = 'control'
-            AND d.fecha >= $1::date - INTERVAL '1 month' AND d.fecha < $1::date
-          GROUP BY p.nombre`,
-        [mes.inicio]
-      ),
-      query(
-        `SELECT d.fecha::text AS fecha, p.tipo, p.nombre, d.netwin::float8 AS netwin
-           FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
-          WHERE d.fecha >= $1::date AND d.fecha < $1::date + INTERVAL '1 month'`,
-        [mes.inicio]
-      )
-    ]);
-
-    const porPanel = {};
-    for (const row of totales.rows) porPanel[row.panel_id] = row;
-
-    const control = Object.fromEntries(anterior.rows.map((r) => [r.nombre, r.netwin]));
-    const netwinAnterior = control.ADMIN === undefined ? null : { admin: control.ADMIN, agentemc: control.AGENTEMC ?? 0 };
-    const banco = bancoRes.banco;
-    const pctCefReal = banco && Number(banco.depositos) > 0 ? Number(banco.iva) / Number(banco.depositos) : null;
-    // Sin cotización cargada para el mes se usa la de CriptoYa en vivo.
-    const enVivo = socioMes.cotizacion === null ? await cotizacionEnVivo() : null;
-    const socioMesCalculo = enVivo ? { ...socioMes, cotizacion: enVivo.valor } : socioMes;
-    const reparto = calcularReparto({ paneles: paneles.rows, totales: porPanel, configs, socioMes: socioMesCalculo, netwinAnterior, pctCefReal });
-    const fijos = costosFijosPorCategoria(egresos, asignaciones.rows, reparto.resumen.cotizacion);
-    const bloques = calcularBloques({ reparto, banco: bancoRes.banco, fijos });
-
-    const configLista = paneles.rows
-      .filter((p) => p.tipo === "socio")
-      .map((p) => {
-        const c = configs[p.id];
-        return {
-          panel_id: p.id,
-          nombre: p.nombre,
-          is_active: p.is_active,
-          heredada: c ? Boolean(c.heredada) : true,
-          nexo_panel_id: c?.nexo_panel_id ?? null,
-          pct_ggr_socio: Number(c?.pct_ggr_socio ?? 0.5),
-          pct_ggr_casa: Number(c?.pct_ggr_casa ?? 0.5),
-          pct_ggr_nexo: Number(c?.pct_ggr_nexo ?? 0),
-          pct_costos_socio: Number(c?.pct_costos_socio ?? 0.5),
-          pct_costos_casa: Number(c?.pct_costos_casa ?? 0.5),
-          pct_costos_nexo: Number(c?.pct_costos_nexo ?? 0),
-          empleados: Number(c?.empleados ?? 0),
-          costo_estructura: [1, 2, 3, 4, 5].map((i) => Number(c?.[`costo_estructura_s${i}`] ?? 0))
-        };
-      });
-
-    return res.json({
-      mes: `${mes.anio}-${String(mes.mes).padStart(2, "0")}`,
-      datos: dias.rows[0],
-      socio_mes: {
-        factura_usd: socioMes.factura_usd === null ? null : Number(socioMes.factura_usd),
-        cotizacion: socioMes.cotizacion === null ? null : Number(socioMes.cotizacion),
-        pct_fichas_pactado: Number(socioMes.pct_fichas_pactado),
-        pct_cef_socio: Number(socioMes.pct_cef_socio),
-        heredado: socioMes.heredado,
-        cotizacion_en_vivo: enVivo
-      },
-      config: configLista,
-      costos_fijos_etiquetas: asignaciones.rows,
-      bloques,
-      banco: bancoRes.banco,
-      aviso_banco: bancoRes.aviso,
-      usd_sin_cotizacion: fijos.usd_sin_cotizacion,
-      control_netwin: controlNetwin(diario.rows, { pctFichasReal: reparto.resumen.pct_fichas_real }),
-      ...reparto
-    });
+    return res.json(await datosReparto(mes));
   } catch (error) {
     console.error("❌ Error armando el reparto de socios:", error);
     return res.status(500).json({ message: "Error armando el reparto de socios" });
@@ -285,6 +290,71 @@ router.put("/costos-fijos", async (req, res) => {
     return res.status(500).json({ message: "Error guardando las etiquetas de costos fijos" });
   } finally {
     client.release();
+  }
+});
+
+// --- Auditoría del mes ---
+// Lee la planilla del mes (trazabilidad y balance bancario) y la compara con
+// lo que tiene el formulario. Si no se puede leer la planilla, igual devuelve
+// la comparación de pagos contra egresos.
+router.get("/auditoria", async (req, res) => {
+  const mes = mesValido(req.query.mes);
+  if (!mes) return res.status(400).json({ message: "mes inválido (AAAA-MM)" });
+  try {
+    const rango = rangoMes(mes.inicio);
+    const [reparto, spreadsheetId, salidas, premios] = await Promise.all([
+      datosReparto(mes),
+      balanceIdDelMes(query, mes.inicio).catch(() => null),
+      query(
+        `SELECT d.fecha::text AS fecha, SUM(d.salida)::float8 AS salida
+           FROM panel_diario d JOIN paneles p ON p.id = d.panel_id
+          WHERE p.tipo IN ('socio', 'personal')
+            AND d.fecha >= $1::date AND d.fecha < $1::date + INTERVAL '1 month'
+          GROUP BY d.fecha`,
+        [mes.inicio]
+      ),
+      query(
+        `SELECT fecha::text AS fecha, SUM(monto)::float8 AS total
+           FROM egresos
+          WHERE status IS DISTINCT FROM 'anulado'
+            AND COALESCE(tipo_transaccion, 'SALIDA') <> 'ENTRADA'
+            AND COALESCE(moneda, 'ARS') = 'ARS'
+            AND TRIM(etiqueta) = $2
+            AND fecha >= $1::date AND fecha < $1::date + INTERVAL '1 month'
+          GROUP BY fecha`,
+        [mes.inicio, ETIQUETA_RETIRO]
+      )
+    ]);
+
+    const avisos = [];
+    let planilla = null;
+    let banco = null;
+    let bancoPorDia = null;
+    if (!spreadsheetId) {
+      avisos.push("Este mes no tiene planilla del balance cargada: no se puede comparar con la planilla ni con el banco.");
+    } else {
+      const [traza, matriz] = await Promise.allSettled([
+        leerRango(spreadsheetId, RANGO_TRAZABILIDAD),
+        leerBalanceMensual(mes.inicio, { spreadsheetId })
+      ]);
+      if (traza.status === "fulfilled") {
+        planilla = compararPlanilla(leerTrazabilidad(traza.value), reparto);
+      } else {
+        console.error("auditoria trazabilidad:", traza.reason?.message || traza.reason);
+        avisos.push(`No pude leer la hoja "${TAB_TRAZABILIDAD}" de la planilla del mes.`);
+      }
+      if (matriz.status === "fulfilled") {
+        banco = compararBanco(reparto.banco, matriz.value, rango);
+        bancoPorDia = retirosBancoPorDia(matriz.value, rango);
+      } else {
+        avisos.push(matriz.reason?.message || "No pude leer el balance bancario del mes.");
+      }
+    }
+    const pagos = compararPagos(salidas.rows, premios.rows, bancoPorDia);
+    return res.json({ mes: reparto.mes, spreadsheet_id: spreadsheetId, avisos, planilla, banco, pagos });
+  } catch (error) {
+    console.error("❌ Error en la auditoría de socios:", error);
+    return res.status(500).json({ message: "Error armando la auditoría" });
   }
 });
 

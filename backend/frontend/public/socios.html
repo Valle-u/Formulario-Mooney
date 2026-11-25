@@ -51,6 +51,12 @@
     .socios-pedidos .estado-listo { color: #10b981; }
     .socios-pedidos .estado-error { color: #ef4444; }
     .socios-pedidos .estado-cancelado { color: var(--muted); }
+    .socios-pedidos tr.dif td { background: rgba(239, 68, 68, 0.08); }
+    .socios-pedidos tr.total td { font-weight: 700; }
+    .socios-pedidos td.num, .socios-pedidos th.num { text-align: right; }
+    .auditoria-seccion { margin-top: 16px; }
+    .auditoria-ok { color: #10b981; }
+    .auditoria-mal { color: #ef4444; }
     .socios-pedidos a { color: #60a5fa; text-decoration: underline; }
     .socios-subtitulo { margin: 8px 0 4px; font-size: 14px; }
     .socios-tabla thead th.col-nombre { background: var(--card); z-index: 3; }
@@ -279,6 +285,23 @@
             <div class="card-body">
               <div id="avisoBloques" class="note" hidden></div>
               <div id="bloques" class="socios-resumen"></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">Auditoría del mes</div>
+            <div class="card-body">
+              <p class="note">
+                Compara el formulario con la planilla del mes: los datos de cada panel con "Trazabilidad General Mensual",
+                los totales del banco guardados con la hoja "Balance Mensual Bancario" de hoy, y los pagos de los paneles (salida)
+                con los egresos "Premio Pagado" y los retiros del banco de cada día. El CEF y las fichas de la casa no se comparan: se calculan distinto a propósito.
+              </p>
+              <div class="socios-banco" style="margin-top:8px">
+                <span id="estadoAuditoria" class="note"></span>
+                <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="auditoriaTodo"> Ver también lo que coincide</label>
+                <button class="btn btn-ghost btn-small" type="button" id="btnAuditar">Auditar el mes</button>
+              </div>
+              <div id="auditoria"></div>
             </div>
           </section>
 
