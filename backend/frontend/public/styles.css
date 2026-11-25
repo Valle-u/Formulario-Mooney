@@ -2471,6 +2471,9 @@ body {
   }
 
   .app-nosidebar .topbar-inner {
+    /* .topbar es flex en fila: sin ancho fijo, el inner toma el ancho de su
+       contenido y la sidebar "salta" cuando el JS agrega el botón y el usuario. */
+    width: 100%;
     height: 100%;
     max-width: none;
     margin: 0;
