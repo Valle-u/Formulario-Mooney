@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agruparMovimientos, armarFlujoCaja, ingresosArsDesdeBalance, mesAnterior, periodoMes } from "../../src/services/flujoCaja.js";
+import { agruparMovimientos, armarFlujoCaja, entradasArsDesdeBalance, ingresosArsDesdeBalance, mesAnterior, periodoMes, tramosPorMes } from "../../src/services/flujoCaja.js";
 
 test("periodoMes cubre el mes completo, incluido febrero bisiesto", () => {
   assert.deepEqual(periodoMes(2026, 9), { desde: "2026-09-01", hasta: "2026-09-30" });
@@ -145,4 +145,52 @@ test("agrupa los movimientos de una etiqueta y conserva cada uno", () => {
   assert.equal(grupos[0].monto, 945);
   assert.equal(grupos[0].n, 2);
   assert.equal(grupos[0].detalle[1].nota, "viaticos");
+});
+
+test("el export de entradas del balance da una fila por transferencia y respeta la etiqueta", () => {
+  const filas = [
+    ["FechaHora", "ID", "Empresa", "Titular de cuenta", "Tipo de transferencia", "Titular", "Origen", "Importe", "Estado", "Nota", "FECHA", "TURNO ", "Etiqueta"],
+    ["04/10/2026 10:00:00", "A1", "PSP-1", "Cuenta", "Transferencia Entrante", "jugador1", "", "1.500,50", "Succes", "n1", "04/10/2026", "", "[Unidad M] Deposito de cliente"],
+    ["04/10/2026 10:05:00", "A2", "PSP-1", "Cuenta", "Transferencia Entrante", "jugador2", "", "200", "Succes", "", "04/10/2026", "", "Deposito de cliente"],
+    ["04/10/2026 11:00:00", "A3", "PSP-1", "Cuenta", "Transferencia Saliente", "x", "", "200", "", "", "04/10/2026", "", "[Unidad M] Premio Pagado"],
+    ["05/10/2026 12:00:00", "A4", "PSP-2", "Cuenta", "Transferencia Entrante", "x", "", "50", "Rechazada", "", "05/10/2026", "", "Deposito de cliente"],
+    ["06/10/2026 09:00:00", "A5", "PSP-2", "Cuenta", "Transferencia Entrante", "jugador3", "", "300", "", "", "", "", ""],
+    ["07/10/2026 09:00:00", "A6", "PSP-2", "Cuenta", "Transferencia Entrante", "x", "", "0", "", "", "07/10/2026", "", "Deposito de cliente"],
+  ];
+  const entradas = entradasArsDesdeBalance(filas, { desde: "2026-10-01", hasta: "2026-10-31" });
+
+  assert.equal(entradas.length, 3);
+  assert.deepEqual(entradas.map((e) => e.id_transaccion), ["A1", "A2", "A5"]);
+  assert.deepEqual(entradas[0], {
+    fecha: "2026-10-04",
+    hora: "10:00",
+    monto: 1500.5,
+    tipo_transaccion: "ENTRADA",
+    etiqueta: "[Unidad M] Deposito de cliente",
+    usuario: "jugador1",
+    cuenta: "PSP-1",
+    id_transaccion: "A1",
+    estado: "Succes",
+    notas: "n1",
+    moneda: "ARS",
+  });
+  assert.equal(entradas[1].etiqueta, "Deposito de cliente");
+  assert.equal(entradas[2].fecha, "2026-10-06");
+  assert.equal(entradas[2].etiqueta, "");
+
+  const soloEl4 = entradasArsDesdeBalance(filas, { desde: "2026-10-04", hasta: "2026-10-04" });
+  assert.equal(soloEl4.length, 2);
+});
+
+test("tramosPorMes parte el rango por mes calendario", () => {
+  assert.deepEqual(tramosPorMes("2026-10-20", "2026-12-05"), [
+    { desde: "2026-10-20", hasta: "2026-10-31" },
+    { desde: "2026-11-01", hasta: "2026-11-30" },
+    { desde: "2026-12-01", hasta: "2026-12-05" },
+  ]);
+  assert.deepEqual(tramosPorMes("2026-12-30", "2027-01-02"), [
+    { desde: "2026-12-30", hasta: "2026-12-31" },
+    { desde: "2027-01-01", hasta: "2027-01-02" },
+  ]);
+  assert.deepEqual(tramosPorMes("2026-11-10", "2026-11-10"), [{ desde: "2026-11-10", hasta: "2026-11-10" }]);
 });

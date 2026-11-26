@@ -5,10 +5,26 @@ import { getLegacyEquivalentes } from "../utils/optionsCache.js";
 import { toCSV, withBOM } from "../utils/csv.js";
 import { montoToCommaString } from "../utils/validators.js";
 import { auditLog } from "../utils/audit.js";
+import { entradasArsDesdeBalance, tramosPorMes } from "../services/flujoCaja.js";
+import { leerBalanceMensual } from "../services/sheetsBalance.js";
+import { balanceIdDelMes } from "../services/planillasMes.js";
 
 const router = express.Router();
 
 const EXPORT_MAX_LIMIT = 500;
+const ENTRADAS_MAX_MESES = 12;
+
+function fechaIsoValida(texto) {
+  const m = String(texto || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.toISOString().slice(0, 10) === texto;
+}
+
+function hoyArgentina() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date());
+}
+
 
 function formatFechaDDMMAAAA(fecha) {
   if (!fecha) return null;
@@ -228,6 +244,79 @@ router.get("/egresos", apiKeyAuth, requireApiScope("export:egresos"), async (req
   } catch (error) {
     console.error("🔥 GET /api/export/egresos ERROR:", error);
     return res.status(500).json({ message: "Error exportando egresos" });
+  }
+});
+
+// Entradas en ARS de la hoja "Balance Mensual Bancario": una transferencia, una fila.
+// Solo lectura: no escribe en la hoja.
+router.get("/entradas-balance", apiKeyAuth, requireApiScope("export:egresos"), async (req, res) => {
+  try {
+    const hoy = hoyArgentina();
+    let hasta = req.query.fecha_hasta ? String(req.query.fecha_hasta) : null;
+    let desde = req.query.fecha_desde ? String(req.query.fecha_desde) : null;
+    if ((desde && !fechaIsoValida(desde)) || (hasta && !fechaIsoValida(hasta))) {
+      return res.status(400).json({ message: "fecha_desde y fecha_hasta van en formato YYYY-MM-DD" });
+    }
+    if (!hasta) hasta = desde && desde > hoy ? desde : hoy;
+    if (!desde) desde = `${hasta.slice(0, 7)}-01`;
+    if (desde > hasta) {
+      return res.status(400).json({ message: "fecha_desde no puede ser posterior a fecha_hasta" });
+    }
+    const tramos = tramosPorMes(desde, hasta);
+    if (tramos.length > ENTRADAS_MAX_MESES) {
+      return res.status(400).json({ message: `El rango no puede cruzar más de ${ENTRADAS_MAX_MESES} meses` });
+    }
+
+    const lim = Math.min(Math.max(Number(req.query.limit || 100), 1), EXPORT_MAX_LIMIT);
+    const off = Math.max(Number(req.query.offset || 0), 0);
+
+    const todas = [];
+    for (const tramo of tramos) {
+      let matriz;
+      try {
+        const spreadsheetId = await balanceIdDelMes(query, tramo.desde);
+        matriz = await leerBalanceMensual(tramo.desde, { spreadsheetId });
+      } catch (e) {
+        console.error("export entradas-balance:", tramo.desde.slice(0, 7), e?.message || e);
+        return res.status(500).json({ message: `No pude leer el balance de ${tramo.desde.slice(0, 7)}` });
+      }
+      todas.push(...entradasArsDesdeBalance(matriz, tramo));
+    }
+
+    // Más nuevas primero, como egresos. Orden estable para que el offset no repita filas.
+    todas.sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+    const total = todas.length;
+    const entradas = todas.slice(off, off + lim).map(({ hora, ...fila }) => ({
+      ...fila,
+      fecha: formatFechaDDMMAAAA(fila.fecha),
+    }));
+
+    await auditLog(req, {
+      action: "API_EXPORT_ENTRADAS_BALANCE",
+      entity: "balance_mensual",
+      success: true,
+      status_code: 200,
+      details: {
+        api_key_id: req.apiKey.id,
+        api_key_name: req.apiKey.name,
+        rows: entradas.length,
+        total,
+        filters: { fecha_desde: desde, fecha_hasta: hasta, limit: lim, offset: off }
+      }
+    });
+
+    return res.json({
+      entradas,
+      pagination: {
+        total,
+        limit: lim,
+        offset: off,
+        hasMore: off + lim < total
+      }
+    });
+  } catch (error) {
+    console.error("🔥 GET /api/export/entradas-balance ERROR:", error);
+    return res.status(500).json({ message: "Error exportando entradas del balance" });
   }
 });
 

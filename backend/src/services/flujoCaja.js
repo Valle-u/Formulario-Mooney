@@ -11,6 +11,23 @@ export function periodoMes(anio, mes) {
   return { desde, hasta };
 }
 
+// Tramos por mes calendario dentro de [desde, hasta]: cada uno se lee de la planilla de su mes.
+export function tramosPorMes(desde, hasta) {
+  const tramos = [];
+  let [y, m] = String(desde).split("-").map(Number);
+  while (true) {
+    const mes = periodoMes(y, m);
+    if (mes.desde > hasta) break;
+    tramos.push({
+      desde: mes.desde < desde ? desde : mes.desde,
+      hasta: mes.hasta > hasta ? hasta : mes.hasta,
+    });
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return tramos;
+}
+
 /** Mes calendario anterior al inicio del período (el 1/10 devuelve septiembre). */
 export function mesAnterior(desde) {
   const [y, m] = String(desde).split("-").map(Number);
@@ -209,22 +226,60 @@ function esRechazada(estado, etiqueta) {
 }
 
 /**
+ * Criterio único de "fila entrante" del balance mensual (lo usan el flujo de caja
+ * y el export). Devuelve la fecha ISO y los centavos, o null si la fila no cuenta.
+ * Columnas: 0 FechaHora, 4 Tipo, 7 Importe (centavos), 8 Estado, 10 FECHA, 12 Etiqueta.
+ */
+function entranteDelBalance(row, { desde, hasta }) {
+  if (!Array.isArray(row) || row.length < 8) return null;
+  if (!normText(row[4]).includes("entrante")) return null;
+  const etiquetaRaw = String(row[12] ?? "").trim();
+  if (esRechazada(row[8], etiquetaRaw)) return null;
+  const fecha = fechaIso(row[10]) || fechaIso(row[0]);
+  if (!fecha || fecha < desde || fecha > hasta) return null;
+  const cents = parseMonto(row[7]);
+  if (cents == null) return null;
+  return { fecha, cents, etiquetaRaw };
+}
+
+/**
+ * Entradas ARS del balance, una fila por transferencia (sin agrupar), para el export.
+ * La etiqueta sale tal cual está en la columna 12.
+ */
+export function entradasArsDesdeBalance(matriz, { desde, hasta }) {
+  const out = [];
+  for (const row of matriz || []) {
+    const ok = entranteDelBalance(row, { desde, hasta });
+    if (!ok) continue;
+    const monto = redondear(ok.cents / 100);
+    if (!(monto > 0)) continue;
+    out.push({
+      fecha: ok.fecha,
+      hora: horaDe(row[0]),
+      monto,
+      tipo_transaccion: "ENTRADA",
+      etiqueta: ok.etiquetaRaw,
+      usuario: String(row[5] ?? "").trim(),
+      cuenta: String(row[2] ?? "").trim(),
+      id_transaccion: String(row[1] ?? "").trim(),
+      estado: String(row[8] ?? "").trim(),
+      notas: String(row[9] ?? "").trim(),
+      moneda: "ARS",
+    });
+  }
+  return out;
+}
+
+/**
  * Ingresos ARS del balance mensual ya etiquetado.
  * Cada fila es una transferencia entrante cargada desde el CSV del banco.
- * Columnas: 0 FechaHora, 4 Tipo, 7 Importe, 8 Estado, 10 FECHA, 12 Etiqueta.
  */
 export function ingresosArsDesdeBalance(matriz, { desde, hasta }) {
   const grupos = new Map();
   for (const row of matriz || []) {
-    if (!Array.isArray(row) || row.length < 8) continue;
-    const tipo = normText(row[4]);
-    if (!tipo.includes("entrante")) continue;
-    const etiquetaRaw = String(row[12] ?? "").trim();
-    if (esRechazada(row[8], etiquetaRaw)) continue;
-    const fecha = fechaIso(row[10]) || fechaIso(row[0]);
-    if (!fecha || fecha < desde || fecha > hasta) continue;
-    const cents = parseMonto(row[7]);
-    if (cents == null) continue;
+    const ok = entranteDelBalance(row, { desde, hasta });
+    if (!ok) continue;
+    const { fecha, cents, etiquetaRaw } = ok;
     const etiqueta = etiquetaRaw || "(sin etiqueta)";
     const key = `${etiqueta}|${fecha}`;
     if (!grupos.has(key)) {
