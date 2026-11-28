@@ -40,7 +40,7 @@ function celdaLado(moneda, monto, clase) {
 }
 
 function textoMovimiento(mov) {
-  return [mov.hora, mov.empresa, mov.quien, mov.id ? `ID ${mov.id}` : "", mov.nota]
+  return [mov.fecha ? fechaCorta(mov.fecha) : "", mov.hora, mov.empresa, mov.quien, mov.id ? `ID ${mov.id}` : "", mov.nota]
     .map((parte) => String(parte || "").trim())
     .filter(Boolean)
     .join(" · ");
@@ -64,13 +64,28 @@ function listaMovimientos(moneda, detalle) {
   </table>`;
 }
 
-function filaEtiqueta(moneda, fila, idDetalle) {
+// Movimientos de una etiqueta en todo el mes, juntados desde el detalle de cada día.
+function movimientosDelMes(flujo, etiqueta) {
+  const movs = [];
+  for (const dia of flujo.por_dia || []) {
+    for (const et of dia.etiquetas || []) {
+      if (et.etiqueta !== etiqueta || !Array.isArray(et.detalle)) continue;
+      for (const mov of et.detalle) movs.push({ ...mov, fecha: dia.fecha });
+    }
+  }
+  return movs;
+}
+
+function filaEtiqueta(moneda, fila, idDetalle, mensual) {
   const nombre = idDetalle
     ? `<button type="button" class="flujo-dia-btn" aria-expanded="false" aria-controls="${idDetalle}">${escapeHtml(fila.etiqueta)}</button>`
     : escapeHtml(fila.etiqueta);
-  const detalle = idDetalle
-    ? `<tr id="${idDetalle}" class="flujo-dia-detalle" hidden><td colspan="4">${listaMovimientos(moneda, fila.detalle)}</td></tr>`
-    : "";
+  // El desglose mensual se arma recién al tocar la etiqueta: puede tener miles de filas.
+  const detalle = !idDetalle
+    ? ""
+    : mensual
+      ? `<tr id="${idDetalle}" class="flujo-dia-detalle" data-moneda="${moneda}" data-pendiente="1" hidden><td colspan="4"></td></tr>`
+      : `<tr id="${idDetalle}" class="flujo-dia-detalle" hidden><td colspan="4">${listaMovimientos(moneda, fila.detalle)}</td></tr>`;
   return `<tr>
     <td>${nombre}</td>
     ${celdaLado(moneda, fila.entro, "num-pos")}
@@ -83,7 +98,9 @@ function tablaEtiquetas(moneda, filas, fecha) {
   if (!filas.length) return `<p class="flujo-vacio">Sin movimientos en este mes.</p>`;
   return `<div class="table-wrap"><table class="table">
     <thead><tr><th>Etiqueta</th><th>Entró</th><th>Salió</th><th>Movimientos</th></tr></thead>
-    <tbody>${filas.map((f, i) => filaEtiqueta(moneda, f, fecha ? `et-${moneda}-${fecha}-${i}` : "")).join("")}</tbody>
+    <tbody>${filas.map((f, i) => (fecha
+      ? filaEtiqueta(moneda, f, `et-${moneda}-${fecha}-${i}`)
+      : filaEtiqueta(moneda, f, `etm-${moneda}-${i}`, true))).join("")}</tbody>
   </table></div>`;
 }
 
@@ -153,6 +170,7 @@ function bloque(moneda, flujo, fechaInicio) {
       ${alertaRedireccion(moneda, flujo)}
       ${cierreHtml(moneda, flujo)}
       <h3 style="margin:0 0 8px">Por etiqueta</h3>
+      <p class="note">Tocá una etiqueta para ver todos sus movimientos del mes.</p>
       ${tablaEtiquetas(moneda, flujo.por_etiqueta)}
       ${diasHtml(moneda, flujo.por_dia)}
     </div>
@@ -213,6 +231,15 @@ function render(data, guardado) {
     btn.addEventListener("click", () => {
       const fila = document.getElementById(btn.getAttribute("aria-controls"));
       if (!fila) return;
+      if (fila.dataset.pendiente === "1") {
+        const moneda = fila.dataset.moneda;
+        const indice = Number(fila.id.split("-").pop());
+        const etiqueta = data.flujos[moneda]?.por_etiqueta?.[indice]?.etiqueta;
+        const movs = movimientosDelMes(data.flujos[moneda] || {}, etiqueta)
+          .sort((a, b) => `${a.fecha} ${a.hora || ""}`.localeCompare(`${b.fecha} ${b.hora || ""}`));
+        fila.firstElementChild.innerHTML = listaMovimientos(moneda, movs);
+        delete fila.dataset.pendiente;
+      }
       const abierto = fila.hidden;
       fila.hidden = !abierto;
       btn.setAttribute("aria-expanded", String(abierto));
