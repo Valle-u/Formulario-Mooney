@@ -63,6 +63,7 @@ router.get("/", auth, requireConciliador, async (req, res) => {
       ultimosCierres("fecha >= $1::date AND fecha <= $2::date", [desde, hasta]),
       query(
         `SELECT
+            id AS egreso_id,
             COALESCE(moneda, 'ARS') AS moneda,
             CASE
               WHEN NULLIF(TRIM(etiqueta), '') IS NULL THEN '(sin etiqueta)'

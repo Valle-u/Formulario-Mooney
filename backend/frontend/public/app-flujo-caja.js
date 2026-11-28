@@ -1,5 +1,5 @@
 const ROLES_FLUJO = new Set(["admin", "direccion"]);
-const CACHE_KEY = "mooney-flujo-caja-v2";
+const CACHE_KEY = "mooney-flujo-caja-v3";
 
 const NOTAS = {
   ARS: "El ingreso sale del balance mensual etiquetado al cargar el CSV. Las salidas y los cierres salen de este formulario. Quedó es inicio + entró − salió.",
@@ -53,8 +53,13 @@ function listaMovimientos(moneda, detalle) {
   if (!detalle.length) return `<p class="flujo-vacio">Sin movimientos.</p>`;
   const filas = detalle.map((mov) => {
     const clase = String(mov.tipo).toUpperCase() === "ENTRADA" ? "num-pos" : "num-neg";
+    const texto = escapeHtml(textoMovimiento(mov) || "Movimiento");
+    // Solo los movimientos del formulario tienen egreso para abrir; los del balance bancario no.
+    const celda = Number(mov.egreso_id) > 0
+      ? `<button type="button" class="flujo-dia-btn flujo-mov-btn" data-egreso-id="${Number(mov.egreso_id)}">${texto}</button>`
+      : texto;
     return `<tr>
-      <td>${escapeHtml(textoMovimiento(mov) || "Movimiento")}</td>
+      <td>${celda}</td>
       <td class="${clase}">${formato(moneda, mov.monto)}</td>
     </tr>`;
   }).join("");
@@ -227,7 +232,7 @@ function render(data, guardado) {
     }
   }
   document.getElementById("flujoEstado").textContent = `Período ${desde} al ${hasta}. ${origen}${extra}`;
-  root.querySelectorAll(".flujo-dia-btn").forEach((btn) => {
+  root.querySelectorAll(".flujo-dia-btn:not(.flujo-mov-btn)").forEach((btn) => {
     btn.addEventListener("click", () => {
       const fila = document.getElementById(btn.getAttribute("aria-controls"));
       if (!fila) return;
@@ -245,6 +250,22 @@ function render(data, guardado) {
       btn.setAttribute("aria-expanded", String(abierto));
     });
   });
+}
+
+// Abre el mismo modal de "Detalle de transferencia" del Historial (mostrarDetalle vive en app-historial.js).
+async function abrirEgreso(id) {
+  if (!id) return;
+  try {
+    const { egresos } = await api(`/api/egresos?id=${id}&limit=1`);
+    const egreso = (egresos || []).find((e) => Number(e.id) === id);
+    if (!egreso) {
+      toast("Movimiento", "No encontré ese egreso", "warning");
+      return;
+    }
+    mostrarDetalle(egreso);
+  } catch (err) {
+    toast("Movimiento", err.message || "No pude abrir el egreso", "error");
+  }
 }
 
 async function cargar(ev) {
@@ -279,6 +300,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const mes = document.getElementById("mes");
   mes.value = mesActual();
   document.getElementById("flujoForm").addEventListener("submit", cargar);
+  document.getElementById("flujoResultado").addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".flujo-mov-btn");
+    if (btn) abrirEgreso(Number(btn.dataset.egresoId));
+  });
+  document.getElementById("btnCerrarModal")?.addEventListener("click", cerrarModal);
+  document.getElementById("detalleModalBackdrop")?.addEventListener("click", cerrarModal);
   if (!ROLES_FLUJO.has(getUser().role)) {
     window.location.replace("egreso.html");
     return;
