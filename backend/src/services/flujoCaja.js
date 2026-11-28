@@ -203,6 +203,7 @@ export function agruparMovimientos(filas) {
       quien: String(fila.quien || "").trim(),
       id: String(fila.id_transferencia || "").trim(),
       nota: String(fila.nota || "").trim(),
+      egreso_id: Number(fila.egreso_id) || null,
     });
   }
   return [...grupos.values()];

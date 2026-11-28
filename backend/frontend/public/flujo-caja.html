@@ -56,6 +56,8 @@
     .flujo-dia-btn[aria-expanded="true"] { font-weight: 700; }
     .flujo-dia-detalle td { padding-top: 4px; background: rgba(255,255,255,.03); }
     .flujo-movs { margin: 4px 0 8px; }
+    .flujo-mov-btn { text-align: left; text-decoration: none; }
+    .flujo-mov-btn:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -140,8 +142,21 @@
         <div id="flujoResultado" class="flujo-bloques" style="display:none"></div>
       </div>
     </main>
+
+    <!-- MODAL DETALLE (mismo que Historial, lo arma app-historial.js) -->
+    <div id="detalleModal" class="modal" style="display: none;">
+      <div class="modal-backdrop" id="detalleModalBackdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Detalle de transferencia</h3>
+          <button id="btnCerrarModal" class="btn-close" type="button">X</button>
+        </div>
+        <div id="detalleBody" style="padding: 20px 24px;"></div>
+      </div>
+    </div>
   </div>
   <script src="app-shared.js?v=AUTO"></script>
+  <script src="app-historial.js?v=AUTO"></script>
   <script src="app-flujo-caja.js?v=AUTO"></script>
 </body>
 </html>
